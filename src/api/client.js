@@ -44,14 +44,19 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.getToken()}`;
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    let response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+      });
+    } catch (error) {
+      throw new Error('API unreachable. Please check if the backend server is running.');
+    }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || error.message || 'Request failed');
+      throw new Error(error.error || error.message || `Request failed with status ${response.status}`);
     }
 
     return response.json();

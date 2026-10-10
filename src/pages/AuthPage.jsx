@@ -457,7 +457,8 @@ function AuthPage() {
       return
     }
 
-    // Fallback to localStorage-based login (existing code)
+    // Feature flag disabled - use localStorage only
+    // NOTE: This path should only be used when VITE_USE_API=false
     const dravyagunaUsers = getDravyagunaUsers()
     const herbUsers = getHerbUsers()
 
