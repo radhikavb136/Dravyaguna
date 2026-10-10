@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { login as apiLogin, register as apiRegister, setCurrentUser } from "../api/auth"
+import { USE_API } from "../api/client"
 import "../styles/AuthPage.css"
 
 function AuthPage() {
@@ -163,7 +165,7 @@ function AuthPage() {
   // SIGN UP
   // =========================================
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     if (
       !fullName.trim() ||
       !email.trim() ||
@@ -194,10 +196,28 @@ function AuthPage() {
     const cleanEmail =
       email.trim().toLowerCase()
 
-    // =========================================
-    // CHECK DRAVYAGUNA USERS
-    // =========================================
+    // Use API if feature flag is enabled
+    if (USE_API) {
+      try {
+        const displayRole = getDisplayRole(selectedRole)
+        await apiRegister(cleanEmail, password, fullName.trim(), displayRole)
+        
+        alert(
+          "Account created successfully! You can now log in."
+        )
 
+        setEmail(cleanEmail)
+        setPassword(password)
+        setConfirmPassword("")
+        setIsLogin(true)
+        setRememberMe(true)
+      } catch (error) {
+        alert(error.message || "Registration failed. Please try again.")
+      }
+      return
+    }
+
+    // Fallback to localStorage-based registration (existing code)
     const dravyagunaUsers =
       getDravyagunaUsers()
 
@@ -220,10 +240,6 @@ function AuthPage() {
 
       return
     }
-
-    // =========================================
-    // CHECK HERB USERS
-    // =========================================
 
     const herbUsers =
       getHerbUsers()
@@ -248,10 +264,6 @@ function AuthPage() {
       return
     }
 
-    // =========================================
-    // CREATE USER
-    // =========================================
-
     const roleForManagement =
       getDisplayRole(selectedRole)
 
@@ -267,10 +279,6 @@ function AuthPage() {
 
     const now =
       new Date().toISOString()
-
-    // =========================================
-    // CREATE USER FOR ADMIN MANAGEMENT
-    // =========================================
 
     const newManagementUser = {
       id:
@@ -313,10 +321,6 @@ function AuthPage() {
         now,
     }
 
-    // =========================================
-    // SAVE TO DRAVYAGUNA USERS
-    // =========================================
-
     const updatedDravyagunaUsers = [
       ...dravyagunaUsers,
       newManagementUser,
@@ -328,10 +332,6 @@ function AuthPage() {
         updatedDravyagunaUsers
       )
     )
-
-    // =========================================
-    // ALSO SAVE TO HERB USERS
-    // =========================================
 
     const newHerbUser = {
       fullName:
@@ -367,20 +367,12 @@ function AuthPage() {
       )
     )
 
-    // =========================================
-    // CURRENT USER
-    // =========================================
-
     localStorage.setItem(
       "herbUser",
       JSON.stringify(
         newManagementUser
       )
     )
-
-    // =========================================
-    // REMEMBER LOGIN
-    // =========================================
 
     localStorage.setItem(
       "rememberedLogin",
@@ -400,9 +392,14 @@ function AuthPage() {
       "Account created successfully! You can now log in."
     )
 
-    // =========================================
-    // MOVE TO LOGIN
-    // =========================================
+    setEmail(cleanEmail)
+    setPassword(password)
+    setConfirmPassword("")
+    setIsLogin(true)
+    setRememberMe(true)
+    alert(
+      "Account created successfully! You can now log in."
+    )
 
     setEmail(cleanEmail)
     setPassword(password)
@@ -415,48 +412,70 @@ function AuthPage() {
   // LOGIN
   // =========================================
 
-  
-const handleLogin = () => {
-  const cleanEmail = email.trim().toLowerCase()
+  const handleLogin = async () => {
+    const cleanEmail = email.trim().toLowerCase()
 
-  if (!cleanEmail || !password) {
-    alert("Please enter your email and password.")
-    return
-  }
-
-  // Read users from both storage locations
-  const dravyagunaUsers = getDravyagunaUsers()
-  const herbUsers = getHerbUsers()
-
-  // Match common role variations
-  const normalizeRole = (role) => {
-    const value = (role || "").trim().toLowerCase()
-
-    if (value === "doctor") return "doctor"
-    if (value === "admin") return "admin"
-    if (value === "ayurvedic reviewer" || value === "reviewer") {
-      return "reviewer"
+    if (!cleanEmail || !password) {
+      alert("Please enter your email and password.")
+      return
     }
 
-    return value
-  }
+    // Use API if feature flag is enabled
+    if (USE_API) {
+      try {
+        const displayRole = getDisplayRole(selectedRole)
+        const response = await apiLogin(cleanEmail, password, displayRole)
+        
+        setCurrentUser(response.user)
+        localStorage.setItem("isAuthenticated", "true")
 
-  const selectedNormalizedRole = normalizeRole(selectedRole)
+        if (rememberMe) {
+          localStorage.setItem(
+            "rememberedLogin",
+            JSON.stringify({
+              email: cleanEmail,
+              password,
+              role: selectedRole,
+            })
+          )
+        } else {
+          localStorage.removeItem("rememberedLogin")
+        }
 
-  // Find matching email and role in the main user list
-  let user = dravyagunaUsers.find((account) => {
-    const accountEmail = (account.email || "").trim().toLowerCase()
-    const accountRole = normalizeRole(account.role)
+        // Navigate based on role
+        const backendRole = response.user.backendRole
+        if (backendRole === 'clinician') {
+          navigate("/doctor")
+        } else if (backendRole === 'admin' || backendRole === 'editor' || backendRole === 'domain_expert') {
+          navigate("/admin")
+        } else {
+          alert("This role does not have a configured destination.")
+        }
+      } catch (error) {
+        alert(error.message || "Login failed. Please check your credentials.")
+      }
+      return
+    }
 
-    return (
-      accountEmail === cleanEmail &&
-      accountRole === selectedNormalizedRole
-    )
-  })
+    // Fallback to localStorage-based login (existing code)
+    const dravyagunaUsers = getDravyagunaUsers()
+    const herbUsers = getHerbUsers()
 
-  // If not found there, check the other user list
-  if (!user) {
-    user = herbUsers.find((account) => {
+    const normalizeRole = (role) => {
+      const value = (role || "").trim().toLowerCase()
+
+      if (value === "doctor") return "doctor"
+      if (value === "admin") return "admin"
+      if (value === "ayurvedic reviewer" || value === "reviewer") {
+        return "reviewer"
+      }
+
+      return value
+    }
+
+    const selectedNormalizedRole = normalizeRole(selectedRole)
+
+    let user = dravyagunaUsers.find((account) => {
       const accountEmail = (account.email || "").trim().toLowerCase()
       const accountRole = normalizeRole(account.role)
 
@@ -465,84 +484,92 @@ const handleLogin = () => {
         accountRole === selectedNormalizedRole
       )
     })
-  }
 
-  if (!user) {
-    alert(
-      `No ${getDisplayRole(selectedRole)} account found with this email. Please check your selected role or sign up first.`
-    )
-    return
-  }
+    if (!user) {
+      user = herbUsers.find((account) => {
+        const accountEmail = (account.email || "").trim().toLowerCase()
+        const accountRole = normalizeRole(account.role)
 
-  // Check password
-  if (user.password !== password) {
-    alert("Incorrect password. Please try again.")
-    return
-  }
-
-  // Check account status, if available
-  const status = (user.status || "Active").trim().toLowerCase()
-
-  if (status === "inactive" || status === "blocked") {
-    alert("This account is blocked. Please contact the admin.")
-    return
-  }
-
-  if (status === "pending") {
-    alert("This account is pending approval. Please contact the admin.")
-    return
-  }
-
-  const now = new Date().toISOString()
-
-  // Update last active in the main user list if the account exists there
-  const updatedUsers = dravyagunaUsers.map((account) => {
-    const matchesEmail =
-      (account.email || "").trim().toLowerCase() === cleanEmail
-
-    const matchesRole =
-      normalizeRole(account.role) === selectedNormalizedRole
-
-    return matchesEmail && matchesRole
-      ? { ...account, lastActive: now }
-      : account
-  })
-
-  localStorage.setItem(
-    "dravyaguna_users",
-    JSON.stringify(updatedUsers)
-  )
-
-  const loggedInUser = {
-    ...user,
-    lastActive: now,
-    role: getDisplayRole(user.role || selectedRole),
-  }
-
-  localStorage.setItem("herbUser", JSON.stringify(loggedInUser))
-  localStorage.setItem("isAuthenticated", "true")
-
-  if (rememberMe) {
-    localStorage.setItem(
-      "rememberedLogin",
-      JSON.stringify({
-        email: cleanEmail,
-        password,
-        role: selectedRole,
+        return (
+          accountEmail === cleanEmail &&
+          accountRole === selectedNormalizedRole
+        )
       })
-    )
-  } else {
-    localStorage.removeItem("rememberedLogin")
-  }
+    }
 
-  if (selectedNormalizedRole === "doctor") {
-    navigate("/doctor")
-  } else if (selectedNormalizedRole === "admin") {
-    navigate("/admin")
-  } else {
-    alert("This role does not have a configured destination.")
+    if (!user) {
+      alert(
+        `No ${getDisplayRole(selectedRole)} account found with this email. Please check your selected role or sign up first.`
+      )
+      return
+    }
+
+    if (user.password !== password) {
+      alert("Incorrect password. Please try again.")
+      return
+    }
+
+    const status = (user.status || "Active").trim().toLowerCase()
+
+    if (status === "inactive" || status === "blocked") {
+      alert("This account is blocked. Please contact the admin.")
+      return
+    }
+
+    if (status === "pending") {
+      alert("This account is pending approval. Please contact the admin.")
+      return
+    }
+
+    const now = new Date().toISOString()
+
+    const updatedUsers = dravyagunaUsers.map((account) => {
+      const matchesEmail =
+        (account.email || "").trim().toLowerCase() === cleanEmail
+
+      const matchesRole =
+        normalizeRole(account.role) === selectedNormalizedRole
+
+      return matchesEmail && matchesRole
+        ? { ...account, lastActive: now }
+        : account
+    })
+
+    localStorage.setItem(
+      "dravyaguna_users",
+      JSON.stringify(updatedUsers)
+    )
+
+    const loggedInUser = {
+      ...user,
+      lastActive: now,
+      role: getDisplayRole(user.role || selectedRole),
+    }
+
+    localStorage.setItem("herbUser", JSON.stringify(loggedInUser))
+    localStorage.setItem("isAuthenticated", "true")
+
+    if (rememberMe) {
+      localStorage.setItem(
+        "rememberedLogin",
+        JSON.stringify({
+          email: cleanEmail,
+          password,
+          role: selectedRole,
+        })
+      )
+    } else {
+      localStorage.removeItem("rememberedLogin")
+    }
+
+    if (selectedNormalizedRole === "doctor") {
+      navigate("/doctor")
+    } else if (selectedNormalizedRole === "admin") {
+      navigate("/admin")
+    } else {
+      alert("This role does not have a configured destination.")
+    }
   }
-}
 
   // =========================================
   // SUBMIT
