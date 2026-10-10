@@ -16,6 +16,6 @@ export const env = {
   databaseUrl: process.env.DATABASE_URL,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
+  frontendOrigin: process.env.FRONTEND_ORIGIN || ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:20322'],
   importDefaultStatus: process.env.IMPORT_DEFAULT_STATUS || 'reviewed',
 };

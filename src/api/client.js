@@ -51,12 +51,19 @@ class ApiClient {
         headers,
       });
     } catch (error) {
-      throw new Error('API unreachable. Please check if the backend server is running.');
+      console.error('API client network error:', error);
+      throw new Error(`API unreachable: ${error.message}. Backend at ${this.baseURL} may not be running.`);
     }
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || error.message || `Request failed with status ${response.status}`);
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = { error: `Request failed with status ${response.status}` };
+      }
+      console.error('API client error response:', errorData);
+      throw new Error(errorData.error || errorData.message || `Request failed with status ${response.status}`);
     }
 
     return response.json();
