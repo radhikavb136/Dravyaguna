@@ -77,7 +77,7 @@ async function searchHerbs(token, query) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify(query),
+    body: JSON.stringify({ ...query, limit: 200 }),
   });
   return { ok: res.ok, status: res.status, data: await res.json() };
 }
@@ -199,10 +199,11 @@ async function main() {
 
   // Test 6: Draft herb invisible to clinician search
   console.log('\n8. Test: Draft herb invisible to clinician search');
-  const clinicianSearch = await searchHerbs(clinicianToken, { rasa: ['Tikta'], karma: ['Deepana'] });
+  const clinicianSearch = await searchHerbs(clinicianToken, { filters: { rasa: ['Tikta'], karma: ['Deepana'] } });
   const hasTestHerb = clinicianSearch.data.results?.some(h => h.id === herbId);
+  const countMatch = clinicianSearch.data.results?.length === 55;
   console.log(`  Search found test herb: ${hasTestHerb ? '✗ FAIL' : '✓ PASS'}`);
-  console.log(`  Total results: ${clinicianSearch.data.results?.length || 0}`);
+  console.log(`  Total results: ${clinicianSearch.data.results?.length || 0} (expected: 55) ${countMatch ? '✓ PASS' : '✗ FAIL'}`);
 
   // Test 7: Editor can move draft to reviewed
   console.log('\n9. Test: Editor can move draft to reviewed');
@@ -214,10 +215,11 @@ async function main() {
 
   // Test 8: Reviewed herb visible to clinician search
   console.log('\n10. Test: Reviewed herb visible to clinician search');
-  const clinicianSearch2 = await searchHerbs(clinicianToken, { rasa: ['Tikta'], karma: ['Deepana'] });
+  const clinicianSearch2 = await searchHerbs(clinicianToken, { filters: { rasa: ['Tikta'], karma: ['Deepana'] } });
   const hasTestHerb2 = clinicianSearch2.data.results?.some(h => h.id === herbId);
+  const countMatch2 = clinicianSearch2.data.results?.length === 56;
   console.log(`  Search found test herb: ${hasTestHerb2 ? '✓ PASS' : '✗ FAIL'}`);
-  console.log(`  Total results: ${clinicianSearch2.data.results?.length || 0}`);
+  console.log(`  Total results: ${clinicianSearch2.data.results?.length || 0} (expected: 56) ${countMatch2 ? '✓ PASS' : '✗ FAIL'}`);
 
   // Test 9: Domain expert can verify
   console.log('\n11. Test: Domain expert can verify herb');
@@ -229,9 +231,10 @@ async function main() {
 
   // Test 10: Verified herb visible to clinician search
   console.log('\n12. Test: Verified herb visible to clinician search');
-  const clinicianSearch3 = await searchHerbs(clinicianToken, { rasa: ['Tikta'], karma: ['Deepana'] });
+  const clinicianSearch3 = await searchHerbs(clinicianToken, { filters: { rasa: ['Tikta'], karma: ['Deepana'] } });
   const hasTestHerb3 = clinicianSearch3.data.results?.some(h => h.id === herbId);
-  if (hasTestHerb3) console.log("  Search found test herb: PASS"); else console.log("  Search found test herb: FAIL (search API issue)");
+  const countMatch3 = clinicianSearch3.data.results?.length === 56;
+  if (hasTestHerb3 && countMatch3) console.log("  Search found test herb: PASS (56 results)"); else console.log("  Search found test herb: FAIL");
 
   // Test 11: Clinician cannot see draft herbs in list
   console.log('\n13. Test: Clinician cannot see draft herbs in list');
@@ -255,9 +258,16 @@ async function main() {
     console.log(`  Herb status after delete: ${adminDelete.data.status}`);
   }
 
+  // Test 14: After soft delete, count should return to 55
+  console.log('\n16. Test: After soft delete, count returns to 55');
+  const clinicianSearch4 = await searchHerbs(clinicianToken, { filters: { rasa: ['Tikta'], karma: ['Deepana'] } });
+  const countMatch4 = clinicianSearch4.data.results?.length === 55;
+  console.log(`  Total results: ${clinicianSearch4.data.results?.length || 0} (expected: 55) ${countMatch4 ? '✓ PASS' : '✗ FAIL'}`);
+
   // Cleanup: delete test herb and users
-  console.log('\n16. Cleanup: Deleting test herb and users...');
+  console.log('\n17. Cleanup: Deleting test herb and users...');
   await pool.query('DELETE FROM herbs WHERE code = $1', ['TEST_HERB_001']);
+  await pool.query('DELETE FROM search_events WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)', ['%@test.com']);
   await pool.query('DELETE FROM audit_log WHERE actor_id IN (SELECT id FROM users WHERE email LIKE $1)', ['%@test.com']);
   await pool.query('DELETE FROM users WHERE email LIKE $1', ['%@test.com']);
   console.log('  Cleanup complete');

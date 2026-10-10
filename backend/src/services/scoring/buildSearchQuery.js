@@ -390,6 +390,7 @@ SELECT
 FROM herbs h
 ${joins.join('\n')}
 WHERE h.status = ANY($1::herb_status[])
+${ratioParts.length > 0 ? `AND ${ratioParts.map(p => `COALESCE(${p.ratio}, 0) > 0`).join(' AND ')}` : ''}
 ORDER BY match_percentage DESC, h.english_name ASC
 LIMIT $${limitParam} OFFSET $${offsetParam}`;
 
