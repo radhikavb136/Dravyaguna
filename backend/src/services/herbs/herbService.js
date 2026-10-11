@@ -45,7 +45,7 @@ export async function getHerbById(id, userRole) {
   }
 
   // Load related data
-  const [rasa, guna, karma, indications, doshaActions, dhatu, mala, srotas, avayava] = await Promise.all([
+  const [rasa, guna, karma, indications, doshaActions, dhatu, mala, srotas, avayava, virya, vipaka] = await Promise.all([
     pool.query(
       `SELECT rt.canonical_en FROM herb_rasa hr JOIN rasa_terms rt ON hr.rasa_id = rt.id WHERE hr.herb_id = $1`,
       [id]
@@ -82,6 +82,14 @@ export async function getHerbById(id, userRole) {
       `SELECT at.canonical_en FROM herb_avayava ha JOIN avayava_terms at ON ha.avayava_id = at.id WHERE ha.herb_id = $1`,
       [id]
     ),
+    pool.query(
+      `SELECT vt.canonical_en FROM virya_terms vt WHERE vt.id = (SELECT virya_id FROM herbs WHERE id = $1)`,
+      [id]
+    ),
+    pool.query(
+      `SELECT vt.canonical_en FROM vipaka_terms vt WHERE vt.id = (SELECT vipaka_id FROM herbs WHERE id = $1)`,
+      [id]
+    ),
   ]);
 
   return {
@@ -90,20 +98,16 @@ export async function getHerbById(id, userRole) {
     guna: guna.rows.map(g => g.canonical_en),
     karma: karma.rows.map(k => k.canonical_en),
     indications: indications.rows.map(i => i.canonical_en),
-    dosha_actions: doshaActions.rows.reduce((acc, row) => {
-      acc[row.dosha] = row.effect;
-      return acc;
-    }, {}),
+    dosha_actions: doshaActions.rows,
     dhatu: dhatu.rows.reduce((acc, row) => {
       acc[row.canonical_en] = row.score;
       return acc;
     }, {}),
-    mala: mala.rows.reduce((acc, row) => {
-      acc[row.canonical_en] = row.effect;
-      return acc;
-    }, {}),
+    mala: mala.rows.map(m => ({ mala: m.canonical_en, effect: m.effect })),
     srotas: srotas.rows.map(s => s.canonical_en),
     avayava: avayava.rows.map(a => a.canonical_en),
+    virya: virya.rows[0]?.canonical_en || null,
+    vipaka: vipaka.rows[0]?.canonical_en || null,
   };
 }
 
