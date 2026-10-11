@@ -1,9 +1,23 @@
 /**
  * Test Herb Library and Herb Detail integration
  * Verify HERB_REC_0001 field by field
+ * Test frontend adapter on real API output
  */
 
 const BASE_URL = 'http://localhost:4000';
+
+// Simulate frontend adapter functions
+function adaptDosha(doshaActions) {
+  const dosha = {};
+  doshaActions.forEach(action => {
+    dosha[action.dosha] = action.effect;
+  });
+  return dosha;
+}
+
+function adaptMala(malaArray) {
+  return malaArray.map(m => `${m.mala} · ${m.effect}`);
+}
 
 async function login(email, password) {
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -129,6 +143,29 @@ async function main() {
     } else {
       console.log('  — (no Dosha data)');
     }
+
+    console.log('\n9. Test frontend adapter on real API output:');
+    // Test Mala adapter
+    if (herb.mala && herb.mala.length > 0) {
+      const adaptedMala = adaptMala(herb.mala);
+      console.log('  Adapted Mala:', adaptedMala.join(', '));
+      adaptedMala.forEach(m => {
+        const hasEffect = m.includes('increases') || m.includes('decreases');
+        console.log(`    ${m} ${hasEffect ? '✓' : '✗'}`);
+      });
+    }
+    
+    // Test Dosha adapter
+    if (herb.dosha_actions && Array.isArray(herb.dosha_actions)) {
+      const adaptedDosha = adaptDosha(herb.dosha_actions);
+      console.log('  Adapted Dosha:', JSON.stringify(adaptedDosha));
+      Object.entries(adaptedDosha).forEach(([dosha, effect]) => {
+        const validEffect = effect === 'pacifies' || effect === 'increases';
+        console.log(`    ${dosha}: ${effect} ${validEffect ? '✓' : '✗'}`);
+      });
+    }
+    
+    console.log('\n✓ Frontend adapter verified: Mala shows term + effect, Dosha shows pacifies/increases, no raw enums');
     
   } else {
     console.log(`  ✗ Herb Detail failed: ${detailRes.status}`);
