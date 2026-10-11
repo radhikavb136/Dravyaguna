@@ -17,6 +17,19 @@ const BASE_URL = 'http://localhost:4000';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+async function registerUser(email, password, name, role) {
+  const res = await fetch(`${BASE_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name, role }),
+  });
+  if (!res.ok) {
+    // User might already exist, that's ok
+    return null;
+  }
+  return res.json();
+}
+
 async function login(email, password) {
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
     method: 'POST',
@@ -88,13 +101,35 @@ async function deleteHerb(token, herbId) {
   return { ok: res.ok, status: res.status, data: await res.json() };
 }
 
+async function registerUser(email, password, name, role) {
+  const res = await fetch(`${BASE_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name, role }),
+  });
+  if (!res.ok) {
+    // User might already exist, that's ok
+    return null;
+  }
+  return res.json();
+}
+
 async function main() {
   console.log('=== Search Visibility Acceptance Test (55 → 56 → 56 → 55) ===\n');
 
-  // Create or use test clinician
-  console.log('1. Setting up test clinician...');
-  await pool.query("INSERT INTO users (email, password_hash, name, role) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO UPDATE SET role = $4", 
-    ['clinician@test.com', '$2b$10$abcdefghijklmnopqrstuvwxyz', 'Test Clinician', 'clinician']);
+  // Create or use test users
+  console.log('1. Setting up test users...');
+  await registerUser('clinician@test.com', 'Test123456', 'Test Clinician', 'clinician');
+  await registerUser('editor@test.com', 'Test123456', 'Test Editor', 'editor');
+  await registerUser('expert@test.com', 'Test123456', 'Test Expert', 'domain_expert');
+  await registerUser('admin@test.com', 'Test123456', 'Test Admin', 'admin');
+
+  // Update roles in database (register defaults to clinician)
+  await pool.query("UPDATE users SET role = $1 WHERE email = $2", ['editor', 'editor@test.com']);
+  await pool.query("UPDATE users SET role = $1 WHERE email = $2", ['domain_expert', 'expert@test.com']);
+  await pool.query("UPDATE users SET role = $1 WHERE email = $2", ['admin', 'admin@test.com']);
+  console.log('  Users ready\n');
+
   const clinicianRes = await login('clinician@test.com', 'Test123456');
   if (!clinicianRes) {
     console.log('Failed to login clinician');
@@ -116,10 +151,9 @@ async function main() {
   const editorToken = editorRes?.token;
   
   if (!editorToken) {
-    await pool.query("INSERT INTO users (email, password_hash, name, role) VALUES ($1, $2, $3, $4)", 
-      ['editor@test.com', '$2b$10$abcdefghijklmnopqrstuvwxyz', 'Test Editor', 'editor']);
-    const newEditorRes = await login('editor@test.com', 'Test123456');
-    editorToken = newEditorRes?.token;
+    console.log('Failed to login editor');
+    await pool.end();
+    return;
   }
 
   const testHerb = {
@@ -150,13 +184,12 @@ async function main() {
   // Test 5: Verify → still 56
   console.log('6. Test: Verify herb (should still be 56)');
   const expertRes = await login('expert@test.com', 'Test123456');
-  let expertToken = expertRes?.token;
+  const expertToken = expertRes?.token;
   
   if (!expertToken) {
-    await pool.query("INSERT INTO users (email, password_hash, name, role) VALUES ($1, $2, $3, $4)", 
-      ['expert@test.com', '$2b$10$abcdefghijklmnopqrstuvwxyz', 'Test Expert', 'domain_expert']);
-    const newExpertRes = await login('expert@test.com', 'Test123456');
-    expertToken = newExpertRes?.token;
+    console.log('Failed to login expert');
+    await pool.end();
+    return;
   }
 
   await verifyHerb(expertToken, herbId);
@@ -167,13 +200,12 @@ async function main() {
   // Test 6: Soft delete → back to 55
   console.log('7. Test: Soft delete herb (should return to 55)');
   const adminRes = await login('admin@test.com', 'Test123456');
-  let adminToken = adminRes?.token;
+  const adminToken = adminRes?.token;
   
   if (!adminToken) {
-    await pool.query("INSERT INTO users (email, password_hash, name, role) VALUES ($1, $2, $3, $4)", 
-      ['admin@test.com', '$2b$10$abcdefghijklmnopqrstuvwxyz', 'Test Admin', 'admin']);
-    const newAdminRes = await login('admin@test.com', 'Test123456');
-    adminToken = newAdminRes?.token;
+    console.log('Failed to login admin');
+    await pool.end();
+    return;
   }
 
   await deleteHerb(adminToken, herbId);

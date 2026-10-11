@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Vite Env</title>
+</head>
+<body>
+    <h1>Vite Environment Variables Test</h1>
+    <script type="module">
+        console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+        console.log('VITE_USE_API:', import.meta.env.VITE_USE_API);
+        document.body.innerHTML += `<p>VITE_API_BASE_URL: ${import.meta.env.VITE_API_BASE_URL}</p>`;
+        document.body.innerHTML += `<p>VITE_USE_API: ${import.meta.env.VITE_USE_API}</p>`;
+    </script>
+</body>
+</html>
