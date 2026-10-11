@@ -7,6 +7,8 @@ import HerbResultCard from "../components/HerbResultCard"
 import herbDataset from "../data/herbDataset"
 
 import { addSearchHistory } from "../utils/searchHistory"
+import { searchHerbsDetailed } from "../api/herbs"
+import { USE_API } from "../api/client"
 
 import "../styles/SearchResults.css"
 
@@ -56,22 +58,51 @@ const searchTermMappings = {
    ========================================= */
 
 function prepareHerbForCard(herb, match) {
+  // Handle both API and local data formats
+  const englishName = herb.englishName || herb.name
+  const botanicalName = herb.botanicalName || herb.scientificName
+  const partUsed = herb.partUsed
+  const prabhava = herb.prabhava
+  const verificationStatus = herb.verificationStatus || herb.status
+  const regionalNames = herb.regionalNames || []
+  const rasa = herb.rasa || []
+  const guna = herb.guna || []
+  const virya = herb.virya
+  const vipaka = herb.vipaka
+  const dosha = herb.dosha || {}
+  const dhatu = herb.dhatu || []
+  const mala = herb.mala || []
+  const srotas = herb.srotas || []
+  const avayava = herb.avayava || []
+  const karma = herb.karma || []
+  const indications = herb.indications || []
+
   return {
     ...herb,
-
-    name: herb.englishName,
-    scientificName: herb.botanicalName,
-
+    englishName,
+    botanicalName,
+    partUsed,
+    prabhava,
+    verificationStatus,
+    regionalNames,
+    rasa,
+    guna,
+    virya,
+    vipaka,
+    dosha,
+    dhatu,
+    mala,
+    srotas,
+    avayava,
+    karma,
+    indications,
     match,
-
-    status: herb.verificationStatus,
-
     description: `Part used: ${
-      herb.partUsed || "Not specified"
+      partUsed || "Not specified"
     }. Indications: ${
-      Array.isArray(herb.indications)
-        ? herb.indications.join(", ")
-        : herb.indications || "Not specified"
+      Array.isArray(indications)
+        ? indications.join(", ")
+        : indications || "Not specified"
     }.`,
   }
 }
@@ -634,6 +665,10 @@ function SearchResults() {
       dosha: "",
     })
 
+  const [apiResults, setApiResults] = useState(null)
+  const [apiLoading, setApiLoading] = useState(false)
+  const [apiError, setApiError] = useState(null)
+
     const savedSettings = JSON.parse(
       localStorage.getItem("herbSettings") || "null"
     )
@@ -641,6 +676,62 @@ function SearchResults() {
     const resultsPerPage = Number(
       savedSettings?.resultsPerPage || 20
     )
+
+  // Call API for detailed search when feature flag is enabled
+  useEffect(() => {
+    if (USE_API && mode === "detailed" && parametersString) {
+      setApiLoading(true)
+      setApiError(null)
+
+      try {
+        const selectedParameters = JSON.parse(decodeURIComponent(parametersString))
+        
+        // Convert frontend parameter format to API filter format
+        const apiFilters = {}
+        
+        if (selectedParameters.Rasa) apiFilters.rasa = selectedParameters.Rasa
+        if (selectedParameters.Guna) apiFilters.guna = selectedParameters.Guna
+        if (selectedParameters.Virya) apiFilters.virya = selectedParameters.Virya
+        if (selectedParameters.Vipaka) apiFilters.vipaka = selectedParameters.Vipaka
+        if (selectedParameters.Karma) apiFilters.karma = selectedParameters.Karma
+        if (selectedParameters["Major Diseases / Indications"]) apiFilters.indications = selectedParameters["Major Diseases / Indications"]
+        if (selectedParameters.Dhatu) apiFilters.dhatu = selectedParameters.Dhatu
+        if (selectedParameters.Mala) apiFilters.mala = selectedParameters.Mala
+        if (selectedParameters.Srotas) apiFilters.srotas = selectedParameters.Srotas
+        if (selectedParameters["Organ / Avayava"]) apiFilters.avayava = selectedParameters["Organ / Avayava"]
+        
+        // Parse Dosha format "Vata · Increases" → { dosha: 'Vata', effect: 'increases' }
+        if (selectedParameters.Dosha) {
+          apiFilters.dosha = []
+          selectedParameters.Dosha.forEach(d => {
+            const [dosha, effect] = d.split(' · ')
+            if (effect === 'Decreases') {
+              apiFilters.dosha.push({ dosha, effect: 'pacifies' })
+            } else {
+              apiFilters.dosha.push({ dosha, effect: 'increases' })
+            }
+          })
+        }
+
+        searchHerbsDetailed(apiFilters, 200)
+          .then(data => {
+            setApiResults(data.results || [])
+            setApiLoading(false)
+          })
+          .catch(error => {
+            console.error('API search error:', error)
+            setApiError(error.message)
+            setApiLoading(false)
+          })
+      } catch (error) {
+        console.error('Failed to parse parameters:', error)
+        setApiError('Invalid search parameters')
+        setApiLoading(false)
+      }
+    } else {
+      setApiResults(null)
+    }
+  }, [mode, parametersString])
 
 
   /* =========================================
@@ -676,6 +767,15 @@ function SearchResults() {
 
   const baseResults =
     useMemo(() => {
+      // Use API results when available
+      if (USE_API && mode === "detailed" && apiResults) {
+        return apiResults.map(herb => ({
+          herb,
+          match: herb.matchPercentage || 100, // API returns match percentage
+        }))
+      }
+
+      // Fallback to client-side search
       let results = []
 
       if (mode === "detailed") {

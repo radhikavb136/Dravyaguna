@@ -23,7 +23,7 @@ function adaptHerb(backendHerb) {
     status: backendHerb.status,
     verificationStatus: backendHerb.status,
     
-    // Arrays
+    // Arrays (from relationships)
     rasa: backendHerb.rasa || [],
     guna: backendHerb.guna || [],
     karma: backendHerb.karma || [],
@@ -196,4 +196,16 @@ export async function searchHerbs(filters, options = {}) {
     results: response.results.map(adaptHerb),
     meta: response.meta,
   };
+}
+
+/**
+ * Detailed search (alias for searchHerbs, returns results array directly)
+ */
+export async function searchHerbsDetailed(filters, limit = 50) {
+  const response = await apiClient.post('/api/search/detailed', {
+    filters,
+    limit,
+  });
+  
+  return response.results.map(adaptHerb);
 }

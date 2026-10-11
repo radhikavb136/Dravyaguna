@@ -8,6 +8,7 @@ import { authRouter } from './routes/auth.routes.js';
 import { searchRouter } from './routes/search.routes.js';
 import { weightsRouter } from './routes/weights.routes.js';
 import { herbRouter } from './routes/herb.routes.js';
+import { vocabularyRouter } from './routes/vocabulary.routes.js';
 
 export function createApp() {
   const app = express();
@@ -34,6 +35,7 @@ export function createApp() {
   app.use('/api/search', searchRouter);
   app.use('/api/scoring/weights', weightsRouter);
   app.use('/api/herbs', herbRouter);
+  app.use('/api/vocabulary', vocabularyRouter);
 
   app.use(errorHandler);
 
