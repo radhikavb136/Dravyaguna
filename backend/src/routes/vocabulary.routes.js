@@ -5,8 +5,19 @@
 
 import express from 'express';
 import { pool } from '../db/pool.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
+import { z } from 'zod';
 
 const router = express.Router();
+
+// Schema for creating custom terms
+const createKarmaSchema = z.object({
+  canonical_en: z.string().min(1),
+});
+
+const createIndicationSchema = z.object({
+  canonical_en: z.string().min(1),
+});
 
 // Get all vocabulary terms for filters
 router.get('/filters', async (req, res) => {
@@ -83,6 +94,50 @@ router.get('/filters', async (req, res) => {
   } catch (error) {
     console.error('Error fetching vocabulary filters:', error);
     res.status(500).json({ error: 'Failed to fetch vocabulary filters' });
+  }
+});
+
+// POST /api/vocabulary/karma - create custom Karma term (admin/domain_expert only)
+router.post('/karma', authenticate, requireRole('admin', 'domain_expert'), async (req, res, next) => {
+  try {
+    const body = createKarmaSchema.parse(req.body);
+    const client = await pool.connect();
+    try {
+      const slug = body.canonical_en.toLowerCase().replace(/\s+/g, '-');
+      const { rows } = await client.query(
+        `INSERT INTO karma_terms (canonical_en, slug, is_custom) 
+         VALUES ($1, $2, true) 
+         RETURNING *`,
+        [body.canonical_en, slug]
+      );
+      res.json(rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/vocabulary/indications - create custom Indication term (admin/domain_expert only)
+router.post('/indications', authenticate, requireRole('admin', 'domain_expert'), async (req, res, next) => {
+  try {
+    const body = createIndicationSchema.parse(req.body);
+    const client = await pool.connect();
+    try {
+      const slug = body.canonical_en.toLowerCase().replace(/\s+/g, '-');
+      const { rows } = await client.query(
+        `INSERT INTO indication_terms (canonical_en, slug, is_custom) 
+         VALUES ($1, $2, true) 
+         RETURNING *`,
+        [body.canonical_en, slug]
+      );
+      res.json(rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    next(err);
   }
 });
 
