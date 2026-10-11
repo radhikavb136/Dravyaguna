@@ -22,7 +22,12 @@ weightsRouter.get('/', authenticate, async (_req, res, next) => {
 const updateSchema = z.object({
   parameterGroup: z.string().min(1),
   weight: z.number().positive(),
-});
+}).or(
+  z.object({
+    parameter_group: z.string().min(1),
+    weight: z.number().positive(),
+  })
+);
 
 weightsRouter.put(
   '/',
@@ -31,11 +36,12 @@ weightsRouter.put(
   async (req, res, next) => {
     try {
       const body = updateSchema.parse(req.body);
+      const parameterGroup = body.parameterGroup || body.parameter_group;
       await pool.query(
         `UPDATE scoring_weights
          SET weight = $1, updated_by = $2, updated_at = now()
          WHERE parameter_group = $3`,
-        [body.weight, req.user.id, body.parameterGroup]
+        [body.weight, req.user.id, parameterGroup]
       );
       invalidateScoringWeightsCache();
       const weights = await getScoringWeights();
