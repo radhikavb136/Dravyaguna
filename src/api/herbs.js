@@ -209,3 +209,11 @@ export async function searchHerbsDetailed(filters, limit = 50) {
   
   return response.results.map(adaptHerb);
 }
+
+/**
+ * Get herb by ID (alias for getHerb with simpler signature)
+ */
+export async function getHerbById(id) {
+  const response = await apiClient.get(`/api/herbs/${id}`);
+  return adaptHerb(response);
+}

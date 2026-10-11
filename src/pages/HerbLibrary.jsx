@@ -2,6 +2,8 @@ import { useMemo, useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
+import { listHerbs } from "../api/herbs"
+import { USE_API } from "../api/client"
 import "../styles/HerbLibrary.css"
 
 function LeafIcon({ variant = "green" }) {
@@ -316,10 +318,55 @@ function HerbLibrary() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedHerbs, setSelectedHerbs] = useState([])
   const [favoriteHerbs, setFavoriteHerbs] = useState([])
+  const [apiHerbs, setApiHerbs] = useState(null)
+  const [apiLoading, setApiLoading] = useState(false)
+  const [apiError, setApiError] = useState(null)
+
+  /*
+    LOAD HERBS FROM API
+  */
+  useEffect(() => {
+    if (USE_API) {
+      setApiLoading(true)
+      setApiError(null)
+      
+      listHerbs({ limit: 200 })
+        .then(response => {
+          setApiHerbs(response.data)
+          setApiLoading(false)
+        })
+        .catch(error => {
+          console.error('Failed to load herbs:', error)
+          setApiError(error.message)
+          setApiLoading(false)
+        })
+    }
+  }, [])
 
   /*
     LOAD FAVORITES
   */
+  useEffect(() => {
+    try {
+      const savedFavorites =
+        JSON.parse(localStorage.getItem("favoriteHerbs")) || []
+
+      setFavoriteHerbs(savedFavorites)
+    } catch (error) {
+      console.error("Unable to load favorite herbs:", error)
+      setFavoriteHerbs([])
+    }
+  }, [])
+
+  /*
+    GET HERBS (API or fallback)
+  */
+  const currentHerbs = useMemo(() => {
+    if (USE_API && apiHerbs) {
+      return apiHerbs
+    }
+    return herbs
+  }, [USE_API, apiHerbs])
   useEffect(() => {
     try {
       const savedFavorites =
@@ -379,10 +426,10 @@ function HerbLibrary() {
     const query = searchQuery.trim().toLowerCase()
 
     if (!query) {
-      return herbs
+      return currentHerbs
     }
 
-    return herbs.filter((herb) => {
+    return currentHerbs.filter((herb) => {
       const englishName =
         herb.englishName?.toLowerCase() || ""
 
@@ -400,7 +447,7 @@ function HerbLibrary() {
         regionalNames.includes(query)
       )
     })
-  }, [searchQuery])
+  }, [searchQuery, currentHerbs])
 
   /*
     SELECT / DESELECT HERB

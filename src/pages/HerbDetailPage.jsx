@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
 import herbDataset from "../data/herbDataset"
+import { getHerbById } from "../api/herbs"
+import { USE_API } from "../api/client"
 
 import "../styles/HerbDetailPage.css"
 
@@ -96,15 +98,46 @@ function HerbDetailPage() {
   const { id } = useParams()
 
   const [isFavorite, setIsFavorite] = useState(false)
+  const [apiHerb, setApiHerb] = useState(null)
+  const [apiLoading, setApiLoading] = useState(false)
+  const [apiError, setApiError] = useState(null)
 
 
   /* =========================================
-     FIND HERB FROM REAL DATASET
+     LOAD HERB FROM API
      ========================================= */
 
-  const herb = herbDataset.find(
-    (item) => item.id === id
-  )
+  useEffect(() => {
+    if (USE_API && id) {
+      setApiLoading(true)
+      setApiError(null)
+      
+      getHerbById(id)
+        .then(herb => {
+          setApiHerb(herb)
+          setApiLoading(false)
+        })
+        .catch(error => {
+          console.error('Failed to load herb:', error)
+          setApiError(error.message)
+          setApiLoading(false)
+        })
+    }
+  }, [id])
+
+
+  /* =========================================
+     GET HERB (API or fallback)
+     ========================================= */
+
+  const currentHerb = useMemo(() => {
+    if (USE_API && apiHerb) {
+      return apiHerb
+    }
+    return herbDataset.find((item) => item.id === id)
+  }, [USE_API, apiHerb, id])
+
+  const herb = currentHerb
 
 
   /* =========================================
