@@ -10,6 +10,7 @@ import { weightsRouter } from './routes/weights.routes.js';
 import { herbRouter } from './routes/herb.routes.js';
 import { vocabularyRouter } from './routes/vocabulary.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
+import { favoritesRouter } from './routes/favorites.routes.js';
 
 export function createApp() {
   const app = express();
@@ -38,6 +39,7 @@ export function createApp() {
   app.use('/api/herbs', herbRouter);
   app.use('/api/vocabulary', vocabularyRouter);
   app.use('/api', adminRouter);
+  app.use('/api', favoritesRouter);
 
   app.use(errorHandler);
 
