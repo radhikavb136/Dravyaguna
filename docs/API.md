@@ -217,17 +217,17 @@ Detailed search with scoring and filters.
 ```json
 {
   "filters": {
-    "rasa": ["Tikta"],
-    "guna": ["Laghu"],
-    "karma": ["Deepana"],
-    "indication": ["agnimandya"],
-    "virya": ["Ushna"],
-    "vipaka": ["Madhura"],
-    "dhatu": ["Rasa"],
-    "mala": ["Purisha · decreases"],
-    "srotas": ["Rasavaha"],
+    "rasa": [1],
+    "guna": [1],
+    "karma": [1],
+    "indication": [1],
+    "virya": [1],
+    "vipaka": [1],
+    "dhatu": [1],
+    "mala": [1],
+    "srotas": [1],
     "avayava": [],
-    "dosha": ["Vata · pacifies"],
+    "dosha": [{"dosha": "vata", "effect": "pacifies"}],
     "prabhava": ["substring"]
   },
   "lang": "en-IN",
@@ -237,8 +237,9 @@ Detailed search with scoring and filters.
 ```
 
 **Filter Format:**
-- Dosha: `"Dosha · effect"` where effect is `pacifies` or `increases`
-- Mala: `"Mala · effect"` where effect is `increases` or `decreases`
+- Rasa, Guna, Virya, Vipaka, Karma, Indication, Dhatu, Mala, Srotas, Avayava: array of term IDs (integers)
+- Dosha: array of objects with `dosha` and `effect` properties
+- Prabhava: array of substrings for text search
 
 **Response:**
 ```json
@@ -272,6 +273,311 @@ Detailed search with scoring and filters.
     "unresolved": {},
     "activeFilterGroups": 2
   }
+}
+```
+
+---
+
+## Vocabulary Endpoints
+
+### GET /api/vocabulary/filters
+Get all vocabulary terms for frontend filters.
+
+**Response:**
+```json
+{
+  "rasa": [{"id": 1, "canonical_en": "Tikta"}],
+  "guna": [{"id": 1, "canonical_en": "Laghu"}],
+  "virya": [{"id": 1, "canonical_en": "Ushna"}],
+  "vipaka": [{"id": 1, "canonical_en": "Madhura"}],
+  "karma": [{"id": 1, "canonical_en": "Deepana"}],
+  "indications": [],
+  "dhatu": [{"id": 1, "canonical_en": "Rasa"}],
+  "mala": [{"id": 1, "canonical_en": "Purisha"}],
+  "srotas": [{"id": 1, "canonical_en": "Rasavaha"}],
+  "avayava": [],
+  "hasOrganData": false
+}
+```
+
+### POST /api/vocabulary/karma
+Create a custom Karma term (admin/domain_expert only).
+
+**Authorization:** Admin, Domain Expert
+
+**Request:**
+```json
+{
+  "canonical_en": "CustomKarma"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 27,
+  "canonical_en": "CustomKarma",
+  "slug": "customkarma",
+  "is_custom": true
+}
+```
+
+### POST /api/vocabulary/indications
+Create a custom Indication term (admin/domain_expert only).
+
+**Authorization:** Admin, Domain Expert
+
+**Request:**
+```json
+{
+  "canonical_en": "CustomIndication"
+}
+```
+
+**Response:** Same shape as Karma.
+
+---
+
+## Scoring Weights Endpoints
+
+### GET /api/scoring/weights
+Get current scoring weights.
+
+**Response:**
+```json
+{
+  "weights": {
+    "rasa": 20,
+    "guna": 18,
+    "virya": 12,
+    "vipaka": 10,
+    "prabhava": 8,
+    "dosha": 15,
+    "dhatu": 6,
+    "mala": 3,
+    "srotas": 8,
+    "avayava": 6,
+    "karma": 10,
+    "indication": 15
+  }
+}
+```
+
+### PUT /api/scoring/weights
+Update scoring weights (admin/domain_expert only).
+
+**Authorization:** Admin, Domain Expert
+
+**Request:**
+```json
+{
+  "parameter_group": "rasa",
+  "weight": 25
+}
+```
+
+**Response:**
+```json
+{
+  "weights": {
+    "rasa": 25,
+    ...
+  }
+}
+```
+
+---
+
+## Admin Endpoints
+
+### GET /api/audit-log
+Get audit log entries (admin only).
+
+**Authorization:** Admin only
+
+**Query Parameters:**
+- `limit` (optional, default: 50)
+- `offset` (optional, default: 0)
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "actor_id": "uuid",
+      "action": "create",
+      "entity_type": "herb",
+      "entity_id": "uuid",
+      "before_json": null,
+      "after_json": {...},
+      "created_at": "2026-10-12T10:00:00Z"
+    }
+  ]
+}
+```
+
+### GET /api/analytics/search
+Get search analytics (admin only).
+
+**Authorization:** Admin only
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "date": "2026-10-12",
+      "search_count": 45
+    }
+  ]
+}
+```
+
+### GET /api/users
+Get all users (admin only).
+
+**Authorization:** Admin only
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "email": "user@example.com",
+      "role": "clinician",
+      "status": "active",
+      "created_at": "2026-10-12T10:00:00Z"
+    }
+  ]
+}
+```
+
+### PATCH /api/users/:id/role
+Update user role (admin only).
+
+**Authorization:** Admin only
+
+**Request:**
+```json
+{
+  "role": "editor"
+}
+```
+
+**Valid roles:** `admin`, `editor`, `domain_expert`, `clinician`
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "role": "editor"
+}
+```
+
+---
+
+## Favorites and Saved Searches Endpoints
+
+### GET /api/favorites
+Get user's favorites.
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "herb_id": "uuid",
+      "code": "HERB_REC_0001",
+      "english_name": "Heart leaved moon seed",
+      "created_at": "2026-10-12T10:00:00Z"
+    }
+  ]
+}
+```
+
+### POST /api/favorites
+Add a favorite.
+
+**Request:**
+```json
+{
+  "herb_id": "uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "user_id": "uuid",
+  "herb_id": "uuid",
+  "created_at": "2026-10-12T10:00:00Z"
+}
+```
+
+### DELETE /api/favorites/:herb_id
+Remove a favorite.
+
+**Response:**
+```json
+{
+  "message": "Favorite removed"
+}
+```
+
+### GET /api/saved-searches
+Get user's saved searches.
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "user_id": "uuid",
+      "name": "Tikta Herbs",
+      "filters": {"rasa": ["Tikta"]},
+      "created_at": "2026-10-12T10:00:00Z"
+    }
+  ]
+}
+```
+
+### POST /api/saved-searches
+Save a search.
+
+**Request:**
+```json
+{
+  "name": "Tikta Herbs",
+  "filters": {
+    "rasa": ["Tikta"]
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "user_id": "uuid",
+  "name": "Tikta Herbs",
+  "filters": {"rasa": ["Tikta"]},
+  "created_at": "2026-10-12T10:00:00Z"
+}
+```
+
+### DELETE /api/saved-searches/:id
+Remove a saved search.
+
+**Response:**
+```json
+{
+  "message": "Saved search removed"
 }
 ```
 
