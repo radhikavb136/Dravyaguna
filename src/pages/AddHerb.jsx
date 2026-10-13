@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
+import { createHerb, updateHerb, getHerbById } from "../api/herbs"
+import { getCurrentUser } from "../api/auth"
 import "../styles/AddHerb.css"
 
 function AddHerb() {
@@ -38,6 +40,7 @@ function AddHerb() {
   const [imagePreview, setImagePreview] = useState("")
   const [isDragging, setIsDragging] = useState(false)
   const [herbId, setHerbId] = useState("")
+  const [currentUser, setCurrentUser] = useState(null)
 
   // =====================================================
   // FORM DATA
@@ -352,6 +355,15 @@ function AddHerb() {
   }
 
   // =====================================================
+  // LOAD CURRENT USER
+  // =====================================================
+
+  useEffect(() => {
+    const user = getCurrentUser()
+    setCurrentUser(user)
+  }, [])
+
+  // =====================================================
   // VOCABULARY
   // =====================================================
 
@@ -602,102 +614,139 @@ function AddHerb() {
   // SAVE
   // =====================================================
 
-  const handleSave = (action) => {
-    const currentId =
-      herbId || `HERB_${Date.now()}`
-
-    let nextStatus =
-      formData.verificationStatus
+  const handleSave = async (action) => {
+    const useApi = import.meta.env.VITE_USE_API === 'true'
+    
+    let nextStatus = formData.verificationStatus
 
     if (action === "draft") {
-      nextStatus = "Draft"
+      nextStatus = "draft"
     }
 
     if (action === "review") {
-      nextStatus = "Reviewed"
+      nextStatus = "reviewed"
     }
 
     if (action === "verify") {
-      nextStatus = "Verified"
+      nextStatus = "verified"
     }
 
-    const previousStatus =
-      formData.verificationStatus
-
-    let updatedHistory =
-      formData.verificationHistory || []
-
-    if (previousStatus !== nextStatus) {
-      updatedHistory = [
-        ...updatedHistory,
-        createHistoryEntry(
-          previousStatus,
-          nextStatus
-        ),
-      ]
-    }
-
-    const now = new Date().toISOString()
-
-    const herbData = {
-      id: currentId,
-      ...formData,
-
-      verificationStatus: nextStatus,
-
-      verificationHistory:
-        updatedHistory,
-
-      imageName,
-
-      savedAt: now,
-      updatedAt: now,
-    }
-
-    const existingHerbs = JSON.parse(
-      localStorage.getItem("herbs") || "[]"
-    )
-
-    const existingIndex =
-      existingHerbs.findIndex(
-        (herb) => herb.id === currentId
-      )
-
-    if (existingIndex !== -1) {
-      existingHerbs[existingIndex] =
-        herbData
-    } else {
-      existingHerbs.push(herbData)
-    }
-
-    localStorage.setItem(
-      "herbs",
-      JSON.stringify(existingHerbs)
-    )
-
-    setHerbId(currentId)
-
-    setFormData((previous) => ({
-      ...previous,
-      verificationStatus: nextStatus,
-      verificationHistory:
-        updatedHistory,
-    }))
-
-    if (action === "draft") {
-      alert("Herb saved as draft.")
+    // Prevent editors from setting verified status
+    if (nextStatus === "verified" && currentUser?.role === "editor") {
+      alert("Editors cannot verify herbs. Only domain experts and admins can verify.")
       return
     }
 
-    if (action === "review") {
-      alert("Herb submitted for review.")
-      return
-    }
+    try {
+      if (useApi) {
+        // Prepare herb data for API
+        const herbData = {
+          code: herbId || `HERB_${Date.now()}`,
+          english_name: formData.herbNameEnglish,
+          sanskrit_name: formData.sanskritName,
+          local_name: formData.commonNames,
+          botanical_name: formData.botanicalName,
+          family: formData.family,
+          part_used: formData.partUsed,
+          description: formData.plantDescription,
+          identification_notes: formData.identificationNotes,
+          rasa: formData.rasa,
+          guna: formData.guna,
+          virya: formData.virya,
+          vipaka: formData.vipaka,
+          prabhava: formData.prabhava,
+          dosha: formData.dosha,
+          dhatu: formData.dhatu,
+          mala: {
+            purisha: formData.mala.purisha,
+            mutra: formData.mala.mutra,
+            sweda: formData.mala.sweda,
+          },
+          srotas: Object.values(formData.srotas).filter(Boolean),
+          karma: formData.karma,
+          indications: formData.indications,
+          avayava: formData.avayava,
+          status: nextStatus,
+        }
 
-    if (action === "verify") {
-      alert("Herb marked as verified.")
-      return
+        if (isEditMode && herbId) {
+          // Update existing herb
+          await updateHerb(herbId, herbData)
+        } else {
+          // Create new herb (always as draft initially)
+          herbData.status = "draft"
+          const created = await createHerb(herbData)
+          setHerbId(created.id)
+        }
+      } else {
+        // Fallback to localStorage for mock data
+        const currentId = herbId || `HERB_${Date.now()}`
+
+        const previousStatus = formData.verificationStatus
+
+        let updatedHistory = formData.verificationHistory || []
+
+        if (previousStatus !== nextStatus) {
+          updatedHistory = [
+            ...updatedHistory,
+            createHistoryEntry(previousStatus, nextStatus),
+          ]
+        }
+
+        const now = new Date().toISOString()
+
+        const herbData = {
+          id: currentId,
+          ...formData,
+          verificationStatus: nextStatus,
+          verificationHistory: updatedHistory,
+          imageName,
+          savedAt: now,
+          updatedAt: now,
+        }
+
+        const existingHerbs = JSON.parse(localStorage.getItem("herbs") || "[]")
+
+        const existingIndex = existingHerbs.findIndex(
+          (herb) => herb.id === currentId
+        )
+
+        if (existingIndex !== -1) {
+          existingHerbs[existingIndex] = herbData
+        } else {
+          existingHerbs.push(herbData)
+        }
+
+        localStorage.setItem("herbs", JSON.stringify(existingHerbs))
+
+        setHerbId(currentId)
+
+        setFormData((previous) => ({
+          ...previous,
+          verificationStatus: nextStatus,
+          verificationHistory: updatedHistory,
+        }))
+      }
+
+      if (action === "draft") {
+        alert("Herb saved as draft.")
+        return
+      }
+
+      if (action === "review") {
+        alert("Herb submitted for review.")
+        return
+      }
+
+      if (action === "verify") {
+        alert("Herb marked as verified.")
+        return
+      }
+    } catch (err) {
+      console.error('Failed to save herb:', err)
+      alert('Failed to save herb')
     }
+  }
 
     if (action === "save") {
       alert("Information saved successfully.")

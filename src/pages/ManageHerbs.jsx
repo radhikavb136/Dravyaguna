@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { addAuditLog } from "../utils/auditLogger"
+import { listHerbs, verifyHerb, deleteHerb } from "../api/herbs"
+import { getCurrentUser } from "../api/auth"
 import "../styles/ManageHerbs.css"
 
 function ManageHerbs() {
@@ -14,24 +16,56 @@ function ManageHerbs() {
   const [selectedStatus, setSelectedStatus] = useState("All")
 
   const [herbs, setHerbs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
 
   /* =========================================================
      LOAD HERBS
   ========================================================= */
 
   useEffect(() => {
+    loadCurrentUser()
     loadHerbs()
-  }, [])
+  }, [selectedStatus])
 
-  const loadHerbs = () => {
+  const loadCurrentUser = () => {
+    const user = getCurrentUser()
+    setCurrentUser(user)
+  }
+
+  const loadHerbs = async () => {
+    setLoading(true)
+    setError(null)
+    
     try {
-      const savedHerbs = JSON.parse(
-        localStorage.getItem("herbs") || "[]"
-      )
-
-      setHerbs(Array.isArray(savedHerbs) ? savedHerbs : [])
-    } catch {
-      setHerbs([])
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        const statusFilter = selectedStatus === 'All' ? undefined : selectedStatus.toLowerCase()
+        const response = await listHerbs({ page: 1, limit: 200, status: statusFilter })
+        setHerbs(response.data)
+      } else {
+        // Fallback to localStorage for mock data
+        const savedHerbs = JSON.parse(
+          localStorage.getItem("herbs") || "[]"
+        )
+        setHerbs(Array.isArray(savedHerbs) ? savedHerbs : [])
+      }
+    } catch (err) {
+      console.error('Failed to load herbs:', err)
+      setError('Failed to load herbs')
+      // Fallback to localStorage on error
+      try {
+        const savedHerbs = JSON.parse(
+          localStorage.getItem("herbs") || "[]"
+        )
+        setHerbs(Array.isArray(savedHerbs) ? savedHerbs : [])
+      } catch {
+        setHerbs([])
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -419,10 +453,70 @@ function ManageHerbs() {
   }
 
   /* =========================================================
-     DELETE HERB
+     VERIFY HERB (DOMAIN_EXPERT/ADMIN ONLY)
   ========================================================= */
 
-  const handleDeleteHerb = (herbId) => {
+  const handleVerifyHerb = async (herbId) => {
+    if (!herbId) {
+      return
+    }
+
+    const herbToVerify =
+      normalizedHerbs.find(
+        (herb) =>
+          herb.id === herbId
+      )
+
+    if (!herbToVerify) {
+      return
+    }
+
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        // Check if user is domain_expert or admin
+        if (currentUser?.role !== 'domain_expert' && currentUser?.role !== 'admin') {
+          alert('Only domain experts and admins can verify herbs')
+          return
+        }
+        
+        await verifyHerb(herbId)
+        // Reload herbs from API
+        await loadHerbs()
+      } else {
+        // Fallback to localStorage for mock data
+        const updatedHerbs = herbs.map(herb => {
+          if ((herb.id || `herb-${herbs.indexOf(herb)}`) === herbId) {
+            return { ...herb, verificationStatus: 'Verified', status: 'verified' }
+          }
+          return herb
+        })
+        localStorage.setItem(
+          "herbs",
+          JSON.stringify(updatedHerbs)
+        )
+        setHerbs(updatedHerbs)
+      }
+      
+      addAuditLog({
+        action: "Verified",
+        module: "Herb",
+        item: herbToVerify.name,
+        previous: `Status: ${herbToVerify.status}`,
+        newValue: "Verified",
+      })
+    } catch (err) {
+      console.error('Failed to verify herb:', err)
+      alert('Failed to verify herb')
+    }
+  }
+
+  /* =========================================================
+     DELETE HERB (ADMIN ONLY)
+  ========================================================= */
+
+  const handleDeleteHerb = async (herbId) => {
     if (!herbId) {
       return
     }
@@ -446,18 +540,33 @@ function ManageHerbs() {
       return
     }
 
-    const updatedHerbs =
-      herbs.filter(
-        (herb, index) =>
-          (herb.id || `herb-${index}`) !==
-          herbId
-      )
-      localStorage.setItem(
-        "herbs",
-        JSON.stringify(updatedHerbs)
-      )
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
       
-      setHerbs(updatedHerbs)
+      if (useApi) {
+        // Check if user is admin
+        if (currentUser?.role !== 'admin') {
+          alert('Only admins can delete herbs')
+          return
+        }
+        
+        await deleteHerb(herbId)
+        // Reload herbs from API
+        await loadHerbs()
+      } else {
+        // Fallback to localStorage for mock data
+        const updatedHerbs =
+          herbs.filter(
+            (herb, index) =>
+              (herb.id || `herb-${index}`) !==
+              herbId
+          )
+        localStorage.setItem(
+          "herbs",
+          JSON.stringify(updatedHerbs)
+        )
+        setHerbs(updatedHerbs)
+      }
       
       addAuditLog({
         action: "Deleted",
@@ -466,6 +575,10 @@ function ManageHerbs() {
         previous: `Status: ${herbToDelete.status}`,
         newValue: "Deleted",
       })
+    } catch (err) {
+      console.error('Failed to delete herb:', err)
+      alert('Failed to delete herb')
+    }
   }
 
   /* =========================================================
@@ -1064,8 +1177,24 @@ function ManageHerbs() {
                           </button>
 
 
-                          {/* DELETE */}
+                          {/* VERIFY (domain_expert/admin only) */}
+                          {(currentUser?.role === 'domain_expert' || currentUser?.role === 'admin') && (
+                            <button
+                              type="button"
+                              className="manage-herbs-action-button"
+                              title="Verify herb"
+                              aria-label="Verify herb"
+                              onClick={() =>
+                                handleVerifyHerb(herb.id)
+                              }
+                            >
+                              ✅
+                            </button>
+                          )}
 
+
+                          {/* DELETE (admin only) */}
+                          {currentUser?.role === 'admin' && (
                           <button
                             type="button"
                             className="manage-herbs-action-button manage-herbs-delete-button"
@@ -1079,6 +1208,7 @@ function ManageHerbs() {
                           >
                             🗑
                           </button>
+                          )}
 
                         </div>
 
