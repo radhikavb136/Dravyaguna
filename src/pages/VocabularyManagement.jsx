@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
+import { getFilterOptions, createKarmaTerm, createIndicationTerm } from "../api/vocabulary"
+import { getCurrentUser } from "../api/auth"
 import "../styles/VocabularyManagement.css"
 
 function VocabularyManagement() {
@@ -8,6 +10,9 @@ function VocabularyManagement() {
   const [editingTermId, setEditingTermId] = useState(null)
   const [mergingTerm, setMergingTerm] = useState(null)
   const [mergeTargetId, setMergeTargetId] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
 
   const categories = [
     "Rasa",
@@ -38,19 +43,69 @@ function VocabularyManagement() {
      LOAD VOCABULARY
   ========================================================= */
 
-  const [vocabularyData, setVocabularyData] = useState(() => {
-    try {
-      const savedVocabulary = JSON.parse(
-        localStorage.getItem("vocabulary") || "[]"
-      )
+  const [vocabularyData, setVocabularyData] = useState([])
+  const [filterOptions, setFilterOptions] = useState({})
 
-      return Array.isArray(savedVocabulary)
-        ? savedVocabulary
-        : []
-    } catch {
-      return []
+  useEffect(() => {
+    loadCurrentUser()
+    loadVocabulary()
+  }, [])
+
+  const loadCurrentUser = () => {
+    const user = getCurrentUser()
+    setCurrentUser(user)
+  }
+
+  const loadVocabulary = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        const response = await getFilterOptions()
+        setFilterOptions(response)
+        
+        // Convert API format to page format
+        const formattedData = []
+        Object.entries(response).forEach(([category, terms]) => {
+          if (Array.isArray(terms)) {
+            terms.forEach(term => {
+              formattedData.push({
+                id: term.id,
+                term: term.canonical_en,
+                category: category.charAt(0).toUpperCase() + category.slice(1),
+                status: 'Active',
+                is_custom: term.is_custom || false,
+              })
+            })
+          }
+        })
+        setVocabularyData(formattedData)
+      } else {
+        // Fallback to localStorage for mock data
+        const savedVocabulary = JSON.parse(
+          localStorage.getItem("vocabulary") || "[]"
+        )
+        setVocabularyData(Array.isArray(savedVocabulary) ? savedVocabulary : [])
+      }
+    } catch (err) {
+      console.error('Failed to load vocabulary:', err)
+      setError('Failed to load vocabulary')
+      // Fallback to localStorage on error
+      try {
+        const savedVocabulary = JSON.parse(
+          localStorage.getItem("vocabulary") || "[]"
+        )
+        setVocabularyData(Array.isArray(savedVocabulary) ? savedVocabulary : [])
+      } catch {
+        setVocabularyData([])
+      }
+    } finally {
+      setLoading(false)
     }
-  })
+  }
 
   /* =========================================================
      LOAD HERBS
@@ -318,7 +373,7 @@ function VocabularyManagement() {
      ADD / UPDATE TERM
   ========================================================= */
 
-  const handleAddTerm = (
+  const handleAddTerm = async (
     event
   ) => {
     event.preventDefault()
@@ -355,124 +410,146 @@ function VocabularyManagement() {
       return
     }
 
-    /* UPDATE */
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        // Use API to create custom Karma or Indication terms
+        if (termForm.category === 'Karma') {
+          await createKarmaTerm(cleanedTerm)
+        } else if (termForm.category === 'Indications') {
+          await createIndicationTerm(cleanedTerm)
+        } else {
+          alert('Custom term creation only supported for Karma and Indications via API')
+          return
+        }
+        // Reload vocabulary from API
+        await loadVocabulary()
+      } else {
+        // Fallback to localStorage for mock data
+        /* UPDATE */
 
-    if (editingTermId) {
-      const updatedVocabulary =
-        vocabularyData.map(
-          (item) => {
-            if (
-              item.id !==
-              editingTermId
-            ) {
-              return item
-            }
+        if (editingTermId) {
+          const updatedVocabulary =
+            vocabularyData.map(
+              (item) => {
+                if (
+                  item.id !==
+                  editingTermId
+                ) {
+                  return item
+                }
 
-            return {
-              ...item,
-              term: cleanedTerm,
-              sanskrit:
-                termForm.sanskrit.trim(),
-              english:
-                termForm.english.trim(),
-              category:
-                termForm.category,
-              description:
-                termForm.description.trim(),
-              status:
-                termForm.status,
-              updatedAt:
-                new Date().toISOString(),
-            }
-          }
-        )
+                return {
+                  ...item,
+                  term: cleanedTerm,
+                  sanskrit:
+                    termForm.sanskrit.trim(),
+                  english:
+                    termForm.english.trim(),
+                  category:
+                    termForm.category,
+                  description:
+                    termForm.description.trim(),
+                  status:
+                    termForm.status,
+                  updatedAt:
+                    new Date().toISOString(),
+                }
+              }
+            )
 
-      setVocabularyData(
-        updatedVocabulary
-      )
+          setVocabularyData(
+            updatedVocabulary
+          )
 
-      localStorage.setItem(
-        "vocabulary",
-        JSON.stringify(
+          localStorage.setItem(
+            "vocabulary",
+            JSON.stringify(
+              updatedVocabulary
+            )
+          )
+
+          setActiveCategory(
+            termForm.category
+          )
+
+          setEditingTermId(null)
+          setIsAddTermOpen(false)
+
+          resetForm(
+            termForm.category
+          )
+
+          alert(
+            "Vocabulary term updated successfully."
+          )
+
+          return
+        }
+
+        /* ADD */
+
+        const newTerm = {
+          id:
+            Date.now().toString(),
+
+          term:
+            cleanedTerm,
+
+          sanskrit:
+            termForm.sanskrit.trim(),
+
+          english:
+            termForm.english.trim(),
+
+          category:
+            termForm.category,
+
+          description:
+            termForm.description.trim(),
+
+          status:
+            termForm.status,
+
+          createdAt:
+            new Date().toISOString(),
+        }
+
+        const updatedVocabulary = [
+          ...vocabularyData,
+          newTerm,
+        ]
+
+        setVocabularyData(
           updatedVocabulary
         )
-      )
 
-      setActiveCategory(
-        termForm.category
-      )
+        localStorage.setItem(
+          "vocabulary",
+          JSON.stringify(
+            updatedVocabulary
+          )
+        )
 
-      setEditingTermId(null)
-      setIsAddTermOpen(false)
+        setActiveCategory(
+          termForm.category
+        )
 
-      resetForm(
-        termForm.category
-      )
+        setIsAddTermOpen(false)
 
-      alert(
-        "Vocabulary term updated successfully."
-      )
+        resetForm(
+          termForm.category
+        )
 
-      return
+        alert(
+          "Vocabulary term added successfully."
+        )
+      }
+    } catch (err) {
+      console.error('Failed to add vocabulary term:', err)
+      alert('Failed to add vocabulary term')
     }
-
-    /* ADD */
-
-    const newTerm = {
-      id:
-        Date.now().toString(),
-
-      term:
-        cleanedTerm,
-
-      sanskrit:
-        termForm.sanskrit.trim(),
-
-      english:
-        termForm.english.trim(),
-
-      category:
-        termForm.category,
-
-      description:
-        termForm.description.trim(),
-
-      status:
-        termForm.status,
-
-      createdAt:
-        new Date().toISOString(),
-    }
-
-    const updatedVocabulary = [
-      ...vocabularyData,
-      newTerm,
-    ]
-
-    setVocabularyData(
-      updatedVocabulary
-    )
-
-    localStorage.setItem(
-      "vocabulary",
-      JSON.stringify(
-        updatedVocabulary
-      )
-    )
-
-    setActiveCategory(
-      termForm.category
-    )
-
-    setIsAddTermOpen(false)
-
-    resetForm(
-      termForm.category
-    )
-
-    alert(
-      "Vocabulary term added successfully."
-    )
   }
 
   /* =========================================================
