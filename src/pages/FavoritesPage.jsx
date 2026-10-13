@@ -1,61 +1,109 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-
+import { getFavorites, removeFavorite as removeFavoriteApi } from "../api/favorites"
+import { getHerbById } from "../api/herbs"
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
-
 import "../styles/FavoritesPage.css"
 
 function FavoritesPage() {
   const navigate = useNavigate()
 
   const [savedHerbs, setSavedHerbs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   // =========================================================
   // LOAD SAVED HERBS
   // =========================================================
 
   useEffect(() => {
-    const loadFavorites = () => {
-      const savedFavorites = localStorage.getItem("favoriteHerbs")
-
-      if (!savedFavorites) {
-        setSavedHerbs([])
-        return
-      }
-
-      try {
-        const favorites = JSON.parse(savedFavorites)
-
-        if (Array.isArray(favorites)) {
-          setSavedHerbs(favorites)
-        } else {
-          setSavedHerbs([])
-        }
-      } catch (error) {
-        console.error("Unable to load saved herbs:", error)
-        setSavedHerbs([])
-      }
-    }
-
     loadFavorites()
   }, [])
+
+  const loadFavorites = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        const response = await getFavorites()
+        // Convert backend favorites to frontend format
+        const herbs = await Promise.all(
+          response.data.map(async (fav) => {
+            const herb = await getHerbById(fav.herb_id)
+            return herb
+          })
+        )
+        setSavedHerbs(herbs)
+      } else {
+        // Fallback to localStorage for mock data
+        const savedFavorites = localStorage.getItem("favoriteHerbs")
+        if (!savedFavorites) {
+          setSavedHerbs([])
+          return
+        }
+        try {
+          const favorites = JSON.parse(savedFavorites)
+          if (Array.isArray(favorites)) {
+            setSavedHerbs(favorites)
+          } else {
+            setSavedHerbs([])
+          }
+        } catch (error) {
+          console.error("Unable to load saved herbs:", error)
+          setSavedHerbs([])
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load favorites:', err)
+      setError('Failed to load favorites')
+      // Fallback to localStorage on error
+      try {
+        const savedFavorites = localStorage.getItem("favoriteHerbs")
+        if (savedFavorites) {
+          const favorites = JSON.parse(savedFavorites)
+          if (Array.isArray(favorites)) {
+            setSavedHerbs(favorites)
+          }
+        }
+      } catch {
+        setSavedHerbs([])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // =========================================================
   // REMOVE HERB FROM FAVORITES
   // =========================================================
 
-  const removeFavorite = (herbId) => {
-    const updatedFavorites = savedHerbs.filter(
-      (herb) => herb.id !== herbId
-    )
-
-    setSavedHerbs(updatedFavorites)
-
-    localStorage.setItem(
-      "favoriteHerbs",
-      JSON.stringify(updatedFavorites)
-    )
+  const removeFavorite = async (herbId) => {
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        await removeFavoriteApi(herbId)
+        // Reload favorites from API
+        await loadFavorites()
+      } else {
+        // Fallback to localStorage for mock data
+        const updatedFavorites = savedHerbs.filter(
+          (herb) => herb.id !== herbId
+        )
+        setSavedHerbs(updatedFavorites)
+        localStorage.setItem(
+          "favoriteHerbs",
+          JSON.stringify(updatedFavorites)
+        )
+      }
+    } catch (err) {
+      console.error('Failed to remove favorite:', err)
+      alert('Failed to remove favorite')
+    }
   }
 
   // =========================================================
