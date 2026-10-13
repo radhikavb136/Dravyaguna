@@ -12,6 +12,8 @@ function DashboardNavbar() {
     localStorage.getItem("herbUser") || "null"
   )
 
+  const useApi = import.meta.env.VITE_USE_API === 'true'
+
   const doctorName = savedUser?.fullName || "Doctor"
   const doctorEmail = savedUser?.email || "Ayurvedic Physician"
   const profilePhoto = savedUser?.profilePhoto || ""
@@ -99,6 +101,16 @@ function DashboardNavbar() {
         <span>Workspace</span>
         <span className="breadcrumb-separator">›</span>
         <strong>Home</strong>
+        {useApi && (
+          <span className="api-indicator" style={{marginLeft: '10px', fontSize: '11px', color: '#28a745', background: '#e6fffa', padding: '2px 8px', borderRadius: '4px'}}>
+            Using API
+          </span>
+        )}
+        {!useApi && (
+          <span className="api-indicator" style={{marginLeft: '10px', fontSize: '11px', color: '#6c757d', background: '#f8f9fa', padding: '2px 8px', borderRadius: '4px'}}>
+            Using mock data
+          </span>
+        )}
       </div>
 
 

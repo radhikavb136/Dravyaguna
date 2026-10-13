@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { getWeights, updateWeight } from "../api/weights"
 import "../styles/ScoringConfiguration.css"
 
 function ScoringConfiguration() {

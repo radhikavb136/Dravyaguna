@@ -14,7 +14,7 @@ All backend APIs for Phase 1 are verified:
 
 ### Frontend: NOT STARTED
 All admin pages use mock data/localStorage:
-- Scoring Configuration: NOT STARTED (hardcoded weights, no API)
+- Scoring Configuration: NOT STARTED (hardcoded weights, no API) - IN PROGRESS
 - Manage Herbs: NOT STARTED (localStorage)
 - Add/Edit Herb: NOT STARTED (localStorage)
 - Vocabulary Management: NOT STARTED (local state, no API)
@@ -28,6 +28,11 @@ All admin pages use mock data/localStorage:
 - Herb Library & Herb Detail ✓
 - Detailed Search ✓
 - AuthPage ✓
+
+### Frontend Integration In Progress
+- Scoring Configuration: Started - added API import, need to complete wiring
+- DashboardNavbar: Added "Using API / Using mock data" indicator ✓
+- .env.example: Updated to VITE_USE_API=true ✓
 
 ### Search Match Percentage
 - Backend search returns match_percentage but frontend search results don't currently display it
