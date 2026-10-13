@@ -97,8 +97,8 @@ router.get('/filters', async (req, res) => {
   }
 });
 
-// POST /api/vocabulary/karma - create custom Karma term (admin/domain_expert only)
-router.post('/karma', authenticate, requireRole('admin', 'domain_expert'), async (req, res, next) => {
+// POST /api/vocabulary/karma - create custom Karma term (editor+)
+router.post('/karma', authenticate, requireRole('editor', 'admin', 'domain_expert'), async (req, res, next) => {
   try {
     const body = createKarmaSchema.parse(req.body);
     const client = await pool.connect();
@@ -119,8 +119,8 @@ router.post('/karma', authenticate, requireRole('admin', 'domain_expert'), async
   }
 });
 
-// POST /api/vocabulary/indications - create custom Indication term (admin/domain_expert only)
-router.post('/indications', authenticate, requireRole('admin', 'domain_expert'), async (req, res, next) => {
+// POST /api/vocabulary/indications - create custom Indication term (editor+)
+router.post('/indications', authenticate, requireRole('editor', 'admin', 'domain_expert'), async (req, res, next) => {
   try {
     const body = createIndicationSchema.parse(req.body);
     const client = await pool.connect();
