@@ -96,16 +96,33 @@ async function main() {
   const clinicianToken = clinicianRes.token;
 
   // Search Rasa=Tikta + Virya=Ushna
-  console.log('3. Search Rasa=Tikta + Virya=Ushna (expected: 63 herbs at 100%)...');
+  console.log('3. Search Rasa=Tikta + Virya=Ushna (expected: 108 total, 63 at 100%)...');
   const searchRes = await searchDetailed(clinicianToken, { rasa: ['Tikta'], virya: ['Ushna'] });
   if (searchRes.ok) {
     const count = searchRes.data.results?.length || 0;
-    console.log(`  Results: ${count} herbs (expected: 63) ${count === 63 ? '✓' : '✗'}`);
+    const count100 = searchRes.data.results?.filter(r => r.matchPercentage === 100).length || 0;
+    console.log(`  Total results: ${count} (expected: 108) ${count === 108 ? '✓' : '✗'}`);
+    console.log(`  100% matches: ${count100} (expected: 63) ${count100 === 63 ? '✓' : '✗'}`);
     
-    // Note: HERB_REC_0010 has Sheeta (cold), not Ushna
-    // HERB_REC_0023 has Madhura + Amla + Ushna (not Tikta)
-    console.log('  Note: HERB_REC_0010 has Sheeta, not Ushna. HERB_REC_0023 has Madhura+Amla+Ushna, not Tikta.');
-    console.log('  Excel-derived calculation test skipped due to data mismatch');
+    // Find HERB_REC_0010 (Tikta + Sheeta, not Ushna)
+    const herb0010 = searchRes.data.results?.find(h => h.code === 'HERB_REC_0010');
+    if (herb0010) {
+      const matchPercent = herb0010.matchPercentage;
+      const expectedPercent = (w_rasa / (w_rasa + w_virya)) * 100;
+      console.log(`  HERB_REC_0010 (Tikta only): ${matchPercent}% (expected: ${expectedPercent.toFixed(1)}%) ${Math.abs(matchPercent - expectedPercent) < 0.1 ? '✓' : '✗'}`);
+    } else {
+      console.log('  HERB_REC_0010 not in search results (has Sheeta, not Ushna)');
+    }
+    
+    // Find HERB_REC_0023 (Ushna + Madhura + Amla, not Tikta)
+    const herb0023 = searchRes.data.results?.find(h => h.code === 'HERB_REC_0023');
+    if (herb0023) {
+      const matchPercent = herb0023.matchPercentage;
+      const expectedPercent = (w_virya / (w_rasa + w_virya)) * 100;
+      console.log(`  HERB_REC_0023 (Ushna only): ${matchPercent}% (expected: ${expectedPercent.toFixed(1)}%) ${Math.abs(matchPercent - expectedPercent) < 0.1 ? '✓' : '✗'}`);
+    } else {
+      console.log('  HERB_REC_0023 not in search results (has Madhura+Amla+Ushna, not Tikta)');
+    }
   } else {
     console.log(`  ✗ Search failed: ${searchRes.status}`);
     return;
@@ -132,9 +149,17 @@ async function main() {
     // Check HERB_REC_0010 again
     const herb0010After = afterSearch.data.results?.find(h => h.code === 'HERB_REC_0010');
     if (herb0010After) {
-      const matchPercent = herb0010After.match_percentage || herb0010After.match;
+      const matchPercent = herb0010After.matchPercentage;
       const expectedPercent = (newRasaWeight / (newRasaWeight + w_virya)) * 100;
-      console.log(`  HERB_REC_0010 match: ${matchPercent?.toFixed(1)}% (expected: ${expectedPercent.toFixed(1)}%) ${Math.abs(matchPercent - expectedPercent) < 0.1 ? '✓' : '✗'}`);
+      console.log(`  HERB_REC_0010: ${matchPercent}% (expected: ${expectedPercent.toFixed(1)}%) ${Math.abs(matchPercent - expectedPercent) < 0.1 ? '✓' : '✗'}`);
+    }
+    
+    // Check HERB_REC_0023 again
+    const herb0023After = afterSearch.data.results?.find(h => h.code === 'HERB_REC_0023');
+    if (herb0023After) {
+      const matchPercent = herb0023After.matchPercentage;
+      const expectedPercent = (w_virya / (newRasaWeight + w_virya)) * 100;
+      console.log(`  HERB_REC_0023: ${matchPercent}% (expected: ${expectedPercent.toFixed(1)}%) ${Math.abs(matchPercent - expectedPercent) < 0.1 ? '✓' : '✗'}`);
     }
   }
 
