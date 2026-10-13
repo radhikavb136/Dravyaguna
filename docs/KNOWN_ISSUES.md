@@ -10,6 +10,7 @@ All backend APIs for Phase 1 are verified:
 - Admin Pages (Audit Log, Search Analytics, User & Role Management)
 - Favorites and Saved Searches
 - Search with partial matches (108 herbs for Tikta+Ushna, 63 at 100%)
+- Behavioral validation (audit_log, Dhatu validation, Mala validation)
 
 ### Frontend: NOT STARTED
 All admin pages use mock data/localStorage:
@@ -36,23 +37,6 @@ All admin pages use mock data/localStorage:
 - Mala displays as "Purisha · decreases" format (correct)
 - Dosha displays as "vata: pacifies" format (correct)
 - No raw enum names are exposed
-
-## Remaining Issues from User Request
-
-### Issue 5: Behavior Tests Needed
-Replace schema-only checks with actual behavior tests:
-- Editor creates custom Karma → immediately searchable
-- Herb update writes audit_log row with before/after values
-- API returns 400 for Dhatu score 7
-- API returns 400 for Mala effect "pacifies"
-
-### Issue 6: Dev-User Seed Script Safety
-seedDevUsers.js must not run when:
-- NODE_ENV=production
-- DATABASE_URL is not a dev database
-
-### Issue 7: Manual Click-Through Checklist
-Need one-page manual checklist per page and role
 
 ## Backend Issues
 
