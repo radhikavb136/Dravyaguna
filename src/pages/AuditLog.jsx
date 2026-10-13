@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
+import { getAuditLog } from "../api/admin"
+import { getCurrentUser } from "../api/auth"
 import "../styles/AuditLog.css"
 
 
@@ -107,32 +109,80 @@ function AuditLog() {
      AUDIT DATA
      ========================================= */
 
-  const [auditEntries, setAuditEntries] =
-    useState(() => {
+  const [auditEntries, setAuditEntries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
 
-      const savedLogs =
-        localStorage.getItem(
-          "dravyaguna_audit_logs"
-        )
+  useEffect(() => {
+    loadCurrentUser()
+    loadAuditLog()
+  }, [])
 
-      if (!savedLogs) {
-        return []
-      }
+  const loadCurrentUser = () => {
+    const user = getCurrentUser()
+    setCurrentUser(user)
+  }
 
-      try {
-        const parsedLogs = JSON.parse(savedLogs)
-
-        if (!Array.isArray(parsedLogs)) {
-          return []
+  const loadAuditLog = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        const response = await getAuditLog({ limit: 100 })
+        // Convert backend audit log format to frontend format
+        const normalized = response.data.map(entry => ({
+          id: entry.id,
+          timestamp: entry.created_at,
+          user: entry.user_email || 'Unknown',
+          role: entry.user_role || '—',
+          action: entry.action,
+          module: entry.table_name || '—',
+          item: entry.record_id || '—',
+          previous: entry.before_json ? JSON.stringify(entry.before_json) : '—',
+          newValue: entry.after_json ? JSON.stringify(entry.after_json) : '—',
+        }))
+        setAuditEntries(normalized)
+      } else {
+        // Fallback to localStorage for mock data
+        const savedLogs = localStorage.getItem("dravyaguna_audit_logs")
+        if (!savedLogs) {
+          setAuditEntries([])
+          return
         }
-
-        return parsedLogs.map(
-          normalizeAuditEntry
-        )
-      } catch {
-        return []
+        try {
+          const parsedLogs = JSON.parse(savedLogs)
+          if (!Array.isArray(parsedLogs)) {
+            setAuditEntries([])
+            return
+          }
+          setAuditEntries(parsedLogs.map(normalizeAuditEntry))
+        } catch {
+          setAuditEntries([])
+        }
       }
-    })
+    } catch (err) {
+      console.error('Failed to load audit log:', err)
+      setError('Failed to load audit log')
+      // Fallback to localStorage on error
+      try {
+        const savedLogs = localStorage.getItem("dravyaguna_audit_logs")
+        if (savedLogs) {
+          const parsedLogs = JSON.parse(savedLogs)
+          if (Array.isArray(parsedLogs)) {
+            setAuditEntries(parsedLogs.map(normalizeAuditEntry))
+          }
+        }
+      } catch {
+        setAuditEntries([])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
 
   /* =========================================

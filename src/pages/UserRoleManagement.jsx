@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react"
+import { getUsers, updateUserRole } from "../api/admin"
+import { getCurrentUser } from "../api/auth"
 import { users as initialUsers } from "../data/users"
 import "../styles/UserRoleManagement.css"
 
@@ -56,22 +58,62 @@ function UserRoleManagement() {
      USER DATA
      ========================================= */
 
-  const [userList, setUserList] = useState(() => {
+  const [userList, setUserList] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
 
-    const savedUsers = localStorage.getItem(
-      "dravyaguna_users"
-    )
+  useEffect(() => {
+    loadCurrentUser()
+    loadUsers()
+  }, [])
 
-    if (savedUsers) {
-      try {
-        return JSON.parse(savedUsers)
-      } catch {
-        return initialUsers
+  const loadCurrentUser = () => {
+    const user = getCurrentUser()
+    setCurrentUser(user)
+  }
+
+  const loadUsers = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        const response = await getUsers()
+        setUserList(response.data || [])
+      } else {
+        // Fallback to localStorage for mock data
+        const savedUsers = localStorage.getItem("dravyaguna_users")
+        if (savedUsers) {
+          try {
+            setUserList(JSON.parse(savedUsers))
+          } catch {
+            setUserList(initialUsers)
+          }
+        } else {
+          setUserList(initialUsers)
+        }
       }
+    } catch (err) {
+      console.error('Failed to load users:', err)
+      setError('Failed to load users')
+      // Fallback to localStorage on error
+      try {
+        const savedUsers = localStorage.getItem("dravyaguna_users")
+        if (savedUsers) {
+          setUserList(JSON.parse(savedUsers))
+        } else {
+          setUserList(initialUsers)
+        }
+      } catch {
+        setUserList(initialUsers)
+      }
+    } finally {
+      setLoading(false)
     }
-
-    return initialUsers
-  })
+  }
 
 
   /* =========================================
@@ -429,31 +471,45 @@ function UserRoleManagement() {
      SAVE EDITED USER
      ========================================= */
 
-  function handleSaveEdit() {
+  const handleSaveEdit = async () => {
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        // Update user role via API
+        await updateUserRole(editingUser.id, editForm.role)
+        // Reload users from API
+        await loadUsers()
+      } else {
+        // Fallback to localStorage for mock data
+        setUserList((currentUsers) =>
+          currentUsers.map((user) =>
+            user.id === editingUser.id
+              ? {
+                  ...user,
+                  name: editForm.name,
+                  email: editForm.email,
+                  role: editForm.role,
+                  status: editForm.status,
 
-    setUserList((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === editingUser.id
-          ? {
-              ...user,
-              name: editForm.name,
-              email: editForm.email,
-              role: editForm.role,
-              status: editForm.status,
+                  initials: editForm.name
+                    .split(" ")
+                    .filter(Boolean)
+                    .map((word) => word[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase(),
+                }
+              : user
+          )
+        )
+      }
 
-              initials: editForm.name
-                .split(" ")
-                .filter(Boolean)
-                .map((word) => word[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase(),
-            }
-          : user
-      )
-    )
-
-    setEditingUser(null)
+      setEditingUser(null)
+    } catch (err) {
+      console.error('Failed to update user:', err)
+      alert('Failed to update user')
+    }
   }
 
 

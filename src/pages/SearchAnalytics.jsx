@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react"
-
+import { useMemo, useState, useEffect } from "react"
+import { getSearchAnalytics } from "../api/admin"
 import { getSearchHistory } from "../utils/searchHistory"
-
+import { getCurrentUser } from "../api/auth"
 import "../styles/SearchAnalytics.css"
 
 
@@ -66,9 +66,46 @@ function SearchAnalytics() {
   const [selectedRange, setSelectedRange] =
     useState("30 days")
 
+  const [analyticsData, setAnalyticsData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
+
+  useEffect(() => {
+    loadCurrentUser()
+    loadAnalytics()
+  }, [])
+
+  const loadCurrentUser = () => {
+    const user = getCurrentUser()
+    setCurrentUser(user)
+  }
+
+  const loadAnalytics = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const useApi = import.meta.env.VITE_USE_API === 'true'
+      
+      if (useApi) {
+        const response = await getSearchAnalytics()
+        setAnalyticsData(response.data || [])
+      } else {
+        // Fallback to localStorage for mock data
+        setAnalyticsData([])
+      }
+    } catch (err) {
+      console.error('Failed to load analytics:', err)
+      setError('Failed to load analytics')
+      setAnalyticsData([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   /* =========================================
-     READ SEARCH HISTORY
+     READ SEARCH HISTORY (fallback)
      ========================================= */
 
   const searchHistory = getSearchHistory()
