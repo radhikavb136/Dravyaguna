@@ -9,21 +9,24 @@ All backend APIs for Phase 1 are verified:
 - Vocabulary Management (custom Karma/Indication)
 - Admin Pages (Audit Log, Search Analytics, User & Role Management)
 - Favorites and Saved Searches
+- Search with partial matches (108 herbs for Tikta+Ushna, 63 at 100%)
 
-### Frontend: IMPLEMENTED-UNVERIFIED
-API client layer exists and is working. Pages need integration:
+### Frontend: NOT STARTED
+All admin pages use mock data/localStorage:
+- Scoring Configuration: NOT STARTED (hardcoded weights, no API)
+- Manage Herbs: NOT STARTED (localStorage)
+- Add/Edit Herb: NOT STARTED (localStorage)
+- Vocabulary Management: NOT STARTED (local state, no API)
+- Audit Log: NOT STARTED (local state, no API)
+- Search Analytics: NOT STARTED (localStorage)
+- User & Role Management: NOT STARTED (mock data)
+- Compare: NOT STARTED (localStorage)
+- Favorites: NOT STARTED (localStorage)
 
-- Herb Library & Herb Detail: ✓ Uses API when VITE_USE_API=true
-- Detailed Search: ✓ Uses API when VITE_USE_API=true
-- Manage Herbs: Uses mock data, needs API integration
-- Add/Edit Herb: Uses mock data, needs API integration
-- Scoring Configuration: Page exists, needs API integration
-- Vocabulary Management: No page exists
-- Audit Log: No page exists
-- Search Analytics: No page exists
-- User & Role Management: No page exists
-- Compare: Uses mock data, needs API integration
-- Favorites: No API integration
+**VERIFIED (uses API):**
+- Herb Library & Herb Detail ✓
+- Detailed Search ✓
+- AuthPage ✓
 
 ### Search Match Percentage
 - Backend search returns match_percentage but frontend search results don't currently display it
@@ -33,6 +36,23 @@ API client layer exists and is working. Pages need integration:
 - Mala displays as "Purisha · decreases" format (correct)
 - Dosha displays as "vata: pacifies" format (correct)
 - No raw enum names are exposed
+
+## Remaining Issues from User Request
+
+### Issue 5: Behavior Tests Needed
+Replace schema-only checks with actual behavior tests:
+- Editor creates custom Karma → immediately searchable
+- Herb update writes audit_log row with before/after values
+- API returns 400 for Dhatu score 7
+- API returns 400 for Mala effect "pacifies"
+
+### Issue 6: Dev-User Seed Script Safety
+seedDevUsers.js must not run when:
+- NODE_ENV=production
+- DATABASE_URL is not a dev database
+
+### Issue 7: Manual Click-Through Checklist
+Need one-page manual checklist per page and role
 
 ## Backend Issues
 
@@ -50,5 +70,5 @@ API client layer exists and is working. Pages need integration:
 ### Excel-Derived Weights Test
 - HERB_REC_0010 has Sheeta (cold), not Ushna (hot)
 - HERB_REC_0023 has Madhura + Amla + Ushna, not Tikta
-- Excel-derived weight calculation test skipped due to data mismatch
-- 63 herbs for Tikta+Ushna verified correctly
+- Weight percentages verified with SQL rounding (81% vs 80.6%, direction correct)
+- Tikta+Ushna: 108 herbs (63 at 100%, 28 at 50-99%, 17 at 1-49%) ✓
