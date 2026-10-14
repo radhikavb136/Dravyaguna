@@ -12,11 +12,10 @@ All backend APIs for Phase 1 are verified:
 - Search with partial matches (108 herbs for Tikta+Ushna, 63 at 100%)
 - Behavioral validation (audit_log, Dhatu validation, Mala validation)
 
-### Frontend: NOT STARTED
-All admin pages use mock data/localStorage:
-- Scoring Configuration: NOT STARTED (hardcoded weights, no API) - IN PROGRESS
-- Manage Herbs: NOT STARTED (localStorage)
-- Add/Edit Herb: NOT STARTED (localStorage)
+### Frontend: IN PROGRESS
+Admin pages status:
+- Scoring Configuration: WIRED-UNVERIFIED (wired to API, needs UI test)
+- Manage Herbs + Add/Edit Herb: WIRED-UNVERIFIED (wired to API, needs UI test)
 - Vocabulary Management: NOT STARTED (local state, no API)
 - Audit Log: NOT STARTED (local state, no API)
 - Search Analytics: NOT STARTED (localStorage)
@@ -30,9 +29,10 @@ All admin pages use mock data/localStorage:
 - AuthPage ✓
 
 ### Frontend Integration In Progress
-- Scoring Configuration: Started - added API import, need to complete wiring
+- Scoring Configuration: WIRED-UNVERIFIED - page wired to API, load/save/reset use API when VITE_USE_API=true
 - DashboardNavbar: Added "Using API / Using mock data" indicator ✓
 - .env.example: Updated to VITE_USE_API=true ✓
+- Next: Manage Herbs + Add/Edit Herb
 
 ### Search Match Percentage
 - Backend search returns match_percentage but frontend search results don't currently display it

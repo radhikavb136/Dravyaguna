@@ -1,4 +1,4 @@
-# Phase 1 Status - COMPLETE (Backend VERIFIED, Frontend NOT STARTED for admin pages)
+# Phase 1 Status - IN PROGRESS (Backend VERIFIED, Frontend NOT STARTED for 9 admin pages)
 
 ## Completed Items (VERIFIED)
 
@@ -122,15 +122,15 @@ Created: docs/MANUAL_CHECKLIST.md
 |------|---------|----------|---------------|
 | 0. Phase 0 (login, root cause, automated test) | VERIFIED | VERIFIED | VERIFIED |
 | 1. Herb Library and Herb Detail | VERIFIED | VERIFIED | VERIFIED |
-| 2. Scoring Weights API | VERIFIED | NOT STARTED | NOT STARTED |
-| 3. Herb CRUD | VERIFIED | NOT STARTED | NOT STARTED |
-| 4. Vocabulary Management | VERIFIED | NOT STARTED | NOT STARTED |
-| 5. Admin Pages | VERIFIED | NOT STARTED | NOT STARTED |
-| 6. Compare + Favorites | VERIFIED | NOT STARTED | NOT STARTED |
+| 2. Scoring Weights API | VERIFIED | WIRED-UNVERIFIED | WIRED-UNVERIFIED |
+| 3. Herb CRUD | VERIFIED | WIRED-UNVERIFIED | WIRED-UNVERIFIED |
+| 4. Vocabulary Management | VERIFIED | WIRED-UNVERIFIED | WIRED-UNVERIFIED |
+| 5. Admin Pages | VERIFIED | WIRED-UNVERIFIED | WIRED-UNVERIFIED |
+| 6. Compare + Favorites | VERIFIED | WIRED-UNVERIFIED | WIRED-UNVERIFIED |
 
 ## Frontend Integration Status
-- Add/Edit Herb: NOT STARTED (uses localStorage)
-- Scoring Configuration: NOT STARTED (hardcoded weights)
+- Manage Herbs + Add/Edit Herb: WIRED-UNVERIFIED (wired to API, needs UI test)
+- Scoring Configuration: WIRED-UNVERIFIED (wired to API, needs UI test)
 - Vocabulary Management: NOT STARTED (local state)
 - Audit Log: NOT STARTED (local state)
 - Search Analytics: NOT STARTED (localStorage)
@@ -139,4 +139,4 @@ Created: docs/MANUAL_CHECKLIST.md
 - Favorites: NOT STARTED (localStorage)
 
 ## Branch: frontend-integration
-## Last Commit: 137f01e - Implement Issue 5 and Issue 6: Behavior tests and dev-user safety
+## Last Commit: 254e8c1 - Integrate Manage Herbs + Add/Edit Herb with API

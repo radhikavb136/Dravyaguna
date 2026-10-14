@@ -11,6 +11,7 @@ node src/index.js
 **Frontend (with VITE_USE_API=true):**
 ```bash
 cd C:\Users\Radhika V Bhosale\Downloads\Dravyaguna
+# Ensure .env contains: VITE_USE_API=true
 npm run dev
 ```
 
