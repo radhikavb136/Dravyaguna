@@ -37,11 +37,11 @@ Updated 2026-10-21. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 
 ## UI and test coverage
 
-- Current frontend Vitest coverage is 21 tests across 5 files, including the API login session name contract, account API contract failures, role normalization/permission matrix, malformed stored session handling, admin page guards, API-authenticated routes, explicit local demo sessions, and herb search result adaptation. Earlier Chromium checks are historical manual evidence, not automated verification; remaining workflows are listed in `PHASE_STATUS.md`.
+- Latest frontend Vitest coverage is 24 tests across 6 files (`npm.cmd test -- --run`). Earlier Chromium checks are historical manual evidence, not automated verification; owner click-through remains outstanding.
 - Herb verification/publish, vocabulary merge/relink/protected deletion, user status mutation, detailed search filters, and compare selection still need browser-level checks. Herb/vocabulary CRUD and permission protections have backend API coverage.
-- Backend suite currently has 15 test files and passed with `npm test`: 15 passed, 0 failed against the isolated local database.
+- Latest backend suite passed against the isolated local database/API: `npm.cmd test` → 22 passed, 0 failed, 22 total. The Supabase URL remains unverified and was not used.
 - ESLint passes with 39 warnings and 0 errors, mostly React Compiler migration, effect, and dependency warnings. Resolve these without changing page behavior.
-- API production build verification passes with `npm run verify:api-build`: `PASS API production bundle excludes 6 mock persistence keys.` The minified JavaScript chunk is approximately 610.40 kB.
+- Production frontend build passes with a 621.36 kB JS chunk warning. `npm.cmd run verify:api-build` reports `PASS API production bundle excludes 6 mock persistence keys.` Offline audits of frontend and backend reported 0 vulnerabilities using cached audit data; this does not verify current online advisory data.
 - In local/demo mode (`VITE_USE_API=false`), pages may use browser storage for mock/demo data. In API mode, server-owned mutations must continue to fail visibly instead of falling back to browser-only writes.
 - `npm run test:cleanup` remains dry-run unless explicitly applied. Preserve the four `dev-*@test.com` accounts and `HERB_REC_*` records.
 

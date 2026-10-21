@@ -1,239 +1,149 @@
-# Manual Click-Through Checklist
+# Staging/manual click-through checklist
 
-## Startup Commands
+No browser click-through is claimed as verified here. Each row describes the manual check the owner should perform against **staging**, then record the result. API/backend automated evidence is tracked separately in [`PHASE_STATUS.md`](./PHASE_STATUS.md).
 
-**Backend:**
-```bash
-cd C:\Users\Radhika V Bhosale\Downloads\Dravyaguna\backend
-node src/index.js
+## Start the application
+
+Use a verified **local development/test PostgreSQL database only** for local review. Do not copy a Supabase production connection into these commands. The current isolated local database used by automated tests is at port `54333`; it must already be running and migrated. Set values in the process environment rather than storing them in this document.
+
+**Backend terminal (PowerShell, from the repository root):**
+
+```powershell
+Set-Location 'C:\Users\Radhika V Bhosale\Downloads\Dravyaguna (2)\Dravyaguna\Dravyaguna\backend'
+$env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:54333/dravyaguna'
+$env:JWT_SECRET = 'local-only-development-secret-change-before-deploy'
+$env:FRONTEND_ORIGIN = 'http://localhost:5173'
+$env:PORT = '4000'
+$env:NODE_ENV = 'development'
+npm.cmd start
 ```
 
-**Frontend (with VITE_USE_API=true):**
-```bash
-cd C:\Users\Radhika V Bhosale\Downloads\Dravyaguna
-# Ensure .env contains: VITE_USE_API=true
-npm run dev
+**Frontend terminal (PowerShell, from the repository root):**
+
+```powershell
+Set-Location 'C:\Users\Radhika V Bhosale\Downloads\Dravyaguna (2)\Dravyaguna\Dravyaguna'
+$env:VITE_USE_API = 'true'
+$env:VITE_API_BASE_URL = 'http://localhost:4000'
+npm.cmd run dev -- --host 127.0.0.1
 ```
 
-**Required .env keys:**
-- DATABASE_URL
-- JWT_SECRET
-- FRONTEND_ORIGIN
+Open `http://localhost:5173`; verify backend readiness at `http://localhost:4000/api/health`. These commands assume the existing local PostgreSQL service at port `54333` is already running. Staging needs separately configured host environment variables and must not use these local values.
 
-**Dev Users** (password min 10; default seed `Dev1234567`, or `DEV_USER_PASSWORD`):
-- dev-admin@test.com → admin
-- dev-editor@test.com → editor
-- dev-expert@test.com → domain_expert
-- dev-clinician@test.com → clinician
+## Account and role setup
 
----
+Backend roles: `admin`, `domain_expert`, `editor`, `clinician`. “Doctor” and regular “User” map to `clinician`; “Ayurvedic Reviewer” maps to `domain_expert`. Local test users are `dev-admin@test.com`, `dev-expert@test.com`, `dev-editor@test.com`, and `dev-clinician@test.com`; use only the locally configured development password. Do not seed these users into staging or production. Staging's first admin must be created with `npm run admin:first` from `backend/` using the host's verified staging database connection.
 
-## Pages and Roles Checklist
+## Route-by-role manual checks
 
-### 1. Login Page
-**All Roles:**
-- [ ] Enter email and password
-- [ ] Click login button
-- [ ] Verify redirect to appropriate dashboard
-- [ ] Verify JWT stored in localStorage
-- [ ] Verify role displayed in UI
+Status is `WIRED-UNVERIFIED` until the owner completes the click-through. Rows marked “denied” should show the access-denied/redirect state and must also be covered by backend authorization.
 
-**Wrong Password:**
-- [ ] Enter wrong password
-- [ ] Verify error message shown
-- [ ] Verify no localStorage fallback when VITE_USE_API=true
+| Page / route | Role | Manual check and expected result | Clicked | Status |
+|---|---|---|---|---|
+| Landing `/` | Public | Load landing page and follow the sign-in link. | [ ] | WIRED-UNVERIFIED |
+| Authentication `/auth` | Public | Sign in; verify role-specific redirect. Try a wrong password and confirm an error with no local API-mode login. | [ ] | WIRED-UNVERIFIED |
+| Password reset `/password-reset` | Public | Request a reset and confirm generic response. Reset links cannot arrive until SMTP delivery is configured. | [ ] | BLOCKED |
+| Help/support `/help-support` | Public | Load the page and verify navigation back to product pages. | [ ] | WIRED-UNVERIFIED |
+| Upgrade `/upgrade` | Public | Load the page; confirm no purchase is represented as successful. | [ ] | WIRED-UNVERIFIED |
+| Payment `/payment` | Public | Confirm payment is unavailable and no charge/success is simulated. | [ ] | BLOCKED |
+| Learn more `/learn-more` | Public | Load explanatory content and navigate back. | [ ] | WIRED-UNVERIFIED |
+| Doctor dashboard `/doctor` | Admin | Load dashboard; confirm dashboard data is appropriate to this account. | [ ] | WIRED-UNVERIFIED |
+| Doctor dashboard `/doctor` | Domain expert | Load dashboard; confirm dashboard data is appropriate to this account. | [ ] | WIRED-UNVERIFIED |
+| Doctor dashboard `/doctor` | Editor | Load dashboard; confirm dashboard data is appropriate to this account. | [ ] | WIRED-UNVERIFIED |
+| Doctor dashboard `/doctor` | Clinician | Load dashboard and verify API-backed counts/favorites where present. | [ ] | WIRED-UNVERIFIED |
+| Search `/search` | Admin | Run an approved-term Simple Search and a Detailed Search. | [ ] | WIRED-UNVERIFIED |
+| Search `/search` | Domain expert | Run searches and verify the language/unsupported-query note is truthful. | [ ] | WIRED-UNVERIFIED |
+| Search `/search` | Editor | Run searches; verify drafts are visible only where permitted. | [ ] | WIRED-UNVERIFIED |
+| Search `/search` | Clinician | Search reviewed/verified records; verify empty/error states and score breakdown. | [ ] | WIRED-UNVERIFIED |
+| Search results `/search-results` | Admin | Open results and verify match ranking and details. | [ ] | WIRED-UNVERIFIED |
+| Search results `/search-results` | Domain expert | Open results and verify match ranking and details. | [ ] | WIRED-UNVERIFIED |
+| Search results `/search-results` | Editor | Open results and verify match ranking and details. | [ ] | WIRED-UNVERIFIED |
+| Search results `/search-results` | Clinician | Open results; verify partial matches and per-parameter breakdown. | [ ] | WIRED-UNVERIFIED |
+| Herb library `/herb-library` | Admin | Browse, filter, paginate, and open a herb. | [ ] | WIRED-UNVERIFIED |
+| Herb library `/herb-library` | Domain expert | Browse, filter, paginate, and open a herb. | [ ] | WIRED-UNVERIFIED |
+| Herb library `/herb-library` | Editor | Verify drafts are included and pagination reaches all records. | [ ] | WIRED-UNVERIFIED |
+| Herb library `/herb-library` | Clinician | Verify only reviewed/verified records appear. | [ ] | WIRED-UNVERIFIED |
+| Herb detail `/herb/:id` | Admin | Verify fields, references, image URL behavior, favorite, translation label, and InfoIcon. | [ ] | WIRED-UNVERIFIED |
+| Herb detail `/herb/:id` | Domain expert | Verify fields; test language selector and translation verification control when configured. | [ ] | WIRED-UNVERIFIED |
+| Herb detail `/herb/:id` | Editor | Verify allowed record visibility and no Verify action. | [ ] | WIRED-UNVERIFIED |
+| Herb detail `/herb/:id` | Clinician | Verify reviewed/verified visibility, favorite, and denied draft IDs. | [ ] | WIRED-UNVERIFIED |
+| Compare `/compare` | Admin | Select 2–3 IDs and verify all herb data is read from the API. | [ ] | WIRED-UNVERIFIED |
+| Compare `/compare` | Domain expert | Select 2–3 IDs and verify all herb data is read from the API. | [ ] | WIRED-UNVERIFIED |
+| Compare `/compare` | Editor | Select 2–3 IDs and verify all herb data is read from the API. | [ ] | WIRED-UNVERIFIED |
+| Compare `/compare` | Clinician | Compare visible herbs; confirm local storage contains IDs only. | [ ] | WIRED-UNVERIFIED |
+| Favorites `/favorites` | Admin | Add/remove a favorite and confirm reload persistence. | [ ] | WIRED-UNVERIFIED |
+| Favorites `/favorites` | Domain expert | Add/remove a favorite and confirm reload persistence. | [ ] | WIRED-UNVERIFIED |
+| Favorites `/favorites` | Editor | Add/remove a favorite and confirm reload persistence. | [ ] | WIRED-UNVERIFIED |
+| Favorites `/favorites` | Clinician | Add/remove a favorite and confirm per-user isolation. | [ ] | WIRED-UNVERIFIED |
+| Profile `/profile` | Admin | Edit allowed profile fields and confirm persisted values after reload. | [ ] | WIRED-UNVERIFIED |
+| Profile `/profile` | Domain expert | Edit allowed profile fields and confirm persisted values after reload. | [ ] | WIRED-UNVERIFIED |
+| Profile `/profile` | Editor | Edit allowed profile fields and confirm persisted values after reload. | [ ] | WIRED-UNVERIFIED |
+| Profile `/profile` | Clinician | Edit allowed profile fields and confirm persisted values after reload. | [ ] | WIRED-UNVERIFIED |
+| Settings `/settings` | Admin | Change account-backed preferences; confirm UI-only preferences stay local. | [ ] | WIRED-UNVERIFIED |
+| Settings `/settings` | Domain expert | Change account-backed preferences; confirm UI-only preferences stay local. | [ ] | WIRED-UNVERIFIED |
+| Settings `/settings` | Editor | Change account-backed preferences; confirm UI-only preferences stay local. | [ ] | WIRED-UNVERIFIED |
+| Settings `/settings` | Clinician | Change search preferences and verify them after reload. | [ ] | WIRED-UNVERIFIED |
+| Language `/language` | Admin | Save language preference and verify stored preference; full interface localization is unavailable. | [ ] | WIRED-UNVERIFIED |
+| Language `/language` | Domain expert | Save language preference and verify stored preference; full interface localization is unavailable. | [ ] | WIRED-UNVERIFIED |
+| Language `/language` | Editor | Save language preference and verify stored preference; full interface localization is unavailable. | [ ] | WIRED-UNVERIFIED |
+| Language `/language` | Clinician | Select a herb-detail language and verify only machine-translated fields change. | [ ] | WIRED-UNVERIFIED |
+| Admin dashboard `/admin` | Admin | Verify metrics and recent data come from APIs; confirm empty/error states. | [ ] | WIRED-UNVERIFIED |
+| Admin dashboard `/admin` | Domain expert | Verify allowed dashboard metrics; user/admin-only data remains inaccessible. | [ ] | WIRED-UNVERIFIED |
+| Admin dashboard `/admin` | Editor | Expect access denied. | [ ] | WIRED-UNVERIFIED |
+| Admin dashboard `/admin` | Clinician | Expect redirect out of the admin area. | [ ] | WIRED-UNVERIFIED |
+| Manage herbs `/admin/manage-herbs` | Admin | Create, edit, archive; confirm database persistence and audit. | [ ] | WIRED-UNVERIFIED |
+| Manage herbs `/admin/manage-herbs` | Domain expert | Create/edit and Verify; archive must be denied. | [ ] | WIRED-UNVERIFIED |
+| Manage herbs `/admin/manage-herbs` | Editor | Create/edit drafts and submit review; Verify/archive must be denied. | [ ] | WIRED-UNVERIFIED |
+| Manage herbs `/admin/manage-herbs` | Clinician | Expect redirect/access denial and backend 403 on writes. | [ ] | WIRED-UNVERIFIED |
+| Add/edit herb `/admin/add-herb` | Admin | Save draft, edit fields, test image upload only when Storage is configured. | [ ] | WIRED-UNVERIFIED |
+| Add/edit herb `/admin/add-herb` | Domain expert | Edit/verify an approved test record; verify edit status rules. | [ ] | WIRED-UNVERIFIED |
+| Add/edit herb `/admin/add-herb` | Editor | Create draft/edit and verify 400 field errors; Verify action must be absent/denied. | [ ] | WIRED-UNVERIFIED |
+| Add/edit herb `/admin/add-herb` | Clinician | Expect redirect/access denial. | [ ] | WIRED-UNVERIFIED |
+| Vocabulary `/admin/vocabulary` | Admin | Create term; edit/merge/delete only unused terms; verify relinking and audit. | [ ] | WIRED-UNVERIFIED |
+| Vocabulary `/admin/vocabulary` | Domain expert | Create terms; existing-term edit/merge/delete must be denied. | [ ] | WIRED-UNVERIFIED |
+| Vocabulary `/admin/vocabulary` | Editor | Create terms; existing-term edit/merge/delete must be denied. | [ ] | WIRED-UNVERIFIED |
+| Vocabulary `/admin/vocabulary` | Clinician | Expect redirect/access denial. | [ ] | WIRED-UNVERIFIED |
+| Scoring `/admin/scoring` | Admin | Change a weight; run a search and verify the next score uses it; restore baseline. | [ ] | WIRED-UNVERIFIED |
+| Scoring `/admin/scoring` | Domain expert | Change a weight; run a search and verify the next score uses it; restore baseline. | [ ] | WIRED-UNVERIFIED |
+| Scoring `/admin/scoring` | Editor | Expect access denied and backend 403 for changes. | [ ] | WIRED-UNVERIFIED |
+| Scoring `/admin/scoring` | Clinician | Expect access denied and backend 403 for changes. | [ ] | WIRED-UNVERIFIED |
+| Analytics `/admin/search-analytics` | Admin | Verify totals, zero/weak results, recent queries, and language breakdown when available. | [ ] | WIRED-UNVERIFIED |
+| Analytics `/admin/search-analytics` | Domain expert | Verify analytics access and data. | [ ] | WIRED-UNVERIFIED |
+| Analytics `/admin/search-analytics` | Editor | Expect access denied and backend 403. | [ ] | WIRED-UNVERIFIED |
+| Analytics `/admin/search-analytics` | Clinician | Expect access denied and backend 403. | [ ] | WIRED-UNVERIFIED |
+| Users `/admin/users` | Admin | Create user, change role, deactivate/reactivate; confirm last-admin and self-action guards. | [ ] | WIRED-UNVERIFIED |
+| Users `/admin/users` | Domain expert | Expect access denied and backend 403. | [ ] | WIRED-UNVERIFIED |
+| Users `/admin/users` | Editor | Expect access denied and backend 403. | [ ] | WIRED-UNVERIFIED |
+| Users `/admin/users` | Clinician | Expect access denied and backend 403. | [ ] | WIRED-UNVERIFIED |
+| Audit log `/admin/audit-log` | Admin | Verify actor, before/after, filters, and audited mutations. | [ ] | WIRED-UNVERIFIED |
+| Audit log `/admin/audit-log` | Domain expert | Expect access denied and backend 403. | [ ] | WIRED-UNVERIFIED |
+| Audit log `/admin/audit-log` | Editor | Expect access denied and backend 403. | [ ] | WIRED-UNVERIFIED |
+| Audit log `/admin/audit-log` | Clinician | Expect access denied and backend 403. | [ ] | WIRED-UNVERIFIED |
+| Admin profile `/admin/profile` | Admin | Edit name/email; confirm persisted; photo upload remains separate from profile photo. | [ ] | WIRED-UNVERIFIED |
+| Admin profile `/admin/profile` | Domain expert | Edit own name/email; confirm persisted. | [ ] | WIRED-UNVERIFIED |
+| Admin profile `/admin/profile` | Editor | Edit own name/email; confirm persisted. | [ ] | WIRED-UNVERIFIED |
+| Admin profile `/admin/profile` | Clinician | Expect redirect from admin layout; use `/profile` instead. | [ ] | WIRED-UNVERIFIED |
+| Admin settings `/admin/settings` | Admin | Verify account settings load/save and failed requests show errors. | [ ] | WIRED-UNVERIFIED |
+| Admin settings `/admin/settings` | Domain expert | Verify account settings load/save and failed requests show errors. | [ ] | WIRED-UNVERIFIED |
+| Admin settings `/admin/settings` | Editor | Verify account settings load/save and failed requests show errors. | [ ] | WIRED-UNVERIFIED |
+| Admin settings `/admin/settings` | Clinician | Expect redirect from admin layout; use `/settings` instead. | [ ] | WIRED-UNVERIFIED |
+| Admin language `/admin/language` | Admin | Save English/Hindi/Marathi/Sanskrit preference; verify selected language after reload. | [ ] | WIRED-UNVERIFIED |
+| Admin language `/admin/language` | Domain expert | Save preference; confirm admin language page role boundary. | [ ] | WIRED-UNVERIFIED |
+| Admin language `/admin/language` | Editor | Save preference; confirm persistence after reload. | [ ] | WIRED-UNVERIFIED |
+| Admin language `/admin/language` | Clinician | Expect redirect from admin layout; use `/language`. | [ ] | WIRED-UNVERIFIED |
+| Admin upgrade `/admin/upgrade-plan` | Admin | Confirm no plan purchase is represented as successful. | [ ] | WIRED-UNVERIFIED |
+| Admin upgrade `/admin/upgrade-plan` | Domain expert | Confirm no plan purchase is represented as successful. | [ ] | WIRED-UNVERIFIED |
+| Admin upgrade `/admin/upgrade-plan` | Editor | Confirm page is informational and billing is unavailable. | [ ] | WIRED-UNVERIFIED |
+| Admin upgrade `/admin/upgrade-plan` | Clinician | Expect redirect from admin layout. | [ ] | WIRED-UNVERIFIED |
 
-**Expired Token:**
-- [ ] Manually expire JWT in localStorage
-- [ ] Refresh page
-- [ ] Verify auto-logout and redirect to login
+## Runtime and release checks
 
----
+- [ ] Confirm `GET /api/health` returns HTTP 200 with database status `ok`.
+- [ ] Confirm frontend deep links `/herb-library`, `/admin/manage-herbs`, and `/password-reset` load from the staging host.
+- [ ] Confirm a herb/profile/settings/favorite/saved-search mutation survives reload and is isolated between two authorized accounts.
+- [ ] Confirm clinician/editor/reviewer negative permissions receive real backend 403s where specified.
+- [ ] Confirm failed network requests never show success.
+- [ ] Do not run the checklist against production before the owner approves release.
 
-### 2. Herb Library
-**Clinician:**
-- [ ] View list of herbs
-- [ ] Verify only reviewed/verified herbs shown
-- [ ] Click herb to view detail
-- [ ] Verify herb detail loads
+## Blocking inputs for staging
 
-**Editor:**
-- [ ] View list of herbs
-- [ ] Verify all statuses shown (draft, reviewed, verified)
-- [ ] Click herb to view detail
-- [ ] Verify herb detail loads
-
-**Admin:**
-- [ ] View list of herbs
-- [ ] Verify all statuses shown
-- [ ] Click herb to view detail
-- [ ] Verify herb detail loads
-
----
-
-### 3. Herb Detail
-**All Roles:**
-- [ ] View herb details
-- [ ] Verify Rasa, Guna, Virya, Vipaka displayed
-- [ ] Verify Mala shows "increases"/"decreases" (not "pacifies")
-- [ ] Verify Dosha shows "pacifies"/"increases" (not raw enum)
-- [ ] Verify no raw enum names displayed
-
----
-
-### 4. Detailed Search
-**Clinician:**
-- [ ] Select filters (Rasa, Guna, Karma, etc.)
-- [ ] Click search
-- [ ] Verify results returned
-- [ ] Verify match percentages shown
-- [ ] Test Tikta + Deepana → should show 55 herbs at 100%
-
-**Editor:**
-- [ ] Select filters
-- [ ] Click search
-- [ ] Verify results returned
-- [ ] Verify draft herbs can appear
-
-**Admin:**
-- [ ] Select filters
-- [ ] Click search
-- [ ] Verify results returned
-- [ ] Verify all statuses included
-
----
-
-### 5. Manage Herbs (API-backed in API mode; CRUD browser check pending)
-**Editor:**
-- [ ] View herb list
-- [ ] Click "Add Herb"
-- [ ] Fill herb form
-- [ ] Submit
-- [ ] Verify herb created as draft
-- [ ] Edit herb
-- [ ] Move to reviewed
-
-**Admin:**
-- [ ] View herb list
-- [ ] Soft delete herb
-- [ ] Verify herb archived
-
-**Clinician:**
-- [ ] View herb list
-- [ ] Verify cannot add/edit/delete
-
----
-
-### 6. Add/Edit Herb (API-backed in API mode; validation is covered by backend tests)
-**Editor:**
-- [ ] Fill all fields
-- [ ] Submit
-- [ ] Verify validation (Dhatu 0-5, Mala increases/decreases)
-- [ ] Verify Dhatu 7 rejected with 400
-- [ ] Verify Mala "pacifies" rejected with 400
-
-**Admin:**
-- [ ] Edit herb
-- [ ] Change status
-- [ ] Verify audit log row created with before/after
-
----
-
-### 7. Scoring Configuration (API-backed; browser persistence verified)
-**Admin/Domain Expert:**
-- [ ] View current weights
-- [ ] Change a weight
-- [ ] Submit
-- [ ] Verify weight updated
-- [ ] Run search to verify new weight reflected
-- [ ] Restore original weight
-
-**Editor/Clinician:**
-- [ ] Verify cannot change weights (403)
-
----
-
-### 8. Vocabulary Management (API-backed; browser mutation check pending)
-**Admin/Domain Expert:**
-- [ ] View vocabulary terms
-- [ ] Add custom Karma term
-- [ ] Verify term appears in filters
-- [ ] Search with custom term
-- [ ] Verify results returned
-- [ ] Add custom Indication term
-- [ ] Verify term appears in filters
-
-**Editor/Clinician:**
-- [ ] Verify cannot add terms (403)
-
----
-
-### 9. Audit Log (API-backed; admin page load verified)
-**Admin:**
-- [ ] View audit log entries
-- [ ] Verify actor, action, entity_type shown
-- [ ] Verify before/after JSON displayed
-- [ ] Filter by date or action
-
-**Other Roles:**
-- [ ] Verify cannot access (403)
-
----
-
-### 10. Search Analytics (API-backed; admin page load verified)
-**Admin:**
-- [ ] View search analytics
-- [ ] Verify search counts by day
-- [ ] Verify top searches shown
-
-**Other Roles:**
-- [ ] Verify cannot access (403)
-
----
-
-### 11. User & Role Management (API-backed; name/email persistence verified)
-**Admin:**
-- [ ] View user list
-- [ ] Change user role
-- [ ] Verify role updated
-
-**Other Roles:**
-- [ ] Verify cannot access (403)
-
----
-
-### 12. Compare (temporary herb selection uses browser storage; UI flow pending)
-**All Roles:**
-- [ ] Add herbs to comparison
-- [ ] View comparison page
-- [ ] Verify herbs compared side-by-side
-- [ ] Remove herb from comparison
-
----
-
-### 13. Favorites (API-backed; browser add/list/remove verified)
-**All Roles:**
-- [ ] Add herb to favorites
-- [ ] View favorites page
-- [ ] Verify favorite herb shown
-- [ ] Remove from favorites
-- [ ] Verify per-user isolation
-
----
-
-### 14. Saved Searches (API-backed; browser create/list/run/delete verified)
-**All Roles:**
-- [ ] Save current search
-- [ ] Name the search
-- [ ] View saved searches
-- [ ] Load saved search
-- [ ] Remove saved search
-
----
-
-## Current verification notes
-
-- Browser-verified scopes include admin and clinician login, clinician profile/language/settings persistence, admin profile/language/settings persistence, admin read pages, user name/email edit, scoring save/restore, herb library/detail, favorites, simple search, and saved searches. See `PHASE_STATUS.md` for environment and exact limits.
-- Browser checks use an isolated local PostgreSQL database. They do not verify the Supabase URL in `backend/.env`; the test guard requires the exact development project reference before permitting that target.
-- Backend API tests cover auth, role restrictions, herb CRUD, vocabulary operations, scoring, admin data, favorites, saved searches, and account APIs. They do not replace the remaining browser checks above.
-- Demo mode (`VITE_USE_API=false`) may use local storage for mock data. In API mode, server-owned actions should display request failures instead of reporting local-only success.
+Provide staging-only Supabase project/session-pooler URL and `DATABASE_URL`, `JWT_SECRET`, exact `FRONTEND_ORIGIN`, Render/Vercel access, and the staging frontend/API URLs. To enable integrations, provide Supabase Storage URL/service-role key/bucket, SMTP account and sender, an LLM provider/key/model, and Sarvam key (optionally Google or Azure translation credentials). Provide Sentry DSN if error monitoring is required. The company Ayurveda expert must approve vocabulary mappings and definitions and confirm the source-data decisions. The production database password and JWT secret must be newly rotated; do not send their values in chat or commit them.

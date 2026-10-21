@@ -63,11 +63,20 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 - The isolated importer/migration fixes, match rounding correction, and custom vocabulary slug/canonical lookup fix are retained.
 - Simple search trigram similarity now uses the Phase B threshold (0.45); synonym quality/coverage still depends on the pending domain-approved seed list.
 
+## Latest verification snapshot (2026-10-21)
+
+- Backend: `npm.cmd test` against isolated local DB/API → 22 passed, 0 failed, 22 total.
+- Frontend: `npm.cmd test -- --run` → 24 passed in 6 files; `npm.cmd run lint` → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded with 621.36 kB chunk warning.
+- API bundle scan: `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
+- Migrations: `npm.cmd run migrate` reported no pending migrations on isolated local PostgreSQL; `npm.cmd run check:rls` reported all public tables have RLS enabled.
+- Offline audits: frontend and backend `npm.cmd audit --offline` reported 0 vulnerabilities using cached audit data; this does not establish current online advisory status.
+- Browser click-through, staging Supabase, Docker builds, and live external providers were not verified in this snapshot.
+
 ## Current status table
 
 | Phase | Feature | Status | Evidence / remaining work |
 |---|---|---|---|
-| A0 | Test foundation and local DB guard | VERIFIED | `backend npm test`: 15 passed, 0 failed; frontend `npm test -- --run`: 21 passed, 0 failed. |
+| A0 | Test foundation and local DB guard | VERIFIED | Latest backend `npm.cmd test` on isolated local DB/API: 22 passed, 0 failed, 22 total. Frontend `npm.cmd test -- --run`: 24 passed in 6 files. |
 | A | Authentication and role enforcement | VERIFIED | Backend auth/RBAC and frontend role-boundary automated suites passed in those commands. |
 | A | Herb library, details, CRUD, verification, archive | WIRED-UNVERIFIED | API suite passes; end-to-end page and role workflows still need automated browser tests. |
 | A | Detailed search and scoring | WIRED-UNVERIFIED | API suite passes; detailed search UI workflow and search-after-weight-change UI remain unverified. |
@@ -81,7 +90,9 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 | B3a | Admin CSV export endpoint and script | VERIFIED | Local backend `npm.cmd test`: `21 passed, 0 failed, 21 total`; covers admin-only access, CSV headers/filename, and stored data. `npm run export:herbs` uses `API_BASE_URL` plus `EXPORT_ADMIN_TOKEN`. |
 | B3b | XLSX export | BLOCKED | API reports HTTP 501 explicitly; no XLSX writer dependency is available in this environment. |
 | B4 | Query/performance work | WIRED-UNVERIFIED | SQL materializes and limits ranked candidates before computing breakdown JSON; backend contract and score tests pass. Local warm EXPLAIN decreased 18.630→13.813 ms. Controlled pool-size measurements are recorded above, but cloud/Supabase throughput and larger production data remain unverified. Existing historical flat-throughput results had no archived metrics; current measurements suggest concurrency queuing (latency roughly doubles at pool 5 / 10 clients) and demonstrate a pool-10 throughput increase at 10 clients, but cannot explain the earlier run conclusively. |
-| C | Herb descriptive translation, cache, verification, selector | WIRED-UNVERIFIED | Backend mock/cache/verification API tests pass; detail selector calls `GET /api/herbs/:id?lang=...` and labels machine output. Browser interaction is not verified. Live Sarvam/Google/Azure requests are blocked until keys are supplied; search-query translation and full UI localization remain unimplemented. |
+| C1 | Herb descriptive translation, cache, verification, selector | WIRED-UNVERIFIED | Mock-backed API tests cover cache hits, provider-call counts, verification permissions/audit, and invalidation. Live providers require keys; browser interaction is unverified. |
+| C2 | Search-query translation and localized results | NOT STARTED | Not implemented. |
+| C3 | Frontend interface localization | NOT STARTED | Language preference/selector currently affects herb descriptive fields only; menus and other pages are not localized. |
 | D1/D2 | Grounded explain API, cache, and InfoIcon | WIRED-UNVERIFIED | Mock-backed service/API and InfoIcon unit tests pass; rate limiting, cache invalidation and structured failure response are tested. Browser interaction is not verified. Real OpenAI calls remain blocked pending `LLM_API_KEY` and `LLM_MODEL`. |
 | E1 | Herb image upload | BLOCKED | Endpoint and Add/Edit UI validate JPEG/PNG/WebP by magic bytes and 2 MB cap; tests verify permissions and reject external writes in test mode. Live upload needs Supabase Storage credentials, bucket, and policy. |
 | E2 | Password reset | BLOCKED | API/UI and backend tests cover generic requests, hashed single-use tokens, 30-minute expiry, and password change. The email sender is a no-output stub; SMTP delivery is not implemented/configured, so users cannot receive reset links. |
@@ -93,12 +104,14 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 
 1. Obtain expert approval for any starter synonym mappings and add browser coverage for Simple Search feedback; the draft CSV is intentionally not imported.
 2. Provide Supabase Storage configuration before enabling image uploads and implement/configure SMTP delivery before enabling password resets.
-3. Add XLSX export and B4 query/performance work; B2 remains blocked until the Ayurveda expert approves mappings.
-4. Add automated browser coverage where the environment supports it. `agent-browser` is not installed; do not label manual browser claims VERIFIED.
-5. Deploy to staging and verify only after a staging Supabase target, hosting accounts, and secrets are supplied. Do not run migrations against the unverified Supabase URL.
+3. Implement C2 search-query translation and C3 interface localization; add XLSX export.
+4. Browser click-through remains for the owner; prior Chromium notes are manual evidence and do not make a feature VERIFIED.
+5. Deploy to staging only after a confirmed staging Supabase target, hosting accounts, and deployment secrets are supplied. Do not run migrations against the unverified Supabase URL.
 
 ## External launch dependencies
 
 Live translation and LLM generation, SMTP password reset/email verification, persistent image storage, billing, production hosting/secrets, and a deployment-time database/RLS policy review require external configuration and remain incomplete. Explain retrieval uses stored SQL records and scoring; no external vector service is currently required. Dockerfiles and context exclusions were updated, but the Docker image was not built because Docker is not installed in this environment.
+
+Additional launch inputs still required: Sarvam and LLM keys; optional Google/Azure translation credentials; SMTP credentials; Supabase Storage URL, service role key, bucket and read policy; confirmed staging and production Supabase projects; hosting accounts and domain; monitoring configuration. The Ayurveda expert must approve vocabulary mappings and definitions. The company must confirm dataset scope, Organ data, and reviewed-record policy. Explain retrieval uses stored SQL records and scoring; no external vector service is currently required. Dockerfiles and context exclusions are present, but Docker was unavailable. Browser click-through is pending with the owner.
 
 Labels: `NOT STARTED`, `WIRED-UNVERIFIED`, `VERIFIED`, `BLOCKED`. VERIFIED refers only to the scope and environment stated above.
