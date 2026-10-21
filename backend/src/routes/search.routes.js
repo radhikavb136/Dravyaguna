@@ -129,6 +129,7 @@ searchRouter.post('/simple', (req, res, next) => {
 
     res.json({
       lang: meta.language,
+      display_lang: meta.displayLanguage,
       results,
       matched_terms: meta.matched_terms,
       unmatched_tokens: meta.unmatched_tokens,

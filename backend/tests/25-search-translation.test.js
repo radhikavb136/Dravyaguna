@@ -39,6 +39,14 @@ export async function run() {
   assert(translatedSearch.meta.matched_terms.some((term) => term.canonical === 'Deepana'), 'translated query maps to the approved canonical term');
   assertEqual(translatedSearch.meta.language, 'hi-IN', 'response preserves the query language');
 
+  const englishQueryForHindiDisplay = await runSimpleSearch({
+    query: 'Deepana', lang: 'hi-IN', role: 'clinician', limit: 20, offset: 0,
+    translationProvider: provider,
+  });
+  assert(englishQueryForHindiDisplay.meta.matched_terms.some((term) => term.canonical === 'Deepana'), 'English search still matches when Hindi is the display language');
+  assertEqual(englishQueryForHindiDisplay.meta.language, 'en-IN', 'Latin-script query remains English');
+  assertEqual(englishQueryForHindiDisplay.meta.displayLanguage, 'hi-IN', 'display language remains the account preference');
+
   const mockResult = await translateSearchQueryToEnglish('दीपन', 'hi-IN', {
     name: 'mock', async translate() { throw new Error('mock translation must not be treated as real'); },
   });
@@ -59,6 +67,15 @@ export async function run() {
   assertEqual(unconfigured.status, 200, 'unconfigured translation degrades to a valid empty search response');
   assertEqual(unconfigured.data.results.length, 0, 'unconfigured provider does not fabricate matching results');
   assert(unconfigured.data.note.includes('not configured'), 'response explains that translation is not configured');
+
+  const englishQuery = await api('POST', '/api/search/simple', {
+    token: tokens.clinician,
+    body: { query: 'Deepana', lang: 'hi-IN' },
+  });
+  assertEqual(englishQuery.status, 200, 'English query is accepted with Hindi display preference');
+  assert(englishQuery.data.results.length > 0, 'English query does not become an untranslated Hindi query');
+  assertEqual(englishQuery.data.lang, 'en-IN', 'API reports detected query language');
+  assertEqual(englishQuery.data.display_lang, 'hi-IN', 'API reports preferred display language separately');
 
   const detected = await api('POST', '/api/search/simple', {
     token: tokens.clinician,

@@ -11,6 +11,7 @@ import { searchHerbsDetailed, searchHerbsSimple } from "../api/herbs"
 import { getAccount } from "../api/account"
 import { saveSearch } from "../api/favorites"
 import { USE_API } from "../api/client"
+import { prepareApiResultsForCards, prepareHerbForCard } from "../utils/searchResults"
 
 import "../styles/SearchResults.css"
 
@@ -58,57 +59,6 @@ const searchTermMappings = {
 /* =========================================
    PREPARE HERB FOR RESULT CARD
    ========================================= */
-
-function prepareHerbForCard(herb, match) {
-  // Handle both API and local data formats
-  const englishName = herb.englishName || herb.name
-  const botanicalName = herb.botanicalName || herb.scientificName
-  const partUsed = herb.partUsed
-  const prabhava = herb.prabhava
-  const verificationStatus = herb.verificationStatus || herb.status
-  const regionalNames = herb.regionalNames || []
-  const rasa = herb.rasa || []
-  const guna = herb.guna || []
-  const virya = herb.virya
-  const vipaka = herb.vipaka
-  const dosha = herb.dosha || {}
-  const dhatu = herb.dhatu || []
-  const mala = herb.mala || []
-  const srotas = herb.srotas || []
-  const avayava = herb.avayava || []
-  const karma = herb.karma || []
-  const indications = herb.indications || []
-
-  return {
-    ...herb,
-    englishName,
-    botanicalName,
-    partUsed,
-    prabhava,
-    verificationStatus,
-    regionalNames,
-    rasa,
-    guna,
-    virya,
-    vipaka,
-    dosha,
-    dhatu,
-    mala,
-    srotas,
-    avayava,
-    karma,
-    indications,
-    match,
-    description: `Part used: ${
-      partUsed || "Not specified"
-    }. Indications: ${
-      Array.isArray(indications)
-        ? indications.join(", ")
-        : indications || "Not specified"
-    }.`,
-  }
-}
-
 
 /* =========================================
    GET ALL SEARCHABLE HERB DATA
@@ -841,10 +791,7 @@ function SearchResults() {
     useMemo(() => {
       // Use API results when available
       if (USE_API) {
-        return (apiResults || []).map(herb => ({
-          herb,
-          match: herb.matchPercentage ?? herb.match ?? 100,
-        }))
+        return prepareApiResultsForCards(apiResults, preferredLanguage)
       }
 
       // Fallback to client-side search
@@ -921,7 +868,8 @@ function SearchResults() {
         (item) =>
           prepareHerbForCard(
             item.herb,
-            item.match
+            item.match,
+            USE_API ? preferredLanguage : "en-IN"
           )
       )
     }, [
@@ -929,6 +877,7 @@ function SearchResults() {
       mode,
       query,
       selectedParameters,
+      preferredLanguage,
     ])
 
 

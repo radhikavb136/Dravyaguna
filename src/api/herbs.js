@@ -298,7 +298,8 @@ export async function searchHerbsSimple(query, limit = 50, filters = {}, options
     results: response.results.map(adaptHerb),
     matchedTerms: response.matched_terms || [],
     unmatchedTokens: response.unmatched_tokens || [],
-    language: response.lang || response.meta?.language || 'en-IN',
+    language: response.display_lang || response.lang || response.meta?.displayLanguage || 'en-IN',
+    queryLanguage: response.lang || response.meta?.language || 'en-IN',
     note: response.note || '',
   };
 }

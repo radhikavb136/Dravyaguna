@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { USE_API } from "../api/client"
 import { addFavorite, getFavorites, removeFavorite } from "../api/favorites"
+import { getHerbById } from "../api/herbs"
 
 function HerbResultCard({ herb }) {
   const navigate = useNavigate()
@@ -9,6 +10,46 @@ function HerbResultCard({ herb }) {
   const [isFavorite, setIsFavorite] = useState(false)
   const [favoriteBusy, setFavoriteBusy] = useState(false)
   const [favoriteError, setFavoriteError] = useState("")
+  const [localizedPartUsed, setLocalizedPartUsed] = useState(null)
+  const displayLanguage = herb.displayLanguage || "en-IN"
+  const shouldTranslate = USE_API && displayLanguage !== "en-IN"
+
+  useEffect(() => {
+    if (!shouldTranslate || !herb.id) return
+    let cancelled = false
+    getHerbById(herb.id, displayLanguage)
+      .then((localizedHerb) => {
+        if (cancelled) return
+        const translation = localizedHerb.translations?.part_used
+        setLocalizedPartUsed({
+          language: displayLanguage,
+          text: translation?.text || "",
+          provider: translation?.provider || "",
+          status: translation?.status || "",
+          unavailable: !translation || translation.translation_unavailable === true,
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setLocalizedPartUsed({ language: displayLanguage, unavailable: true })
+      })
+    return () => { cancelled = true }
+  }, [displayLanguage, herb.id, shouldTranslate])
+
+  const activeTranslation = localizedPartUsed?.language === displayLanguage ? localizedPartUsed : null
+  const displayPartUsed = activeTranslation?.text && !activeTranslation.unavailable
+    ? activeTranslation.text
+    : herb.partUsed
+  const translationLabel = !shouldTranslate
+    ? ""
+    : !activeTranslation
+      ? "Loading translation..."
+      : activeTranslation.unavailable
+        ? "Translation unavailable; showing original"
+        : activeTranslation.provider === "mock"
+          ? "Mock translation"
+          : activeTranslation.status === "verified_translation"
+            ? "Verified translation"
+            : "Machine-translated"
 
   // =========================================
   // CHECK FAVORITE STATUS
@@ -362,10 +403,10 @@ function HerbResultCard({ herb }) {
 
         <p className="herb-result-description">
 
-          {herb.partUsed && (
+          {displayPartUsed && (
             <>
               <strong>Part used:</strong>{" "}
-              {herb.partUsed}
+              {displayPartUsed}
               {" "}
             </>
           )}
@@ -386,6 +427,10 @@ function HerbResultCard({ herb }) {
           )}
 
         </p>
+
+        {translationLabel && (herb.partUsed || activeTranslation?.text) && (
+          <p role="status">{translationLabel}</p>
+        )}
 
 
         {/* =========================================

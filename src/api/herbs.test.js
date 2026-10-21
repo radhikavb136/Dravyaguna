@@ -55,6 +55,7 @@ describe("herb search API adapters", () => {
         matched_terms: [],
         unmatched_tokens: ["दीपन"],
         lang: "hi-IN",
+        display_lang: "mr-IN",
         note: "Search translation is not configured. The query was not interpreted.",
       }),
     })
@@ -63,7 +64,8 @@ describe("herb search API adapters", () => {
     const response = await searchHerbsSimple("दीपन", 25, {}, { lang: "hi-IN" })
 
     expect(response.note).toContain("not configured")
-    expect(response.language).toBe("hi-IN")
+    expect(response.language).toBe("mr-IN")
+    expect(response.queryLanguage).toBe("hi-IN")
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "http://localhost:4000/api/search/simple",
       expect.objectContaining({

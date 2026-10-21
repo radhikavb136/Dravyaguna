@@ -46,8 +46,9 @@ export async function runSimpleSearch({ query, lang, filters: requestedFilters =
   const normalizedQuery = normalizeSimpleQuery(query);
   const detectedLanguage = detectSearchLanguage(normalizedQuery);
   const language = detectedLanguage === 'hi-IN'
-    ? (lang === 'mr-IN' ? 'mr-IN' : 'hi-IN')
-    : (lang || detectedLanguage);
+    ? (lang === 'sa-IN' ? 'sa-IN' : lang === 'mr-IN' ? 'mr-IN' : 'hi-IN')
+    : detectedLanguage;
+  const displayLanguage = lang || language;
   let searchText = normalizedQuery;
   let note;
   if (language === 'hi-IN' || language === 'mr-IN') {
@@ -102,6 +103,7 @@ export async function runSimpleSearch({ query, lang, filters: requestedFilters =
         matched_terms: mapped.matchedTerms,
         unmatched_tokens: mapped.unmatchedTokens,
         language,
+        displayLanguage,
         note,
       },
     };
@@ -122,6 +124,7 @@ export async function runSimpleSearch({ query, lang, filters: requestedFilters =
       matched_terms: mapped.matchedTerms,
       unmatched_tokens: mapped.unmatchedTokens,
       language,
+      displayLanguage,
       note,
     },
   };
