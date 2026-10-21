@@ -1,0 +1,80 @@
+# Dravyaguna release status
+
+Updated 2026-10-21. This is the living status file. `PHASE_0_STATUS.md` and `PHASE_1_STATUS.md` are historical.
+
+## Re-verification evidence (2026-10-21)
+
+- `backend`: `$env:DATABASE_URL=<isolated local PostgreSQL>; $env:API_BASE_URL=http://127.0.0.1:4015; $env:NODE_ENV=test; npm.cmd test` → `12 passed, 0 failed, 12 total`.
+- Frontend `npm.cmd test -- --run` → `Test Files 4 passed (4); Tests 20 passed (20)`.
+- Frontend `npm.cmd run lint` → exit 0, 0 errors, 39 warnings.
+- Frontend `npm.cmd run build` → exit 0; Vite reports a 610.33 kB minified JS chunk warning.
+- Backend `npm.cmd run migrate`: no migrations pending when explicitly pointed at the isolated local PostgreSQL database at port 54333.
+- Backend `npm.cmd test`: 12/12 passed against the isolated database. Herb regression cases prove editors and reviewers cannot archive through the general update endpoint while Admin can. Admin audit tests confirm user creation, role changes, status changes, and name/email edits are recorded. Other cases cover verification, domain expert scoring/analytics, immediate token permission revocation, vocabulary relinking/protected deletion, and the Phase B simple-search threshold of 0.45.
+- Chromium with the local API: clinician login, profile, language, and search settings persisted after reload; restored seed values afterward.
+- Chromium with the local API: admin dashboard, herb management, vocabulary, scoring, users, audit log, and analytics pages loaded without API errors or browser exceptions.
+- Chromium with the local API: admin user name/email edit and scoring weight changes persisted after reload; restored seed user values and scoring weights afterward.
+- Chromium with the local API: clinician herb library/detail, favorite add/reload/remove, simple fever search (9 results), and saved-search create/list/run/delete passed. The saved search and favorite rows were cleaned up afterward.
+- Chromium with the local API: admin herb draft create, edit hydration, and description/identification-note persistence passed; the temporary test herb was removed.
+- Chromium with the local API: admin Karma term create/edit persisted across reloads; temporary vocabulary term was removed. Unsupported API vocabulary fields and local-only activation/deactivation controls are now hidden in server mode; failed create/update/delete/merge requests surface errors.
+- Chromium with the local API: admin role change for the seeded clinician persisted after reload; the original role and active status were restored.
+- Fixed a stale `SearchResults` memo that kept API search results empty, and preserved backend `matchPercentage` values through the frontend adapter.
+- Backend request logging now redacts `Authorization` and `Cookie` headers.
+- Frontend role normalization now consistently maps Admin, Ayurvedic Reviewer, Doctor/User, Editor, legacy case variants, and backend role IDs. Admin routes redirect unauthenticated or regular clinician accounts, and admin-only pages render an access-denied state for unauthorized elevated roles. Herb Verify/Archive controls use the normalized role; backend checks remain authoritative.
+- Backend authentication now loads the current role and account status from PostgreSQL on every authenticated request. Integration tests prove an existing admin token loses admin access immediately after demotion and an inactive account's existing token is rejected; login is still required to restore a session after reactivation.
+- The User & Role Management permissions matrix and sidebar now reflect API capabilities: reviewers can verify herbs, change scoring weights, and view analytics but cannot access user management/audit; editors can add herbs and vocabulary terms but cannot verify herbs, edit/merge/delete vocabulary, or change scoring; clinicians are limited to clinical/search workflows.
+- API-backed clinical/search/account routes now redirect users without an API token to sign in. The same boundary honors the explicit `isAuthenticated` session in local demo mode, and logout clears that marker.
+- The embedded DB script initialized and started a clean isolated cluster at port 54333. An older local cluster at port 54331 failed with a shared-memory-in-use error; it was left untouched. The script checks for `PG_VERSION` before init so it does not reinitialize existing data.
+- Live API `GET /api/health`: returned `{ status: "ok", database: "ok" }` on 2026-10-21.
+- `git diff --check`: passed on 2026-10-21; Git emitted only LF-to-CRLF conversion notices.
+
+The repository `.env` still defaults to an unverified Supabase pooler URL. A migration command using that default was denied by the environment before connecting; no remote migration ran. Subsequent migration and API test commands used the explicit local `127.0.0.1:54333` URL. Always override the database URL for local migration/test work until the development project reference is confirmed.
+
+The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is absent. The backend safety guard therefore refuses tests against it. No project reference was guessed, no safety check was weakened, and no remote database was used. Integration results above are from the local embedded database only.
+
+## Recent implementation
+
+- Added repo-root `AGENTS.md` with the standing safety, testing, status, and documentation rules; read `docs/PHASE_STATUS.md`, `KNOWN_ISSUES.md`, `API.md`, and `MANUAL_CHECKLIST.md` after confirming the supplied build prompt override.
+- Herb archive authorization is enforced in the service layer for status changes through PUT/PATCH and the dedicated DELETE route. Editors and domain experts cannot set `status: archived` through the general update route; API regression tests cover those denials and the Admin path.
+- Admin user creation, role changes, and status changes now write audit records in the same transaction as the mutation; the API suite verifies all user mutation audit events.
+- Admin metrics and search analytics read backend aggregates; audit log and user management use protected backend routes.
+- Admin profile, preferred language, notification and workspace preferences, and password changes use authenticated account APIs. Admin profile photo upload and active-session reporting remain unavailable and are identified as such in the UI.
+- Admin user name/email editing now has a validated admin-only API with transaction and audit record.
+- Clinician profile, preferred language, password, and displayed settings are wired to account APIs. Search mode and result page size consume the stored preferences. Email change requires the unavailable verification-mail service.
+- Favorites and saved searches have API-backed create/list/delete flows; saved searches can be named and rerun from the saved library.
+- Herb library, admin dashboard, and herb management now follow pagination metadata rather than silently stopping at the first 200 herbs.
+- Scoring configuration saves as one server transaction with audit logging; invalid parameter groups roll back the request.
+- The isolated importer/migration fixes, match rounding correction, and custom vocabulary slug/canonical lookup fix are retained.
+- Simple search trigram similarity now uses the Phase B threshold (0.45); synonym quality/coverage still depends on the pending domain-approved seed list.
+
+## Area status
+
+| Area | Backend | Frontend / UI | Overall |
+|---|---|---|---|
+| Startup, migrations, local DB | VERIFIED (local embedded DB, health check, migrations) | VERIFIED (Vite dev app) | VERIFIED locally |
+| Auth and role enforcement | VERIFIED by API suite, including immediate role/status revocation | Admin and clinician login verified in Chromium; role-gate unit tests pass | VERIFIED locally (full browser route denial still pending) |
+| Herb library/detail and pagination | VERIFIED by API suite | Library and detail read paths verified in Chromium; multi-page UI not exercised | VERIFIED locally for read paths |
+| Simple/detailed search and scoring | VERIFIED by API suite, including transactional weights | Simple search and displayed backend results verified in Chromium; detailed filter UI not exercised | VERIFIED locally for simple search; detailed UI partial |
+| Herb CRUD and verification | VERIFIED by API suite (including clinician/editor verification denial, expert verification allowed) | Draft create/edit description and identification-note persistence verified; Verify action still not browser-tested after role fix | WIRED-UNVERIFIED |
+| Vocabulary create/update/merge/delete | VERIFIED by API suite, including live herb relinking and protected deletion | Karma create/edit persistence verified; merge/relink/protected deletion not browser-tested | WIRED-UNVERIFIED |
+| Admin profile/language/settings | VERIFIED by account API tests | VERIFIED in Chromium; persistence checked after reload | VERIFIED |
+| Clinician profile/language/settings | Account API and preference validation tested | Profile, language, and search preferences persisted after reload | VERIFIED locally |
+| User role/status/name/email | VERIFIED by API suite, including authorization and validation | Name/email and role edits persisted in Chromium; status mutation not browser-tested | WIRED-UNVERIFIED |
+| Audit log and analytics | VERIFIED for route data and role restrictions | Both admin pages loaded without API/browser errors | VERIFIED locally for read paths |
+| Favorites | VERIFIED by API suite | Add, reload, list, and remove verified in Chromium | VERIFIED locally |
+| Saved searches | VERIFIED by API suite | Create, list, run, delete verified in Chromium | VERIFIED locally |
+| Compare | n/a | Stores only herb IDs locally and fetches content from API | WIRED-UNVERIFIED |
+
+## Remaining critical work
+
+1. Browser-test herb verification/publish, vocabulary merge/relink/protected deletion, user status mutation, detailed search filters, and compare selection. Backend tests cover herb verification permissions, archive authorization, and vocabulary merge/relink/protection; browser confirmation remains open. `agent-browser` is not installed in this environment.
+2. Add browser-level coverage for admin profile/language/settings and user name/email; existing Chromium reports verify account preference reloads and name/email edits, while dedicated automated frontend workflow coverage is still limited.
+3. Review remaining failure/empty/loading states across pages, especially herb verification and vocabulary merge; continue removing any server-mode mock fallbacks that imply success.
+4. Diagnose the intermittent local API HTTP 500 if it recurs; it did not reproduce on the last fresh-server retry.
+5. Validate production configuration and smoke-test only against the intended allowlisted development Supabase project after its exact reference is confirmed in environment configuration.
+6. Resolve data/search product issues in `KNOWN_ISSUES.md` with domain-approved input.
+
+## External launch dependencies
+
+Translation provider, RAG/vector service, SMTP password reset/email verification, persistent image storage, billing, production hosting/secrets, and a deployment-time database/RLS policy review require external configuration and remain incomplete. Dockerfiles and context exclusions were updated, but the Docker image was not built because Docker is not installed in this environment.
+
+Labels: `NOT STARTED`, `WIRED-UNVERIFIED`, `VERIFIED`, `BLOCKED`. VERIFIED refers only to the scope and environment stated above.
