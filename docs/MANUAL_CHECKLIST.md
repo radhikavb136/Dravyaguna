@@ -4,13 +4,13 @@ No browser click-through is claimed as verified here. Each row describes the man
 
 ## Start the application
 
-Use a verified **local development/test PostgreSQL database only** for local review. Do not copy a Supabase production connection into these commands. The current isolated local database used by automated tests is at port `54333`; it must already be running and migrated. Set values in the process environment rather than storing them in this document.
+Use a verified **local development/test PostgreSQL database only** for local review. Do not copy a Supabase production connection into these commands. The current isolated local database used by automated tests is at port `54334`; it must already be running and migrated. Port `54333` is a stale cluster and must not be used. Set values in the process environment rather than storing them in this document.
 
 **Backend terminal (PowerShell, from the repository root):**
 
 ```powershell
 Set-Location 'C:\Users\Radhika V Bhosale\Downloads\Dravyaguna (2)\Dravyaguna\Dravyaguna\backend'
-$env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:54333/dravyaguna'
+$env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:54334/dravyaguna'
 $env:JWT_SECRET = 'local-only-development-secret-change-before-deploy'
 $env:FRONTEND_ORIGIN = 'http://localhost:5173'
 $env:PORT = '4000'
@@ -27,7 +27,7 @@ $env:VITE_API_BASE_URL = 'http://localhost:4000'
 npm.cmd run dev -- --host 127.0.0.1
 ```
 
-Open `http://localhost:5173`; verify backend readiness at `http://localhost:4000/api/health`. These commands assume the existing local PostgreSQL service at port `54333` is already running. Staging needs separately configured host environment variables and must not use these local values.
+Open `http://localhost:5173`; verify backend readiness at `http://localhost:4000/api/health`. These commands assume the existing local PostgreSQL service at port `54334` is already running. Staging needs separately configured host environment variables and must not use these local values.
 
 ## Account and role setup
 

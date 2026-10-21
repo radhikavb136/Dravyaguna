@@ -4,6 +4,7 @@ Updated 2026-10-21. This is the living status file. `PHASE_0_STATUS.md` and `PHA
 
 ## Re-verification evidence (2026-10-21)
 
+- Latest localized Simple Search and shared navigation work: frontend `npm.cmd test -- --run` â†’ 34 tests passed across 9 files; `npm.cmd run lint` â†’ 0 errors, 39 warnings; `npm.cmd run build` succeeded (627.22 kB JS chunk warning); `npm.cmd run verify:api-build` â†’ `PASS API production bundle excludes 6 mock persistence keys.` Backend on isolated local DB port 54334 with fresh API process: `npm.cmd test` â†’ 27 passed, 0 failed. Local Chromium simple search returned HTTP 200 with 98 results, named cards, and 0 page errors. Shared navigation translations have automated hook/dictionary tests but no browser click-through.
 - `backend`: `$env:DATABASE_URL=<isolated local PostgreSQL>; $env:API_BASE_URL=http://127.0.0.1:4015; $env:NODE_ENV=test; npm.cmd test` → `12 passed, 0 failed, 12 total`.
 - Frontend `npm.cmd test -- --run` → `Test Files 5 passed (5); Tests 21 passed (21)`.
 - Frontend `npm.cmd run lint` → exit 0, 0 errors, 39 warnings.
@@ -25,7 +26,7 @@ Updated 2026-10-21. This is the living status file. `PHASE_0_STATUS.md` and `PHA
 - Backend `npm.cmd run migrate` applied `011_enable_rls_public_tables`; `npm.cmd run check:rls` → `All public tables have row-level security enabled.`
 - Migration 005 is already applied and historically recreated `herb_mala`; it must not be rerun. All new schema changes are additive/ALTER-only.
 - Local production smoke: Vite preview root and `/herb-library` both returned HTTP 200; production-mode API `/api/health` returned HTTP 200 with API/database `ok`.
-- Backend `npm.cmd run migrate`: no migrations pending when explicitly pointed at the isolated local PostgreSQL database at port 54333.
+- Historical check: no migrations were pending at port 54333 when that cluster was active. It is now the stale, partially migrated cluster; current tests use the isolated database at port 54334.
 - Backend `npm.cmd test`: 12/12 passed against the isolated database. Herb regression cases prove editors and reviewers cannot archive through the general update endpoint while Admin can. Admin audit tests confirm user creation, role changes, status changes, and name/email edits are recorded. Other cases cover verification, domain expert scoring/analytics, immediate token permission revocation, vocabulary relinking/protected deletion, and the Phase B simple-search threshold of 0.45.
 - Chromium with the local API: clinician login, profile, language, and search settings persisted after reload; restored seed values afterward.
 - Chromium with the local API: admin dashboard, herb management, vocabulary, scoring, users, audit log, and analytics pages loaded without API errors or browser exceptions.
@@ -40,11 +41,11 @@ Updated 2026-10-21. This is the living status file. `PHASE_0_STATUS.md` and `PHA
 - Backend authentication now loads the current role and account status from PostgreSQL on every authenticated request. Integration tests prove an existing admin token loses admin access immediately after demotion and an inactive account's existing token is rejected; login is still required to restore a session after reactivation.
 - The User & Role Management permissions matrix and sidebar now reflect API capabilities: reviewers can verify herbs, change scoring weights, and view analytics but cannot access user management/audit; editors can add herbs and vocabulary terms but cannot verify herbs, edit/merge/delete vocabulary, or change scoring; clinicians are limited to clinical/search workflows.
 - API-backed clinical/search/account routes now redirect users without an API token to sign in. The same boundary honors the explicit `isAuthenticated` session in local demo mode, and logout clears that marker.
-- The embedded DB script initialized and started a clean isolated cluster at port 54333. An older local cluster at port 54331 failed with a shared-memory-in-use error; it was left untouched. The script checks for `PG_VERSION` before init so it does not reinitialize existing data.
+- The embedded DB script previously initialized a clean isolated cluster at port 54333; it is now stale and was left untouched. Current migrated test cluster is at port 54334. An older local cluster at port 54331 failed with a shared-memory-in-use error and remains untouched. The startup script checks for `PG_VERSION` before init so it does not reinitialize existing data.
 - Live API `GET /api/health`: returned `{ status: "ok", database: "ok" }` on 2026-10-21.
 - `git diff --check`: passed on 2026-10-21; Git emitted only LF-to-CRLF conversion notices.
 
-The repository `.env` still defaults to an unverified Supabase pooler URL. A migration command using that default was denied by the environment before connecting; no remote migration ran. Subsequent migration and API test commands used the explicit local `127.0.0.1:54333` URL. Always override the database URL for local migration/test work until the development project reference is confirmed.
+The repository `.env` still defaults to an unverified Supabase pooler URL. A migration command using that default was denied by the environment before connecting; no remote migration ran. Older migration/API test commands used local `127.0.0.1:54333`; use `127.0.0.1:54334` for current local work. Always override the database URL; do not test against the unconfirmed Supabase project.
 
 The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is absent. The backend safety guard therefore refuses tests against it. No project reference was guessed, no safety check was weakened, and no remote database was used. Integration results above are from the local embedded database only.
 
