@@ -7,6 +7,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
+import { createXlsxWorkbook } from '../utils/xlsxWorkbook.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -16,7 +17,6 @@ const VALID_ROLES = ['admin', 'editor', 'domain_expert', 'clinician'];
 router.get('/admin/export', authenticate, requireRole('admin'), async (req, res, next) => {
   try {
     const format = z.enum(['csv', 'xlsx']).parse(req.query.format || 'csv');
-    if (format === 'xlsx') return res.status(501).json({ error: 'XLSX export is not implemented yet; request format=csv' });
     const { rows } = await pool.query(`
       SELECT h.code, h.english_name, h.sanskrit_name, h.botanical_name, h.local_name, h.family,
              h.part_used, h.description,
@@ -45,6 +45,15 @@ router.get('/admin/export', authenticate, requireRole('admin'), async (req, res,
       ['karma', 'Karma'], ['indications', 'Indications'], ['raw_karma', 'Raw Karma'],
       ['raw_indication', 'Raw Indications'], ['status', 'Status'], ['image_url', 'Image URL'], ['references', 'References'],
     ];
+    if (format === 'xlsx') {
+      const workbook = createXlsxWorkbook(headers, rows);
+      res.set({
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="dravyaguna-herbs.xlsx"',
+        'Cache-Control': 'no-store',
+      });
+      return res.send(workbook);
+    }
     const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
     const csv = [headers.map(([, label]) => csvCell(label)).join(','), ...rows.map((row) => headers.map(([key]) => csvCell(row[key])).join(','))].join('\r\n');
     res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="dravyaguna-herbs.csv"', 'Cache-Control': 'no-store' });

@@ -1,3 +1,4 @@
+import { inflateRawSync } from 'node:zlib';
 import { assert, assertEqual } from './lib/assert.js';
 import { BASE_URL } from './lib/http.js';
 import { getTokens } from './lib/session.js';
@@ -16,5 +17,37 @@ export async function run() {
   assert(csv.split('\r\n').length > 2, 'CSV includes stored herb records');
 
   const xlsx = await fetch(`${BASE_URL}/api/admin/export?format=xlsx`, { headers: { Authorization: `Bearer ${tokens.admin}` } });
-  assertEqual(xlsx.status, 501, 'XLSX remains explicitly unsupported instead of returning fake data');
+  assertEqual(xlsx.status, 200, 'admin can export XLSX');
+  assert(xlsx.headers.get('content-type')?.includes('spreadsheetml.sheet'), 'XLSX content type is correct');
+  assert(xlsx.headers.get('content-disposition')?.includes('dravyaguna-herbs.xlsx'), 'XLSX filename is set');
+  const workbook = Buffer.from(await xlsx.arrayBuffer());
+  assertEqual(workbook.readUInt32LE(0), 0x04034b50, 'XLSX response is a ZIP workbook');
+  const parts = readZipEntries(workbook);
+  assert(parts.has('[Content_Types].xml'), 'workbook has content types');
+  assert(parts.has('xl/workbook.xml'), 'workbook has a workbook definition');
+  const worksheet = parts.get('xl/worksheets/sheet1.xml');
+  assert(/<t[^>]*>Code<\/t>/.test(worksheet) && /<t[^>]*>English Name<\/t>/.test(worksheet), 'worksheet uses the herb master headers');
+  assert(worksheet.includes('African Baobab'), 'worksheet contains current database records');
+
+  const clinicianXlsx = await fetch(`${BASE_URL}/api/admin/export?format=xlsx`, { headers: { Authorization: `Bearer ${tokens.clinician}` } });
+  assertEqual(clinicianXlsx.status, 403, 'clinicians cannot export XLSX');
+}
+
+function readZipEntries(buffer) {
+  const entries = new Map();
+  let offset = 0;
+  while (offset + 4 <= buffer.length && buffer.readUInt32LE(offset) === 0x04034b50) {
+    const method = buffer.readUInt16LE(offset + 8);
+    const compressedSize = buffer.readUInt32LE(offset + 18);
+    const nameLength = buffer.readUInt16LE(offset + 26);
+    const extraLength = buffer.readUInt16LE(offset + 28);
+    const nameStart = offset + 30;
+    const name = buffer.toString('utf8', nameStart, nameStart + nameLength);
+    const dataStart = nameStart + nameLength + extraLength;
+    const compressed = buffer.subarray(dataStart, dataStart + compressedSize);
+    const content = method === 8 ? inflateRawSync(compressed) : compressed;
+    entries.set(name, content.toString('utf8'));
+    offset = dataStart + compressedSize;
+  }
+  return entries;
 }
