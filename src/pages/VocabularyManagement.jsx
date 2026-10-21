@@ -1,6 +1,12 @@
 import { useMemo, useState, useEffect } from "react"
-import { getFilterOptions, createKarmaTerm, createIndicationTerm } from "../api/vocabulary"
-import { getCurrentUser } from "../api/auth"
+import {
+  getFilterOptions,
+  createKarmaTerm,
+  createIndicationTerm,
+  updateManagedTerm,
+  deleteManagedTerm,
+  mergeManagedTerms,
+} from "../api/vocabulary"
 import "../styles/VocabularyManagement.css"
 
 function VocabularyManagement() {
@@ -12,7 +18,10 @@ function VocabularyManagement() {
   const [mergeTargetId, setMergeTargetId] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
+  const [mutationError, setMutationError] = useState("")
+  const [mutationSuccess, setMutationSuccess] = useState("")
+  const useApi = import.meta.env.VITE_USE_API === "true"
+  const isManagedApiCategory = (category) => category === "Karma" || category === "Indications"
 
   const categories = [
     "Rasa",
@@ -44,17 +53,10 @@ function VocabularyManagement() {
   ========================================================= */
 
   const [vocabularyData, setVocabularyData] = useState([])
-  const [filterOptions, setFilterOptions] = useState({})
 
   useEffect(() => {
-    loadCurrentUser()
     loadVocabulary()
   }, [])
-
-  const loadCurrentUser = () => {
-    const user = getCurrentUser()
-    setCurrentUser(user)
-  }
 
   const loadVocabulary = async () => {
     setLoading(true)
@@ -65,8 +67,6 @@ function VocabularyManagement() {
       
       if (useApi) {
         const response = await getFilterOptions()
-        setFilterOptions(response)
-        
         // Convert API format to page format
         const formattedData = []
         Object.entries(response).forEach(([category, terms]) => {
@@ -76,7 +76,7 @@ function VocabularyManagement() {
                 id: term.id,
                 term: term.canonical_en,
                 category: category.charAt(0).toUpperCase() + category.slice(1),
-                status: 'Active',
+                status: term.status || null,
                 is_custom: term.is_custom || false,
               })
             })
@@ -93,15 +93,7 @@ function VocabularyManagement() {
     } catch (err) {
       console.error('Failed to load vocabulary:', err)
       setError('Failed to load vocabulary')
-      // Fallback to localStorage on error
-      try {
-        const savedVocabulary = JSON.parse(
-          localStorage.getItem("vocabulary") || "[]"
-        )
-        setVocabularyData(Array.isArray(savedVocabulary) ? savedVocabulary : [])
-      } catch {
-        setVocabularyData([])
-      }
+      setVocabularyData([])
     } finally {
       setLoading(false)
     }
@@ -215,6 +207,7 @@ function VocabularyManagement() {
   const getUsageCount = (
     vocabularyTerm
   ) => {
+    if (useApi) return null
     const normalizedTerm =
       String(vocabularyTerm)
         .trim()
@@ -258,7 +251,8 @@ function VocabularyManagement() {
     return vocabularyData.map(
       (item) => ({
         ...item,
-        realUsage: (() => {
+          realUsage: (() => {
+            if (useApi) return null
           const normalizedTerm =
             String(item.term || "")
               .trim()
@@ -295,7 +289,7 @@ function VocabularyManagement() {
         })(),
       })
     )
-  }, [vocabularyData, herbs])
+  }, [vocabularyData, herbs, useApi])
 
   /* =========================================================
      FILTER DATA
@@ -411,20 +405,33 @@ function VocabularyManagement() {
     }
 
     try {
-      const useApi = import.meta.env.VITE_USE_API === 'true'
+      setMutationError("")
+      setMutationSuccess("")
       
       if (useApi) {
-        // Use API to create custom Karma or Indication terms
-        if (termForm.category === 'Karma') {
-          await createKarmaTerm(cleanedTerm)
-        } else if (termForm.category === 'Indications') {
-          await createIndicationTerm(cleanedTerm)
-        } else {
-          alert('Custom term creation only supported for Karma and Indications via API')
+        const category = termForm.category === 'Indications'
+          ? 'indications'
+          : termForm.category === 'Karma'
+            ? 'karma'
+            : null
+
+        if (!category) {
+          alert('API vocabulary management currently supports Karma and Indications.')
           return
         }
-        // Reload vocabulary from API
+
+        if (editingTermId) {
+          await updateManagedTerm(category, editingTermId, cleanedTerm)
+        } else if (category === 'karma') {
+          await createKarmaTerm(cleanedTerm)
+        } else {
+          await createIndicationTerm(cleanedTerm)
+        }
         await loadVocabulary()
+        setEditingTermId(null)
+        setIsAddTermOpen(false)
+        resetForm(termForm.category)
+        setMutationSuccess(editingTermId ? "Vocabulary term updated." : "Vocabulary term added.")
       } else {
         // Fallback to localStorage for mock data
         /* UPDATE */
@@ -548,7 +555,7 @@ function VocabularyManagement() {
       }
     } catch (err) {
       console.error('Failed to add vocabulary term:', err)
-      alert('Failed to add vocabulary term')
+      setMutationError(err.message || 'Failed to save vocabulary term')
     }
   }
 
@@ -573,9 +580,11 @@ function VocabularyManagement() {
      STATUS CHANGE
   ========================================================= */
 
-  const handleStatusChange = (
+  const handleStatusChange = async (
     termId
   ) => {
+    if (useApi) return
+
     const updatedVocabulary =
       vocabularyData.map(
         (item) => {
@@ -614,7 +623,7 @@ function VocabularyManagement() {
      DELETE TERM
   ========================================================= */
 
-  const handleDeleteTerm = (
+  const handleDeleteTerm = async (
     termId
   ) => {
     const termToDelete =
@@ -647,6 +656,28 @@ function VocabularyManagement() {
       )
 
     if (!confirmDelete) {
+      return
+    }
+
+    if (useApi) {
+      const category = termToDelete.category === 'Indications'
+        ? 'indications'
+        : termToDelete.category === 'Karma'
+          ? 'karma'
+          : null
+      if (!category) {
+        alert('Only Karma and Indications terms can be deleted through the API.')
+        return
+      }
+      setMutationError("")
+      setMutationSuccess("")
+      try {
+        await deleteManagedTerm(category, termId)
+        await loadVocabulary()
+        setMutationSuccess(`“${termToDelete.term}” was deleted.`)
+      } catch (err) {
+        setMutationError(err.message || "Unable to delete vocabulary term")
+      }
       return
     }
 
@@ -740,7 +771,7 @@ function VocabularyManagement() {
      MERGE TERMS
   ========================================================= */
 
-  const handleMergeTerms = () => {
+  const handleMergeTerms = async () => {
     if (
       !mergingTerm ||
       !mergeTargetId
@@ -782,6 +813,30 @@ function VocabularyManagement() {
       alert(
         "A term cannot be merged into itself."
       )
+      return
+    }
+
+    if (useApi) {
+      const category = mergingTerm.category === 'Indications'
+        ? 'indications'
+        : mergingTerm.category === 'Karma'
+          ? 'karma'
+          : null
+      if (!category) {
+        alert('Only Karma and Indications terms can be merged through the API.')
+        return
+      }
+      setMutationError("")
+      setMutationSuccess("")
+      try {
+        await mergeManagedTerms(category, mergingTerm.id, targetTerm.id)
+        await loadVocabulary()
+        setMutationSuccess(`“${mergingTerm.term}” was merged into “${targetTerm.term}”.`)
+        setMergingTerm(null)
+        setMergeTargetId("")
+      } catch (err) {
+        setMutationError(err.message || "Unable to merge vocabulary terms")
+      }
       return
     }
 
@@ -851,6 +906,14 @@ function VocabularyManagement() {
      RENDER
   ========================================================= */
 
+  if (loading) {
+    return <p role="status">Loading vocabulary...</p>
+  }
+
+  if (error) {
+    return <p role="alert">{error}</p>
+  }
+
   return (
     <div className="vocabulary-page">
 
@@ -879,6 +942,8 @@ function VocabularyManagement() {
         <button
           type="button"
           className="vocabulary-add-button"
+          disabled={useApi && !isManagedApiCategory(activeCategory)}
+          title={useApi && !isManagedApiCategory(activeCategory) ? "Only Karma and Indications can be edited through the configured API." : undefined}
           onClick={() => {
             setEditingTermId(null)
 
@@ -894,6 +959,9 @@ function VocabularyManagement() {
         </button>
 
       </div>
+
+      {mutationError && <p role="alert">{mutationError}</p>}
+      {mutationSuccess && <p role="status">{mutationSuccess}</p>}
 
 
       {/* =====================================================
@@ -1062,7 +1130,7 @@ function VocabularyManagement() {
                       </td>
 
                       <td className="vocabulary-usage">
-                        {item.realUsage}
+                        {item.realUsage ?? "—"}
                       </td>
 
                       <td>
@@ -1075,7 +1143,7 @@ function VocabularyManagement() {
                               : "inactive"
                           }`}
                         >
-                          {item.status}
+                          {item.status || (useApi ? "Available" : "Inactive")}
                         </span>
 
                       </td>
@@ -1086,7 +1154,7 @@ function VocabularyManagement() {
 
                           {/* EDIT */}
 
-                          <button
+                          {(!useApi || isManagedApiCategory(item.category)) && <button
                             type="button"
                             className="vocabulary-action-button"
                             title="Edit vocabulary term"
@@ -1098,12 +1166,12 @@ function VocabularyManagement() {
                             }
                           >
                             ✎
-                          </button>
+                          </button>}
 
 
                           {/* MERGE */}
 
-                          <button
+                          {(!useApi || isManagedApiCategory(item.category)) && <button
                             type="button"
                             className="vocabulary-action-text"
                             onClick={() =>
@@ -1113,12 +1181,12 @@ function VocabularyManagement() {
                             }
                           >
                             Merge
-                          </button>
+                          </button>}
 
 
                           {/* ACTIVATE / DEACTIVATE */}
 
-                          <button
+                          {(!useApi || isManagedApiCategory(item.category)) && <button
                             type="button"
                             className="vocabulary-action-text"
                             onClick={() =>
@@ -1131,12 +1199,12 @@ function VocabularyManagement() {
                             "Active"
                               ? "Deactivate"
                               : "Activate"}
-                          </button>
+                          </button>}
 
 
                           {/* DELETE */}
 
-                          <button
+                          {!useApi && <button
                             type="button"
                             className="vocabulary-action-delete"
                             onClick={() =>
@@ -1146,7 +1214,7 @@ function VocabularyManagement() {
                             }
                           >
                             Delete
-                          </button>
+                          </button>}
 
                         </div>
 
@@ -1280,7 +1348,7 @@ function VocabularyManagement() {
                   }
                 >
 
-                  {categories.map(
+                  {categories.filter((category) => !useApi || isManagedApiCategory(category)).map(
                     (category) => (
 
                       <option
@@ -1327,7 +1395,8 @@ function VocabularyManagement() {
               </div>
 
 
-              {/* SANSKRIT + ENGLISH */}
+              {/* SANSKRIT + ENGLISH: the current API persists only the canonical term. */}
+              {!useApi && <>
 
               <div className="vocabulary-form-row">
 
@@ -1401,7 +1470,10 @@ function VocabularyManagement() {
               </div>
 
 
-              {/* STATUS */}
+              </>}
+
+              {/* STATUS is a demo-only field; managed API terms do not have status storage. */}
+              {!useApi && <>
 
               <div className="vocabulary-form-field">
 
@@ -1431,6 +1503,7 @@ function VocabularyManagement() {
                 </select>
 
               </div>
+              </>}
 
 
               {/* ACTIONS */}
@@ -1543,7 +1616,7 @@ function VocabularyManagement() {
                   Current usage:{" "}
                   {getUsageCount(
                     mergingTerm.term
-                  )}
+                  ) ?? "—"}
                 </small>
 
               </div>
@@ -1645,7 +1718,7 @@ function VocabularyManagement() {
                           Current usage:{" "}
                           {getUsageCount(
                             targetTerm.term
-                          )}
+                          ) ?? "—"}
                         </small>
                       </>
                     )

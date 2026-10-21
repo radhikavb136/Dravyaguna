@@ -2,7 +2,9 @@
  * HTTP client with base URL and JWT handling
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
+  import.meta.env.PROD ? '' : 'http://localhost:4000'
+);
 const USE_API = import.meta.env.VITE_USE_API === 'true';
 
 class ApiClient {
@@ -59,9 +61,18 @@ class ApiClient {
       let errorData;
       try {
         errorData = await response.json();
-      } catch (e) {
+      } catch {
         errorData = { error: `Request failed with status ${response.status}` };
       }
+
+      if (response.status === 401) {
+        this.clearToken();
+        localStorage.removeItem('user');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+          window.location.assign('/auth');
+        }
+      }
+
       console.error('API client error response:', errorData);
       throw new Error(errorData.error || errorData.message || `Request failed with status ${response.status}`);
     }

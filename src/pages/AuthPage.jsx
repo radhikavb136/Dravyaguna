@@ -2,6 +2,11 @@ import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { login as apiLogin, register as apiRegister, setCurrentUser } from "../api/auth"
 import { USE_API } from "../api/client"
+import {
+  clearRememberedLogin,
+  loadRememberedLogin,
+  persistRememberedLogin,
+} from "../utils/rememberedLogin"
 import "../styles/AuthPage.css"
 
 function AuthPage() {
@@ -68,28 +73,13 @@ function AuthPage() {
   // =========================================
 
   useEffect(() => {
-    const rememberedLogin =
-      localStorage.getItem("rememberedLogin")
-
-    if (!rememberedLogin) {
-      return
-    }
-
-    try {
-      const savedLogin =
-        JSON.parse(rememberedLogin)
-
-      setEmail(savedLogin.email || "")
-      setPassword(savedLogin.password || "")
+    const savedLogin = loadRememberedLogin()
+    if (savedLogin.email) {
+      setEmail(savedLogin.email)
       setRememberMe(true)
-
-      if (savedLogin.role) {
-        setSelectedRole(
-          savedLogin.role.toLowerCase()
-        )
-      }
-    } catch {
-      localStorage.removeItem("rememberedLogin")
+    }
+    if (savedLogin.role) {
+      setSelectedRole(savedLogin.role.toLowerCase())
     }
   }, [])
 
@@ -185,9 +175,9 @@ function AuthPage() {
       return
     }
 
-    if (password.length < 6) {
+    if (password.length < 10) {
       alert(
-        "Password must contain at least 6 characters."
+        "Password must contain at least 10 characters."
       )
 
       return
@@ -374,19 +364,10 @@ function AuthPage() {
       )
     )
 
-    localStorage.setItem(
-      "rememberedLogin",
-      JSON.stringify({
-        email:
-          cleanEmail,
-
-        password:
-          password,
-
-        role:
-          selectedRole,
-      })
-    )
+    persistRememberedLogin({
+      email: cleanEmail,
+      role: selectedRole,
+    })
 
     alert(
       "Account created successfully! You can now log in."
@@ -430,16 +411,12 @@ function AuthPage() {
         localStorage.setItem("isAuthenticated", "true")
 
         if (rememberMe) {
-          localStorage.setItem(
-            "rememberedLogin",
-            JSON.stringify({
-              email: cleanEmail,
-              password,
-              role: selectedRole,
-            })
-          )
+          persistRememberedLogin({
+            email: cleanEmail,
+            role: selectedRole,
+          })
         } else {
-          localStorage.removeItem("rememberedLogin")
+          clearRememberedLogin()
         }
 
         // Navigate based on role
@@ -551,16 +528,12 @@ function AuthPage() {
     localStorage.setItem("isAuthenticated", "true")
 
     if (rememberMe) {
-      localStorage.setItem(
-        "rememberedLogin",
-        JSON.stringify({
-          email: cleanEmail,
-          password,
-          role: selectedRole,
-        })
-      )
+      persistRememberedLogin({
+        email: cleanEmail,
+        role: selectedRole,
+      })
     } else {
-      localStorage.removeItem("rememberedLogin")
+      clearRememberedLogin()
     }
 
     if (selectedNormalizedRole === "doctor") {
@@ -593,48 +566,20 @@ function AuthPage() {
   const switchToLogin = () => {
     setIsLogin(true)
 
-    const rememberedLogin =
-      localStorage.getItem(
-        "rememberedLogin"
-      )
+    const savedLogin = loadRememberedLogin()
 
-    if (!rememberedLogin) {
+    if (!savedLogin.email) {
       setEmail("")
       setPassword("")
       setRememberMe(false)
-
       return
     }
 
-    try {
-      const savedLogin =
-        JSON.parse(
-          rememberedLogin
-        )
-
-      setEmail(
-        savedLogin.email || ""
-      )
-
-      setPassword(
-        savedLogin.password || ""
-      )
-
-      setRememberMe(true)
-
-      if (savedLogin.role) {
-        setSelectedRole(
-          savedLogin.role.toLowerCase()
-        )
-      }
-    } catch {
-      localStorage.removeItem(
-        "rememberedLogin"
-      )
-
-      setEmail("")
-      setPassword("")
-      setRememberMe(false)
+    setEmail(savedLogin.email)
+    setPassword("")
+    setRememberMe(true)
+    if (savedLogin.role) {
+      setSelectedRole(savedLogin.role.toLowerCase())
     }
   }
 

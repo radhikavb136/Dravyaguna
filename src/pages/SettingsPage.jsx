@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { changeAccountPassword, getAccount, updateAccountPreferences } from "../api/account"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
@@ -8,13 +9,13 @@ import "../styles/SettingsPage.css"
 
 function SettingsPage() {
   const navigate = useNavigate()
+  const useApi = import.meta.env.VITE_USE_API === "true"
 
-  const savedUser = JSON.parse(
-    localStorage.getItem("herbUser") || "null"
-  )
+  const savedUser = useApi ? null : JSON.parse(localStorage.getItem("herbUser") || "null")
 
-  const doctorName = savedUser?.fullName || "Doctor"
-  const doctorEmail = savedUser?.email || "Not available"
+  const [account, setAccount] = useState(savedUser)
+  const doctorName = account?.full_name || account?.fullName || "Doctor"
+  const doctorEmail = account?.email || "Not available"
 
   const [activeSetting, setActiveSetting] = useState("account")
   const [searchText, setSearchText] = useState("")
@@ -43,6 +44,43 @@ function SettingsPage() {
     useState(true)
 
   const [saveMessage, setSaveMessage] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(useApi)
+
+  useEffect(() => {
+    if (!useApi) {
+      try {
+        const preferences = JSON.parse(localStorage.getItem("herbSettings") || "{}")
+        setDefaultSearch(preferences.defaultSearch || "simple")
+        setResultsPerPage(String(preferences.resultsPerPage || 20))
+        setVerifiedProfiles(preferences.verifiedProfiles ?? true)
+        setShowMatchPercentage(preferences.showMatchPercentage ?? true)
+        setShowScoringBreakdown(preferences.showScoringBreakdown ?? true)
+        setSearchUpdates(preferences.searchUpdates ?? true)
+        setSavedReminders(preferences.savedReminders ?? false)
+        setReferenceUpdates(preferences.referenceUpdates ?? true)
+        setShowClassicalReferences(preferences.showClassicalReferences ?? true)
+        setShowVerificationStatus(preferences.showVerificationStatus ?? true)
+        setShowClinicalNotes(preferences.showClinicalNotes ?? true)
+      } catch { /* corrupted browser preferences are ignored in local demo mode */ }
+      return
+    }
+    getAccount().then((user) => {
+      setAccount(user)
+      const preferences = user.preferences || {}
+      setDefaultSearch(preferences.defaultSearch || "simple")
+      setResultsPerPage(String(preferences.resultsPerPage || 20))
+      setVerifiedProfiles(preferences.verifiedProfiles ?? true)
+      setShowMatchPercentage(preferences.showMatchPercentage ?? true)
+      setShowScoringBreakdown(preferences.showScoringBreakdown ?? true)
+      setSearchUpdates(preferences.searchUpdates ?? true)
+      setSavedReminders(preferences.savedReminders ?? false)
+      setReferenceUpdates(preferences.referenceUpdates ?? true)
+      setShowClassicalReferences(preferences.showClassicalReferences ?? true)
+      setShowVerificationStatus(preferences.showVerificationStatus ?? true)
+      setShowClinicalNotes(preferences.showClinicalNotes ?? true)
+    }).catch((err) => setError(err.message || "Unable to load account settings")).finally(() => setLoading(false))
+  }, [useApi])
 
   // =========================================
   // SETTINGS NAVIGATION
@@ -95,29 +133,37 @@ function SettingsPage() {
   // =========================================
 
   const handleChangeEmail = () => {
-    alert(
-      "To change your email, an OTP will be sent to your registered email address. This process will be connected to the backend later."
-    )
+    setError("Email changes are unavailable until the email verification service is configured.")
   }
 
   // =========================================
   // CHANGE PASSWORD
   // =========================================
 
-  const handleChangePassword = () => {
-    alert(
-      "Password change will be connected to the backend later."
-    )
+  const handleChangePassword = async () => {
+    const currentPassword = window.prompt("Enter your current password")
+    if (currentPassword === null) return
+    const newPassword = window.prompt("Enter a new password (at least 10 characters)")
+    if (newPassword === null) return
+    try {
+      await changeAccountPassword(currentPassword, newPassword)
+      setError("")
+      setSaveMessage("Password updated successfully.")
+    } catch (err) {
+      setError(err.message || "Unable to change password")
+    }
   }
 
   // =========================================
   // SAVE ALL SETTINGS
   // =========================================
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
+    setError("")
+    setSaveMessage("")
     const settings = {
       defaultSearch,
-      resultsPerPage,
+      resultsPerPage: Number(resultsPerPage),
       verifiedProfiles,
       showMatchPercentage,
       showScoringBreakdown,
@@ -129,12 +175,13 @@ function SettingsPage() {
       showClinicalNotes
     }
 
-    localStorage.setItem(
-      "herbSettings",
-      JSON.stringify(settings)
-    )
-
-    setSaveMessage("Settings saved successfully.")
+    try {
+      if (useApi) await updateAccountPreferences({ preferences: settings })
+      else localStorage.setItem("herbSettings", JSON.stringify(settings))
+      setSaveMessage("Settings saved successfully.")
+    } catch (err) {
+      setError(err.message || "Unable to save settings")
+    }
 
     setTimeout(() => {
       setSaveMessage("")
@@ -146,9 +193,8 @@ function SettingsPage() {
   // =========================================
 
   const handleClearSearchHistory = () => {
-    alert(
-      "Recent search history will be cleared here."
-    )
+    localStorage.removeItem("searchHistory")
+    setSaveMessage("This browser's recent search history was cleared.")
   }
 
   // =========================================
@@ -768,7 +814,7 @@ function SettingsPage() {
   // =========================================
 
   return (
-    <div className="settings-page-layout">
+      <div className="settings-page-layout">
 
       <DashboardNavbar />
 
@@ -871,6 +917,9 @@ function SettingsPage() {
 
                 <div className="settings-scroll-area">
 
+                  {loading && <p role="status">Loading settings...</p>}
+                  {error && <p role="alert">{error}</p>}
+
                   {renderActivePanel()}
 
                 </div>
@@ -892,6 +941,7 @@ function SettingsPage() {
                     type="button"
                     className="settings-save-button"
                     onClick={handleSaveChanges}
+                    disabled={loading}
                   >
                     Save changes
                   </button>

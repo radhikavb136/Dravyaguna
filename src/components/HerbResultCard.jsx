@@ -1,16 +1,35 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { USE_API } from "../api/client"
+import { addFavorite, getFavorites, removeFavorite } from "../api/favorites"
 
 function HerbResultCard({ herb }) {
   const navigate = useNavigate()
 
   const [isFavorite, setIsFavorite] = useState(false)
+  const [favoriteBusy, setFavoriteBusy] = useState(false)
+  const [favoriteError, setFavoriteError] = useState("")
 
   // =========================================
   // CHECK FAVORITE STATUS
   // =========================================
 
   useEffect(() => {
+    if (USE_API) {
+      getFavorites()
+        .then(response => {
+          setIsFavorite(Boolean(
+            response.data?.some(savedHerb => savedHerb.herb_id === herb.id)
+          ))
+        })
+        .catch(error => {
+          console.error("Unable to load favorite herbs:", error)
+          setFavoriteError(error.message || "Unable to load favorite status")
+          setIsFavorite(false)
+        })
+      return
+    }
+
     const savedFavorites = localStorage.getItem("favoriteHerbs")
 
     if (!savedFavorites) {
@@ -36,7 +55,27 @@ function HerbResultCard({ herb }) {
   // FAVORITE
   // =========================================
 
-  const handleFavorite = () => {
+  const handleFavorite = async () => {
+    if (USE_API) {
+      setFavoriteBusy(true)
+      setFavoriteError("")
+      try {
+        if (isFavorite) {
+          await removeFavorite(herb.id)
+          setIsFavorite(false)
+        } else {
+          await addFavorite(herb.id)
+          setIsFavorite(true)
+        }
+      } catch (error) {
+        console.error("Unable to update favorite herb:", error)
+        setFavoriteError(error.message || "Unable to update favorite")
+      } finally {
+        setFavoriteBusy(false)
+      }
+      return
+    }
+
     const savedFavorites = localStorage.getItem("favoriteHerbs")
 
     let favorites = []
@@ -133,9 +172,11 @@ function HerbResultCard({ herb }) {
     }
 
     const updatedCompareHerbs = [
-      ...compareHerbs,
-      herb,
-    ]
+      ...compareHerbs.map((item) => (
+        item && typeof item === "object" ? item.id : item
+      )),
+      herb.id,
+    ].filter(Boolean)
 
     localStorage.setItem(
       "selectedCompareHerbs",
@@ -257,6 +298,8 @@ function HerbResultCard({ herb }) {
             }`}
             type="button"
             onClick={handleFavorite}
+            disabled={favoriteBusy}
+            aria-pressed={isFavorite}
             aria-label={
               isFavorite
                 ? `Remove ${herb.englishName} from favorites`
@@ -265,6 +308,8 @@ function HerbResultCard({ herb }) {
           >
             {isFavorite ? "♥" : "♡"}
           </button>
+
+          {favoriteError && <p role="alert">{favoriteError}</p>}
 
         </div>
 

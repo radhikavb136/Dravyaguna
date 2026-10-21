@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { getFavorites, removeFavorite as removeFavoriteApi } from "../api/favorites"
+import { getFavorites, removeFavorite as removeFavoriteApi, getSavedSearches, removeSavedSearch } from "../api/favorites"
 import { getHerbById } from "../api/herbs"
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
@@ -12,6 +12,10 @@ function FavoritesPage() {
   const [savedHerbs, setSavedHerbs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState("herbs")
+  const [savedSearches, setSavedSearches] = useState([])
+  const [searchesLoading, setSearchesLoading] = useState(false)
+  const [searchesError, setSearchesError] = useState("")
 
   // =========================================================
   // LOAD SAVED HERBS
@@ -19,7 +23,22 @@ function FavoritesPage() {
 
   useEffect(() => {
     loadFavorites()
+    loadSavedSearches()
   }, [])
+
+  const loadSavedSearches = async () => {
+    if (import.meta.env.VITE_USE_API !== 'true') return
+    setSearchesLoading(true)
+    setSearchesError("")
+    try {
+      const response = await getSavedSearches()
+      setSavedSearches(response.data || [])
+    } catch (err) {
+      setSearchesError(err.message || "Unable to load saved searches")
+    } finally {
+      setSearchesLoading(false)
+    }
+  }
 
   const loadFavorites = async () => {
     setLoading(true)
@@ -59,19 +78,8 @@ function FavoritesPage() {
       }
     } catch (err) {
       console.error('Failed to load favorites:', err)
-      setError('Failed to load favorites')
-      // Fallback to localStorage on error
-      try {
-        const savedFavorites = localStorage.getItem("favoriteHerbs")
-        if (savedFavorites) {
-          const favorites = JSON.parse(savedFavorites)
-          if (Array.isArray(favorites)) {
-            setSavedHerbs(favorites)
-          }
-        }
-      } catch {
-        setSavedHerbs([])
-      }
+      setError(err.message || 'Failed to load favorites')
+      setSavedHerbs([])
     } finally {
       setLoading(false)
     }
@@ -102,8 +110,27 @@ function FavoritesPage() {
       }
     } catch (err) {
       console.error('Failed to remove favorite:', err)
-      alert('Failed to remove favorite')
+      setError(err.message || 'Failed to remove favorite')
     }
+  }
+
+  const handleRemoveSearch = async (id) => {
+    try {
+      await removeSavedSearch(id)
+      setSavedSearches((previous) => previous.filter((item) => item.id !== id))
+    } catch (err) {
+      setSearchesError(err.message || "Unable to remove saved search")
+    }
+  }
+
+  const handleRunSearch = (saved) => {
+    const data = saved.filters || {}
+    const params = new URLSearchParams({ mode: data.mode || "simple" })
+    if (data.query) params.set("query", data.query)
+    if (data.parameters && Object.keys(data.parameters).length) {
+      params.set("parameters", encodeURIComponent(JSON.stringify(data.parameters)))
+    }
+    navigate(`/search-results?${params.toString()}`)
   }
 
   // =========================================================
@@ -189,6 +216,14 @@ function FavoritesPage() {
     )
   }
 
+  if (loading) {
+    return <p role="status">Loading favorites...</p>
+  }
+
+  if (error) {
+    return <p role="alert">{error}</p>
+  }
+
   return (
     <div className="favorites-page-layout">
 
@@ -248,26 +283,49 @@ function FavoritesPage() {
             <div className="favorites-tabs">
 
               <button
-                className="favorites-tab active"
+                className={`favorites-tab ${activeTab === "herbs" ? "active" : ""}`}
                 type="button"
+                onClick={() => setActiveTab("herbs")}
               >
                 Herbs
               </button>
 
               <button
-                className="favorites-tab"
+                className={`favorites-tab ${activeTab === "searches" ? "active" : ""}`}
                 type="button"
+                onClick={() => setActiveTab("searches")}
               >
                 Searches
               </button>
 
             </div>
 
+            {error && activeTab === "herbs" && <p role="alert">{error}</p>}
+            {searchesError && activeTab === "searches" && <p role="alert">{searchesError}</p>}
+
+            {activeTab === "searches" ? (
+              searchesLoading ? <p role="status">Loading saved searches...</p> : savedSearches.length === 0 ? (
+                !searchesError && <section className="favorites-empty-state"><h2>No saved searches yet</h2><p>Save a search from its results page to find it here.</p></section>
+              ) : (
+                <section className="saved-herbs-grid">
+                  {savedSearches.map((saved) => (
+                    <article className="saved-herb-card" key={saved.id}>
+                      <h2>{saved.name}</h2>
+                      <p>{saved.filters?.mode === "detailed" ? "Detailed search" : "Simple search"}{saved.filters?.query ? ` · ${saved.filters.query}` : ""}</p>
+                      <button type="button" className="saved-view-profile" onClick={() => handleRunSearch(saved)}>Run search</button>
+                      <button type="button" className="saved-view-profile" onClick={() => handleRemoveSearch(saved.id)}>Remove</button>
+                    </article>
+                  ))}
+                </section>
+              )
+            ) : (
+              <>
+
             {/* =================================================
                 EMPTY STATE
                 ================================================= */}
 
-            {savedHerbs.length === 0 ? (
+            {loading ? <p role="status">Loading saved herbs...</p> : savedHerbs.length === 0 && !error ? (
 
               <section className="favorites-empty-state">
 
@@ -528,6 +586,10 @@ function FavoritesPage() {
                 })}
 
               </section>
+
+            )}
+
+              </>
 
             )}
 

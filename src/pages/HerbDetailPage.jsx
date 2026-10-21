@@ -6,6 +6,7 @@ import Sidebar from "../components/Sidebar"
 import herbDataset from "../data/herbDataset"
 import { getHerbById } from "../api/herbs"
 import { USE_API } from "../api/client"
+import { addFavorite, getFavorites, removeFavorite } from "../api/favorites"
 
 import "../styles/HerbDetailPage.css"
 
@@ -101,6 +102,7 @@ function HerbDetailPage() {
   const [apiHerb, setApiHerb] = useState(null)
   const [apiLoading, setApiLoading] = useState(false)
   const [apiError, setApiError] = useState(null)
+  const [favoriteBusy, setFavoriteBusy] = useState(false)
 
 
   /* =========================================
@@ -131,11 +133,11 @@ function HerbDetailPage() {
      ========================================= */
 
   const currentHerb = useMemo(() => {
-    if (USE_API && apiHerb) {
+    if (USE_API) {
       return apiHerb
     }
     return herbDataset.find((item) => item.id === id)
-  }, [USE_API, apiHerb, id])
+  }, [apiHerb, id])
 
   const herb = currentHerb
 
@@ -147,6 +149,21 @@ function HerbDetailPage() {
   useEffect(() => {
     if (!herb) {
       setIsFavorite(false)
+      return
+    }
+
+    if (USE_API) {
+      getFavorites()
+        .then(response => {
+          const alreadyFavorite = response.data?.some(
+            item => item.herb_id === herb.id
+          )
+          setIsFavorite(Boolean(alreadyFavorite))
+        })
+        .catch(error => {
+          setApiError(error.message)
+          setIsFavorite(false)
+        })
       return
     }
 
@@ -181,8 +198,26 @@ function HerbDetailPage() {
      ADD / REMOVE FAVORITE
      ========================================= */
 
-  const handleFavorite = () => {
+  const handleFavorite = async () => {
     if (!herb) return
+
+    if (USE_API) {
+      setFavoriteBusy(true)
+      try {
+        if (isFavorite) {
+          await removeFavorite(herb.id)
+          setIsFavorite(false)
+        } else {
+          await addFavorite(herb.id)
+          setIsFavorite(true)
+        }
+      } catch (error) {
+        setApiError(error.message)
+      } finally {
+        setFavoriteBusy(false)
+      }
+      return
+    }
 
     const savedFavorites =
       localStorage.getItem("favoriteHerbs")
@@ -323,6 +358,14 @@ function HerbDetailPage() {
 
           <div className="herb-detail-inner">
 
+            {USE_API && apiLoading && (
+              <p role="status">Loading herb profile...</p>
+            )}
+
+            {USE_API && apiError && (
+              <p role="alert">{apiError}</p>
+            )}
+
 
             {/* =========================================
                 BACK
@@ -433,6 +476,23 @@ function HerbDetailPage() {
                 />
 
               </div>
+
+              <button
+                className={`herb-favorite-button${isFavorite ? " favorite-active" : ""}`}
+                type="button"
+                onClick={handleFavorite}
+                disabled={favoriteBusy}
+                aria-pressed={isFavorite}
+              >
+                <span className="favorite-heart" aria-hidden="true">
+                  {isFavorite ? "♥" : "♡"}
+                </span>
+                {favoriteBusy
+                  ? "Saving..."
+                  : isFavorite
+                    ? "Saved to favorites"
+                    : "Save to favorites"}
+              </button>
 
             </section>
 

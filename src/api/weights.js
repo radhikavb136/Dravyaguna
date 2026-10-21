@@ -11,3 +11,7 @@ export async function getWeights() {
 export async function updateWeight(parameterGroup, weight) {
   return apiClient.put('/api/scoring/weights', { parameter_group: parameterGroup, weight });
 }
+
+export async function updateWeights(weights) {
+  return apiClient.put('/api/scoring/weights/bulk', { weights });
+}

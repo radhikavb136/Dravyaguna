@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { getWeights, updateWeight } from "../api/weights"
+import { getWeights, updateWeights } from "../api/weights"
 import "../styles/ScoringConfiguration.css"
 
 function ScoringConfiguration() {
@@ -26,6 +26,7 @@ function ScoringConfiguration() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [saveMessage, setSaveMessage] = useState("")
 
   // =====================================================
   // LOAD WEIGHTS FROM API
@@ -157,14 +158,8 @@ function ScoringConfiguration() {
     const useApi = import.meta.env.VITE_USE_API === 'true'
     
     if (useApi) {
-      // Reset to API defaults by fetching current weights
-      try {
-        const response = await getWeights()
-        setWeights(response.weights)
-      } catch (err) {
-        console.error('Failed to reset weights:', err)
-        setError('Failed to reset weights')
-      }
+      setWeights(defaultWeights)
+      setSaveMessage('Defaults loaded. Save configuration to apply them.')
     } else {
       setWeights(defaultWeights)
       localStorage.removeItem("scoringWeights")
@@ -178,28 +173,26 @@ function ScoringConfiguration() {
   const handleSave = async () => {
     setSaving(true)
     setError(null)
+    setSaveMessage("")
     
     try {
       const useApi = import.meta.env.VITE_USE_API === 'true'
       
       if (useApi) {
-        // Update each weight individually via API
-        for (const [key, value] of Object.entries(weights)) {
-          await updateWeight(key, value)
-        }
-        alert('Scoring configuration saved successfully.')
+        const response = await updateWeights(weights)
+        setWeights(response.weights)
+        setSaveMessage('Scoring configuration saved successfully.')
       } else {
         // Fallback to localStorage for mock data
         localStorage.setItem(
           "scoringWeights",
           JSON.stringify(weights)
         )
-        alert('Scoring configuration saved successfully.')
+        setSaveMessage('Scoring configuration saved successfully.')
       }
     } catch (err) {
       console.error('Failed to save weights:', err)
-      setError('Failed to save weights')
-      alert('Failed to save weights. Please try again.')
+      setError(err.message || 'Failed to save weights')
     } finally {
       setSaving(false)
     }
@@ -261,10 +254,11 @@ function ScoringConfiguration() {
       ========================================= */}
 
       {error && (
-        <div className="scoring-error">
+        <div className="scoring-error" role="alert">
           {error}
         </div>
       )}
+      {saveMessage && <p role="status">{saveMessage}</p>}
 
       {/* =========================================
           LOADING STATE

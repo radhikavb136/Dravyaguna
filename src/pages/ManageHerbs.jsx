@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { addAuditLog } from "../utils/auditLogger"
-import { listHerbs, verifyHerb, deleteHerb } from "../api/herbs"
+import { listAllHerbs, verifyHerb, deleteHerb } from "../api/herbs"
 import { getCurrentUser } from "../api/auth"
+import { getAccount } from "../api/account"
+import { canArchiveHerbs, canVerifyHerbs } from "../utils/roles"
 import "../styles/ManageHerbs.css"
 
 function ManageHerbs() {
@@ -19,6 +21,13 @@ function ManageHerbs() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
+  const [confirmBeforeDelete, setConfirmBeforeDelete] = useState(true)
+
+  useEffect(() => {
+    getAccount()
+      .then(({ preferences }) => setConfirmBeforeDelete(preferences?.confirmBeforeDelete ?? true))
+      .catch(() => setConfirmBeforeDelete(true))
+  }, [])
 
   /* =========================================================
      LOAD HERBS
@@ -43,8 +52,7 @@ function ManageHerbs() {
       
       if (useApi) {
         const statusFilter = selectedStatus === 'All' ? undefined : selectedStatus.toLowerCase()
-        const response = await listHerbs({ page: 1, limit: 200, status: statusFilter })
-        setHerbs(response.data)
+        setHerbs(await listAllHerbs({ limit: 200, status: statusFilter }))
       } else {
         // Fallback to localStorage for mock data
         const savedHerbs = JSON.parse(
@@ -55,15 +63,7 @@ function ManageHerbs() {
     } catch (err) {
       console.error('Failed to load herbs:', err)
       setError('Failed to load herbs')
-      // Fallback to localStorage on error
-      try {
-        const savedHerbs = JSON.parse(
-          localStorage.getItem("herbs") || "[]"
-        )
-        setHerbs(Array.isArray(savedHerbs) ? savedHerbs : [])
-      } catch {
-        setHerbs([])
-      }
+      setHerbs([])
     } finally {
       setLoading(false)
     }
@@ -476,7 +476,7 @@ function ManageHerbs() {
       
       if (useApi) {
         // Check if user is domain_expert or admin
-        if (currentUser?.role !== 'domain_expert' && currentUser?.role !== 'admin') {
+        if (!canVerifyHerbs(currentUser)) {
           alert('Only domain experts and admins can verify herbs')
           return
         }
@@ -499,7 +499,7 @@ function ManageHerbs() {
         setHerbs(updatedHerbs)
       }
       
-      addAuditLog({
+      if (!useApi) addAuditLog({
         action: "Verified",
         module: "Herb",
         item: herbToVerify.name,
@@ -508,7 +508,7 @@ function ManageHerbs() {
       })
     } catch (err) {
       console.error('Failed to verify herb:', err)
-      alert('Failed to verify herb')
+      alert(err.message || 'Failed to verify herb')
     }
   }
 
@@ -531,10 +531,9 @@ function ManageHerbs() {
       return
     }
 
-    const confirmed =
-      window.confirm(
-        `Are you sure you want to delete "${herbToDelete.name}"?\n\nThis will remove the herb entry from the current admin dataset.`
-      )
+    const confirmed = !confirmBeforeDelete || window.confirm(
+      `Are you sure you want to archive "${herbToDelete.name}"? It will be hidden from clinical search but retained in the database.`
+    )
 
     if (!confirmed) {
       return
@@ -545,7 +544,7 @@ function ManageHerbs() {
       
       if (useApi) {
         // Check if user is admin
-        if (currentUser?.role !== 'admin') {
+        if (!canArchiveHerbs(currentUser)) {
           alert('Only admins can delete herbs')
           return
         }
@@ -568,7 +567,7 @@ function ManageHerbs() {
         setHerbs(updatedHerbs)
       }
       
-      addAuditLog({
+      if (!useApi) addAuditLog({
         action: "Deleted",
         module: "Herb",
         item: herbToDelete.name,
@@ -577,7 +576,7 @@ function ManageHerbs() {
       })
     } catch (err) {
       console.error('Failed to delete herb:', err)
-      alert('Failed to delete herb')
+      alert(err.message || 'Failed to delete herb')
     }
   }
 
@@ -612,6 +611,14 @@ function ManageHerbs() {
   /* =========================================================
      RENDER
   ========================================================= */
+
+  if (loading) {
+    return <p role="status">Loading herbs...</p>
+  }
+
+  if (error) {
+    return <p role="alert">{error}</p>
+  }
 
   return (
     <>
@@ -1178,7 +1185,7 @@ function ManageHerbs() {
 
 
                           {/* VERIFY (domain_expert/admin only) */}
-                          {(currentUser?.role === 'domain_expert' || currentUser?.role === 'admin') && (
+                          {canVerifyHerbs(currentUser) && (
                             <button
                               type="button"
                               className="manage-herbs-action-button"
@@ -1194,7 +1201,7 @@ function ManageHerbs() {
 
 
                           {/* DELETE (admin only) */}
-                          {currentUser?.role === 'admin' && (
+                          {canArchiveHerbs(currentUser) && (
                           <button
                             type="button"
                             className="manage-herbs-action-button manage-herbs-delete-button"

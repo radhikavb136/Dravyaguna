@@ -11,7 +11,7 @@
  * - dev-expert@test.com (domain_expert)
  * - dev-clinician@test.com (clinician)
  * 
- * Password for all: Dev123456
+ * Password for all: DEV_USER_PASSWORD or Dev1234567 (min 10 characters). Not printed.
  */
 
 import pg from 'pg';
@@ -35,20 +35,42 @@ const isDevDatabase =
   dbUrl.includes('dev') ||
   dbUrl.includes('test') ||
   dbUrl.includes('.local');
+const devRef = process.env.DEV_DB_REF || '';
+let databaseProjectRef = '';
+try {
+  const databaseUrl = new URL(dbUrl);
+  const usernameMatch = decodeURIComponent(databaseUrl.username).match(/^postgres\.([a-z0-9]+)$/i);
+  databaseProjectRef = usernameMatch ? usernameMatch[1] : '';
+} catch {
+  databaseProjectRef = '';
+}
+const isExplicitDevDatabase = Boolean(devRef && databaseProjectRef === devRef);
 
-if (!isDevDatabase) {
+const prodRef = process.env.PROD_DB_REF || '';
+if (prodRef && (dbUrl.includes(prodRef) || databaseProjectRef === prodRef)) {
+  console.error('ERROR: DATABASE_URL matches PROD_DB_REF');
+  process.exit(1);
+}
+
+if (!isDevDatabase && !isExplicitDevDatabase) {
   console.error('ERROR: DATABASE_URL does not appear to be a development database');
-  console.error('DATABASE_URL must contain: localhost, 127.0.0.1, dev, test, or .local');
+  console.error('Use a local dev URL or set DEV_DB_REF to the exact Supabase project ref.');
   process.exit(1);
 }
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+const SEED_PASSWORD = process.env.DEV_USER_PASSWORD || 'Dev1234567';
+if (SEED_PASSWORD.length < 10) {
+  console.error('ERROR: DEV_USER_PASSWORD must be at least 10 characters');
+  process.exit(1);
+}
+
 const users = [
-  { email: 'dev-admin@test.com', password: 'Dev123456', full_name: 'Dev Admin', role: 'admin' },
-  { email: 'dev-editor@test.com', password: 'Dev123456', full_name: 'Dev Editor', role: 'editor' },
-  { email: 'dev-expert@test.com', password: 'Dev123456', full_name: 'Dev Expert', role: 'domain_expert' },
-  { email: 'dev-clinician@test.com', password: 'Dev123456', full_name: 'Dev Clinician', role: 'clinician' },
+  { email: 'dev-admin@test.com', password: SEED_PASSWORD, full_name: 'Dev Admin', role: 'admin' },
+  { email: 'dev-editor@test.com', password: SEED_PASSWORD, full_name: 'Dev Editor', role: 'editor' },
+  { email: 'dev-expert@test.com', password: SEED_PASSWORD, full_name: 'Dev Expert', role: 'domain_expert' },
+  { email: 'dev-clinician@test.com', password: SEED_PASSWORD, full_name: 'Dev Clinician', role: 'clinician' },
 ];
 
 async function main() {
@@ -73,10 +95,9 @@ async function main() {
       console.log(`✓ ${rows[0].email} (${rows[0].role})`);
     }
 
-    console.log('\nDev users seeded successfully!');
-    console.log('\nLogin credentials:');
-    users.forEach(u => {
-      console.log(`  ${u.email} / ${u.password} (${u.role})`);
+    console.log('\nDev users seeded successfully (password not printed).');
+    users.forEach((u) => {
+      console.log(`  ${u.email} (${u.role})`);
     });
   } finally {
     client.release();

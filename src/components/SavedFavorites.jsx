@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { USE_API } from "../api/client"
+import { getFavorites } from "../api/favorites"
+import { getHerbById } from "../api/herbs"
 
 import "../styles/SavedFavorites.css"
 
@@ -7,58 +10,55 @@ function SavedFavorites() {
   const navigate = useNavigate()
 
   const [savedFavorites, setSavedFavorites] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   // =========================================================
   // LOAD REAL SAVED FAVORITES
   // =========================================================
 
   useEffect(() => {
-    const loadFavorites = () => {
-      const savedData = localStorage.getItem("favoriteHerbs")
-
-      if (!savedData) {
-        setSavedFavorites([])
-        return
-      }
-
+    let cancelled = false
+    const loadFavorites = async () => {
+      setLoading(true)
+      setError("")
       try {
-        const favorites = JSON.parse(savedData)
-
-        if (Array.isArray(favorites)) {
-          setSavedFavorites(favorites)
-        } else {
-          setSavedFavorites([])
+        if (USE_API) {
+          const response = await getFavorites()
+          const herbs = await Promise.all(
+            (response.data || []).map((favorite) => getHerbById(favorite.herb_id))
+          )
+          if (!cancelled) setSavedFavorites(herbs)
+          return
         }
-      } catch (error) {
-        console.error(
-          "Unable to load saved favorites:",
-          error
-        )
 
-        setSavedFavorites([])
+        const savedData = localStorage.getItem("favoriteHerbs")
+        const favorites = savedData ? JSON.parse(savedData) : []
+        if (!cancelled) setSavedFavorites(Array.isArray(favorites) ? favorites : [])
+      } catch (loadError) {
+        if (!cancelled) {
+          setSavedFavorites([])
+          setError(loadError.message || "Unable to load saved favorites")
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
 
     loadFavorites()
 
-    // Listen for changes made from other components
-    const handleStorageChange = (event) => {
-      if (event.key === "favoriteHerbs") {
-        loadFavorites()
+    if (!USE_API) {
+      const handleStorageChange = (event) => {
+        if (event.key === "favoriteHerbs") loadFavorites()
+      }
+      window.addEventListener("storage", handleStorageChange)
+      return () => {
+        cancelled = true
+        window.removeEventListener("storage", handleStorageChange)
       }
     }
 
-    window.addEventListener(
-      "storage",
-      handleStorageChange
-    )
-
-    return () => {
-      window.removeEventListener(
-        "storage",
-        handleStorageChange
-      )
-    }
+    return () => { cancelled = true }
   }, [])
 
   // =========================================================
@@ -173,9 +173,12 @@ function SavedFavorites() {
 
       <div className="saved-favorites-list">
 
+        {loading && <p role="status">Loading saved favorites...</p>}
+        {!loading && error && <p role="alert">{error}</p>}
+
         {/* EMPTY STATE */}
 
-        {savedFavorites.length === 0 && (
+        {!loading && !error && savedFavorites.length === 0 && (
 
           <div className="saved-favorite-item">
 
@@ -215,7 +218,7 @@ function SavedFavorites() {
 
         {/* SAVED HERBS */}
 
-        {visibleFavorites.map((herb) => {
+        {!loading && !error && visibleFavorites.map((herb) => {
 
           const herbName =
             getHerbName(herb)

@@ -1,18 +1,24 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { getAccount, updateAccountPreferences } from "../api/account"
 
 import "../styles/AdminLanguagePage.css"
 
 function AdminLanguagePage() {
   const navigate = useNavigate()
 
-  const savedLanguage =
-    localStorage.getItem("adminLanguage") || "English"
-
   const [selectedLanguage, setSelectedLanguage] =
-    useState(savedLanguage)
+    useState("English")
 
   const [saveMessage, setSaveMessage] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    getAccount().then(({ preferred_language: language }) => {
+      setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi", "sa-IN": "Sanskrit" })[language] || "English")
+    }).catch((err) => setError(err.message || "Unable to load language preference")).finally(() => setLoading(false))
+  }, [])
 
   // =========================================
   // CLOSE LANGUAGE PAGE
@@ -26,15 +32,15 @@ function AdminLanguagePage() {
   // SAVE LANGUAGE
   // =========================================
 
-  const handleSave = () => {
-    localStorage.setItem(
-      "adminLanguage",
-      selectedLanguage
-    )
-
-    setSaveMessage(
-      "Language preference updated successfully."
-    )
+  const handleSave = async () => {
+    setError("")
+    setSaveMessage("")
+    try {
+      await updateAccountPreferences({ language: ({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN" })[selectedLanguage] })
+      setSaveMessage("Language preference saved successfully.")
+    } catch (err) {
+      setError(err.message || "Unable to save language preference")
+    }
   }
 
   // =========================================
@@ -58,6 +64,8 @@ function AdminLanguagePage() {
       description: "Use Marathi across the admin workspace."
     }
   ]
+
+  if (loading) return <p role="status">Loading language preference...</p>
 
   return (
     <div className="admin-language-overlay">
@@ -105,6 +113,8 @@ function AdminLanguagePage() {
            ========================================= */}
 
         <section className="admin-language-section">
+
+          {error && <p role="alert">{error}</p>}
 
           <div className="admin-language-section-header">
 

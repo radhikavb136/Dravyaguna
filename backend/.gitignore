@@ -1,4 +1,6 @@
 node_modules/
-.env
+.env*
+!.env.example
 import-report.json
 *.log
+test-rerun-logs/

@@ -30,6 +30,12 @@ import AdminProfilePage from "./pages/AdminProfilePage"
 import AdminSettingsPage from "./pages/AdminSettingsPage"
 import AdminLanguagePage from "./pages/AdminLanguagePage"
 import AdminUpgradePlanPage from "./pages/AdminUpgradePlanPage"
+import AdminPageGuard from "./components/AdminPageGuard"
+import AuthenticatedRoute from "./components/AuthenticatedRoute"
+
+const ADMIN_EXPERT = ["admin", "domain_expert"]
+const HERB_EDITORS = ["admin", "editor", "domain_expert"]
+const ADMIN_ONLY = ["admin"]
 
 function App() {
   return (
@@ -41,17 +47,17 @@ function App() {
         <Route path="/auth" element={<AuthPage />} />
 
         {/* Doctor Dashboard */}
-        <Route path="/doctor" element={<DoctorHome />} />
+        <Route path="/doctor" element={<AuthenticatedRoute><DoctorHome /></AuthenticatedRoute>} />
        {/* Admin Dashboard */}
        <Route path="/admin" element={<AdminLayout />}>
-           <Route index element={<AdminDashboard />} />
-           <Route path="manage-herbs" element={<ManageHerbs />} />
-           <Route path="add-herb" element={<AddHerb />} />
-           <Route path="vocabulary" element={<VocabularyManagement />} />
-           <Route path="scoring" element={<ScoringConfiguration />} />
-           <Route path="search-analytics" element={<SearchAnalytics />} />
-           <Route path="users" element={<UserRoleManagement />} />
-           <Route path="audit-log" element={<AuditLog />} />
+           <Route index element={<AdminPageGuard allowedRoles={ADMIN_EXPERT}><AdminDashboard /></AdminPageGuard>} />
+           <Route path="manage-herbs" element={<AdminPageGuard allowedRoles={HERB_EDITORS}><ManageHerbs /></AdminPageGuard>} />
+           <Route path="add-herb" element={<AdminPageGuard allowedRoles={HERB_EDITORS}><AddHerb /></AdminPageGuard>} />
+           <Route path="vocabulary" element={<AdminPageGuard allowedRoles={HERB_EDITORS}><VocabularyManagement /></AdminPageGuard>} />
+           <Route path="scoring" element={<AdminPageGuard allowedRoles={ADMIN_EXPERT}><ScoringConfiguration /></AdminPageGuard>} />
+           <Route path="search-analytics" element={<AdminPageGuard allowedRoles={ADMIN_EXPERT}><SearchAnalytics /></AdminPageGuard>} />
+           <Route path="users" element={<AdminPageGuard allowedRoles={ADMIN_ONLY}><UserRoleManagement /></AdminPageGuard>} />
+           <Route path="audit-log" element={<AdminPageGuard allowedRoles={ADMIN_ONLY}><AuditLog /></AdminPageGuard>} />
            <Route path="profile" element={<AdminProfilePage />} />
            <Route path="settings" element={<AdminSettingsPage />} />
            <Route path="/admin/language" element={<AdminLanguagePage />}/>
@@ -63,21 +69,21 @@ function App() {
       </Route>
 
         {/* Search */}
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/search-results" element={<SearchResults />} />
+        <Route path="/search" element={<AuthenticatedRoute><SearchPage /></AuthenticatedRoute>} />
+        <Route path="/search-results" element={<AuthenticatedRoute><SearchResults /></AuthenticatedRoute>} />
 
         {/* Herb Pages */}
-        <Route path="/herb-library" element={<HerbLibrary />} />
-        <Route path="/herb/:id" element={<HerbDetailPage />} />
+        <Route path="/herb-library" element={<AuthenticatedRoute><HerbLibrary /></AuthenticatedRoute>} />
+        <Route path="/herb/:id" element={<AuthenticatedRoute><HerbDetailPage /></AuthenticatedRoute>} />
 
         {/* Doctor Workspace */}
-        <Route path="/compare" element={<ComparePage />} />
-        <Route path="/favorites" element={<FavoritesPage />} />
+        <Route path="/compare" element={<AuthenticatedRoute><ComparePage /></AuthenticatedRoute>} />
+        <Route path="/favorites" element={<AuthenticatedRoute><FavoritesPage /></AuthenticatedRoute>} />
 
         {/* Profile / Preferences */}
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/language" element={<LanguagePage />} />
+        <Route path="/profile" element={<AuthenticatedRoute><ProfilePage /></AuthenticatedRoute>} />
+        <Route path="/settings" element={<AuthenticatedRoute><SettingsPage /></AuthenticatedRoute>} />
+        <Route path="/language" element={<AuthenticatedRoute><LanguagePage /></AuthenticatedRoute>} />
         <Route path="/help-support" element={<HelpSupportPage />} />
 
         {/* Additional Pages */}

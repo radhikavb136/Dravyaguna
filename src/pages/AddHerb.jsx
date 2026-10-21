@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { createHerb, updateHerb, getHerbById } from "../api/herbs"
+import { createHerb, getHerbById, updateHerb } from "../api/herbs"
+import { getFilterOptions } from "../api/vocabulary"
 import { getCurrentUser } from "../api/auth"
+import { getBackendRole } from "../utils/roles"
 import "../styles/AddHerb.css"
 
 function AddHerb() {
@@ -40,7 +42,11 @@ function AddHerb() {
   const [imagePreview, setImagePreview] = useState("")
   const [isDragging, setIsDragging] = useState(false)
   const [herbId, setHerbId] = useState("")
+  const [herbCode, setHerbCode] = useState("")
   const [currentUser, setCurrentUser] = useState(null)
+  const [loadError, setLoadError] = useState("")
+  const [vocabularyLoading, setVocabularyLoading] = useState(import.meta.env.VITE_USE_API === "true")
+  const [herbLoading, setHerbLoading] = useState(Boolean(selectedHerbId))
 
   // =====================================================
   // FORM DATA
@@ -368,25 +374,126 @@ function AddHerb() {
   // =====================================================
 
   useEffect(() => {
-    const savedVocabulary = JSON.parse(
-      localStorage.getItem("vocabulary") || "[]"
-    )
+    let cancelled = false
+    const useApi = import.meta.env.VITE_USE_API === "true"
 
-    setRasaVocabulary(
-      savedVocabulary.filter(
-        (item) =>
-          item.category === "Rasa" &&
-          item.status === "Active"
-      )
-    )
+    if (useApi) {
+      setVocabularyLoading(true)
+      getFilterOptions()
+        .then((options) => {
+          if (cancelled) return
+          setRasaVocabulary((options.rasa || []).map((term) => ({
+            id: term.id,
+            term: term.canonical_en,
+            english: "",
+          })))
+          setGunaVocabulary((options.guna || []).map((term) => ({
+            id: term.id,
+            term: term.canonical_en,
+            english: "",
+          })))
+          setLoadError("")
+        })
+        .catch((error) => {
+          if (!cancelled) setLoadError(error.message || "Unable to load herb vocabulary")
+        })
+        .finally(() => {
+          if (!cancelled) setVocabularyLoading(false)
+        })
+      return () => { cancelled = true }
+    }
 
-    setGunaVocabulary(
-      savedVocabulary.filter(
-        (item) =>
-          item.category === "Guna" &&
-          item.status === "Active"
-      )
-    )
+    try {
+      const savedVocabulary = JSON.parse(localStorage.getItem("vocabulary") || "[]")
+      setRasaVocabulary(savedVocabulary.filter((item) => item.category === "Rasa" && item.status === "Active"))
+      setGunaVocabulary(savedVocabulary.filter((item) => item.category === "Guna" && item.status === "Active"))
+      setVocabularyLoading(false)
+    } catch {
+      setLoadError("Unable to read local vocabulary")
+      setVocabularyLoading(false)
+    }
+    return () => { cancelled = true }
+  }, [selectedHerbId])
+
+  useEffect(() => {
+    if (!selectedHerbId) return
+
+    let cancelled = false
+    const useApi = import.meta.env.VITE_USE_API === "true"
+    setHerbLoading(true)
+    const applyHerb = (herb) => {
+      if (cancelled || !herb) return
+      setHerbId(herb.id)
+      setHerbCode(herb.code || "")
+      const mala = Object.fromEntries((herb.mala || []).map((entry) => {
+        const [name, rawEffect] = String(entry).replace("Â·", "·").split("·").map((part) => part.trim())
+        const key = name?.toLowerCase()
+        const effect = rawEffect?.toLowerCase()
+        return [key, effect === "decreases" || effect === "pacifies" ? "Decreases" : effect === "increases" ? "Increases" : ""]
+      }).filter(([key]) => key))
+      const dosha = Object.fromEntries(Object.entries(herb.dosha || {}).map(([key, effect]) => [
+        key.toLowerCase(), String(effect).toLowerCase() === "pacifies" || String(effect).toLowerCase() === "decreases" ? "Decreases" : String(effect).toLowerCase() === "increases" ? "Increases" : "",
+      ]))
+      const dhatu = Object.fromEntries(Object.entries(herb.dhatu || {}).map(([key, value]) => [key.toLowerCase(), String(value)]))
+      const srotas = Object.fromEntries((herb.srotas || []).map((value) => [value.toLowerCase(), true]))
+      setFormData((previous) => ({
+        ...previous,
+        herbNameEnglish: herb.englishName || "",
+        sanskritName: herb.sanskritName || "",
+        commonNames: herb.localName || (herb.regionalNames || []).join(", "),
+        botanicalName: herb.botanicalName || "",
+        family: herb.family || "",
+        plantDescription: herb.description || "",
+        identificationNotes: herb.identificationNotes || "",
+        partUsed: herb.partUsed || "",
+        rasa: herb.rasa || [],
+        guna: herb.guna || [],
+        virya: herb.virya || "",
+        vipaka: herb.vipaka || "",
+        prabhava: herb.prabhava || "",
+        dosha,
+        dhatu: { ...previous.dhatu, ...dhatu },
+        mala: { ...previous.mala, ...mala },
+        srotas: { ...previous.srotas, ...srotas },
+        importantKarma: (herb.karma || []).join(", "),
+        majorDiseases: (herb.indications || []).join(", "),
+        avayava: herb.avayava || [],
+        verificationStatus: herb.verificationStatus || "draft",
+        classicalReferences: herb.classicalReferences?.length ? herb.classicalReferences : [{ source: "", chapter: "", verse: "", notes: "" }],
+      }))
+      setLoadError("")
+      setHerbLoading(false)
+    }
+
+    if (useApi) {
+      getHerbById(selectedHerbId)
+        .then(applyHerb)
+        .catch((error) => {
+          if (!cancelled) {
+            setLoadError(error.message || "Unable to load herb for editing")
+            setHerbLoading(false)
+          }
+        })
+    } else {
+      try {
+        const savedHerbs = JSON.parse(localStorage.getItem("herbs") || "[]")
+        const herb = savedHerbs.find((item) => item.id === selectedHerbId)
+        if (!herb) {
+          setLoadError("Herb not found")
+          setHerbLoading(false)
+        }
+        else {
+          setHerbId(herb.id)
+          setHerbCode(herb.code || herb.id)
+          setFormData((previous) => ({ ...previous, ...herb }))
+          setHerbLoading(false)
+        }
+      } catch (error) {
+        setLoadError(error.message || "Unable to load herb")
+        setHerbLoading(false)
+      }
+    }
+    return () => { cancelled = true }
   }, [selectedHerbId])
 
   const addVocabularyTerm = (
@@ -397,6 +504,7 @@ function AddHerb() {
     setVocabulary,
     field
   ) => {
+    if (import.meta.env.VITE_USE_API === "true") return
     const cleanedTerm = termForm.term.trim()
 
     if (!cleanedTerm) {
@@ -524,56 +632,6 @@ function AddHerb() {
   }, [imagePreview])
 
   // =====================================================
-  // LOAD EXISTING HERB
-  // =====================================================
-
-  useEffect(() => {
-    if (!selectedHerbId) return
-
-    const savedHerbs = JSON.parse(
-      localStorage.getItem("herbs") || "[]"
-    )
-
-    const selectedHerb = savedHerbs.find(
-      (herb) => herb.id === selectedHerbId
-    )
-
-    if (!selectedHerb) return
-    setHerbId(selectedHerb.id)
-
-    setFormData((previous) => ({
-      ...previous,
-      ...selectedHerb,
-      dosha: {
-        ...previous.dosha,
-        ...(selectedHerb.dosha || {}),
-      },
-      dhatu: {
-        ...previous.dhatu,
-        ...(selectedHerb.dhatu || {}),
-      },
-      mala: {
-        ...previous.mala,
-        ...(selectedHerb.mala || {}),
-      },
-      srotas: {
-        ...previous.srotas,
-        ...(selectedHerb.srotas || {}),
-      },
-      classicalReferences:
-        selectedHerb.classicalReferences?.length
-          ? selectedHerb.classicalReferences
-          : previous.classicalReferences,
-      verificationHistory:
-        selectedHerb.verificationHistory || [],
-    }))
-
-    if (selectedHerb.imageName) {
-      setImageName(selectedHerb.imageName)
-    }
-  }, [selectedHerbId])
-
-  // =====================================================
   // VERIFICATION HISTORY
   // =====================================================
 
@@ -616,6 +674,10 @@ function AddHerb() {
 
   const handleSave = async (action) => {
     const useApi = import.meta.env.VITE_USE_API === 'true'
+    if (selectedHerbId && !herbId) {
+      alert(loadError || "Wait for the herb to load before saving.")
+      return
+    }
     
     let nextStatus = formData.verificationStatus
 
@@ -632,7 +694,7 @@ function AddHerb() {
     }
 
     // Prevent editors from setting verified status
-    if (nextStatus === "verified" && currentUser?.role === "editor") {
+    if (nextStatus === "verified" && getBackendRole(currentUser) === "editor") {
       alert("Editors cannot verify herbs. Only domain experts and admins can verify.")
       return
     }
@@ -640,8 +702,25 @@ function AddHerb() {
     try {
       if (useApi) {
         // Prepare herb data for API
+        const karmaText = [
+          formData.importantKarma,
+          formData.otherKarma,
+        ]
+          .filter(Boolean)
+          .join(", ")
+        const indicationText = [
+          formData.majorDiseases,
+          formData.clinicalIndications,
+        ]
+          .filter(Boolean)
+          .join(", ")
+        const splitTerms = (value) => value
+          .split(",")
+          .map((term) => term.trim())
+          .filter(Boolean)
+
         const herbData = {
-          code: herbId || `HERB_${Date.now()}`,
+          code: isEditMode ? herbCode : (herbCode || `HERB_${Date.now()}`),
           english_name: formData.herbNameEnglish,
           sanskrit_name: formData.sanskritName,
           local_name: formData.commonNames,
@@ -662,14 +741,19 @@ function AddHerb() {
             mutra: formData.mala.mutra,
             sweda: formData.mala.sweda,
           },
-          srotas: Object.values(formData.srotas).filter(Boolean),
-          karma: formData.karma,
-          indications: formData.indications,
+          srotas: Object.entries(formData.srotas)
+            .filter(([, selected]) => selected)
+            .map(([term]) => term),
+          karma: splitTerms(karmaText),
+          indications: splitTerms(indicationText),
           avayava: formData.avayava,
-          status: nextStatus,
+          raw_karma: karmaText,
+          raw_indication: indicationText,
+          references: formData.classicalReferences,
+          status: String(nextStatus).toLowerCase(),
         }
 
-        if (isEditMode && herbId) {
+        if ((isEditMode || herbId) && herbId) {
           // Update existing herb
           await updateHerb(herbId, herbData)
         } else {
@@ -677,6 +761,7 @@ function AddHerb() {
           herbData.status = "draft"
           const created = await createHerb(herbData)
           setHerbId(created.id)
+          setHerbCode(created.code)
         }
       } else {
         // Fallback to localStorage for mock data
@@ -742,20 +827,13 @@ function AddHerb() {
         alert("Herb marked as verified.")
         return
       }
+
+      if (action === "submit") {
+        alert("Herb saved successfully.")
+      }
     } catch (err) {
       console.error('Failed to save herb:', err)
-      alert('Failed to save herb')
-    }
-  }
-
-    if (action === "save") {
-      alert("Information saved successfully.")
-      return
-    }
-
-    if (action === "submit") {
-      alert("Herb saved successfully.")
-      navigate("/admin/manage-herbs")
+      alert(err.message || 'Failed to save herb')
     }
   }
 
@@ -813,6 +891,10 @@ function AddHerb() {
   return (
     <div className="add-herb-page">
 
+      {loadError && <p role="alert">{loadError}</p>}
+      {herbLoading && <p role="status">Loading herb profile...</p>}
+      {vocabularyLoading && <p role="status">Loading herb vocabulary...</p>}
+
       {/* HEADER */}
 
       <div className="add-herb-page-header">
@@ -860,6 +942,7 @@ function AddHerb() {
               <button
                 type="button"
                 className="add-herb-draft-button"
+                disabled={herbLoading}
                 onClick={() =>
                   handleSave("draft")
                 }
@@ -872,6 +955,7 @@ function AddHerb() {
             <button
               type="button"
               className="add-herb-submit-button"
+              disabled={herbLoading}
               onClick={() =>
                 isReviewMode
                   ? handleSave("review")
@@ -893,6 +977,9 @@ function AddHerb() {
       <section className="add-herb-image-card">
 
         <h2>Herb Image</h2>
+        {import.meta.env.VITE_USE_API === "true" && (
+          <p role="note">Image selection is a local preview; persistent herb image storage is not configured.</p>
+        )}
 
         <input
           ref={imageInputRef}
@@ -1188,7 +1275,8 @@ function AddHerb() {
                     </div>
 
                     {!isViewMode &&
-                      !isReviewMode && (
+                      !isReviewMode &&
+                      import.meta.env.VITE_USE_API !== "true" && (
                         <button
                           type="button"
                           className="add-herb-add-term-button"
@@ -1254,7 +1342,8 @@ function AddHerb() {
                     </div>
 
                     {!isViewMode &&
-                      !isReviewMode && (
+                      !isReviewMode &&
+                      import.meta.env.VITE_USE_API !== "true" && (
                         <button
                           type="button"
                           className="add-herb-add-term-button"

@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import { env } from './config/env.js';
+import { pool } from './db/pool.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.routes.js';
 import { searchRouter } from './routes/search.routes.js';
@@ -11,6 +12,7 @@ import { herbRouter } from './routes/herb.routes.js';
 import { vocabularyRouter } from './routes/vocabulary.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { favoritesRouter } from './routes/favorites.routes.js';
+import { accountRouter } from './routes/account.routes.js';
 
 export function createApp() {
   const app = express();
@@ -18,6 +20,10 @@ export function createApp() {
   app.use(
     pinoHttp({
       level: env.nodeEnv === 'production' ? 'info' : 'debug',
+      redact: {
+        paths: ['req.headers.authorization', 'req.headers.cookie'],
+        censor: '[REDACTED]',
+      },
     })
   );
   app.use(helmet());
@@ -29,11 +35,19 @@ export function createApp() {
   );
   app.use(express.json({ limit: '1mb' }));
 
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok' });
-  });
+  const health = async (_req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      res.json({ status: 'ok', database: 'ok' });
+    } catch {
+      res.status(503).json({ status: 'error', database: 'unavailable' });
+    }
+  };
+  app.get('/api/health', health);
+  app.get('/health', health);
 
   app.use('/api/auth', authRouter);
+  app.use('/api/account', accountRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/scoring/weights', weightsRouter);
   app.use('/api/herbs', herbRouter);

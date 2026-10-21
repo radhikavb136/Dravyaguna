@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
 import { getAuditLog } from "../api/admin"
-import { getCurrentUser } from "../api/auth"
 import "../styles/AuditLog.css"
 
 
@@ -51,54 +50,6 @@ function getDateOnly(dateValue) {
 }
 
 
-function normalizeAuditEntry(entry, index) {
-  return {
-    id:
-      entry.id ||
-      `AUDIT-${Date.now()}-${index}`,
-
-    timestamp:
-      entry.timestamp ||
-      entry.createdAt ||
-      entry.date ||
-      null,
-
-    user:
-      entry.user ||
-      entry.userName ||
-      entry.name ||
-      "Unknown User",
-
-    role:
-      entry.role ||
-      "—",
-
-    action:
-      entry.action ||
-      "Unknown Action",
-
-    module:
-      entry.module ||
-      "—",
-
-    item:
-      entry.item ||
-      entry.itemName ||
-      "—",
-
-    previous:
-      entry.previous ??
-      entry.previousValue ??
-      "—",
-
-    newValue:
-      entry.newValue ??
-      entry.new ??
-      "—",
-  }
-}
-
-
 /* =========================================
    COMPONENT
    ========================================= */
@@ -112,27 +63,17 @@ function AuditLog() {
   const [auditEntries, setAuditEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
-    loadCurrentUser()
     loadAuditLog()
   }, [])
-
-  const loadCurrentUser = () => {
-    const user = getCurrentUser()
-    setCurrentUser(user)
-  }
 
   const loadAuditLog = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const useApi = import.meta.env.VITE_USE_API === 'true'
-      
-      if (useApi) {
-        const response = await getAuditLog({ limit: 100 })
+      const response = await getAuditLog({ limit: 100 })
         // Convert backend audit log format to frontend format
         const normalized = response.data.map(entry => ({
           id: entry.id,
@@ -146,39 +87,10 @@ function AuditLog() {
           newValue: entry.after_json ? JSON.stringify(entry.after_json) : '—',
         }))
         setAuditEntries(normalized)
-      } else {
-        // Fallback to localStorage for mock data
-        const savedLogs = localStorage.getItem("dravyaguna_audit_logs")
-        if (!savedLogs) {
-          setAuditEntries([])
-          return
-        }
-        try {
-          const parsedLogs = JSON.parse(savedLogs)
-          if (!Array.isArray(parsedLogs)) {
-            setAuditEntries([])
-            return
-          }
-          setAuditEntries(parsedLogs.map(normalizeAuditEntry))
-        } catch {
-          setAuditEntries([])
-        }
-      }
     } catch (err) {
       console.error('Failed to load audit log:', err)
-      setError('Failed to load audit log')
-      // Fallback to localStorage on error
-      try {
-        const savedLogs = localStorage.getItem("dravyaguna_audit_logs")
-        if (savedLogs) {
-          const parsedLogs = JSON.parse(savedLogs)
-          if (Array.isArray(parsedLogs)) {
-            setAuditEntries(parsedLogs.map(normalizeAuditEntry))
-          }
-        }
-      } catch {
-        setAuditEntries([])
-      }
+      setError(err.message || 'Failed to load audit log')
+      setAuditEntries([])
     } finally {
       setLoading(false)
     }
@@ -239,79 +151,6 @@ function AuditLog() {
 
   const [selectedEntry, setSelectedEntry] =
     useState(null)
-
-
-  /* =========================================
-     SAVE NORMALIZED AUDIT LOGS
-     ========================================= */
-
-  useEffect(() => {
-
-    localStorage.setItem(
-      "dravyaguna_audit_logs",
-      JSON.stringify(auditEntries)
-    )
-
-  }, [auditEntries])
-
-
-  /* =========================================
-     LISTEN FOR AUDIT LOG UPDATES
-     ========================================= */
-
-  useEffect(() => {
-
-    const handleStorageChange = (event) => {
-
-      if (
-        event.key !==
-        "dravyaguna_audit_logs"
-      ) {
-        return
-      }
-
-      if (!event.newValue) {
-        setAuditEntries([])
-        return
-      }
-
-      try {
-
-        const parsedLogs =
-          JSON.parse(event.newValue)
-
-        if (Array.isArray(parsedLogs)) {
-
-          setAuditEntries(
-            parsedLogs.map(
-              normalizeAuditEntry
-            )
-          )
-
-        }
-
-      } catch {
-        setAuditEntries([])
-      }
-    }
-
-
-    window.addEventListener(
-      "storage",
-      handleStorageChange
-    )
-
-
-    return () => {
-
-      window.removeEventListener(
-        "storage",
-        handleStorageChange
-      )
-
-    }
-
-  }, [])
 
 
   /* =========================================
@@ -760,6 +599,14 @@ function AuditLog() {
      RENDER
      ========================================= */
 
+  if (loading) {
+    return <p role="status">Loading audit log...</p>
+  }
+
+  if (error) {
+    return <p role="alert">{error}</p>
+  }
+
   return (
 
     <div className="audit-log-page">
@@ -1191,13 +1038,10 @@ function AuditLog() {
                           <button
                             type="button"
                             className="rollback-button"
-                            onClick={() =>
-                              window.alert(
-                                "Rollback will be connected to the original module data after the corresponding module supports audit restoration."
-                              )
-                            }
+                            disabled
+                            title="Audit rollback is unavailable until each module supports audited restoration."
                           >
-                            Rollback
+                            Rollback unavailable
                           </button>
 
                         </div>

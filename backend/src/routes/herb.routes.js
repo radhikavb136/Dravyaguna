@@ -15,9 +15,14 @@ export const herbRouter = Router();
 // Validation schemas
 const herbQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(20),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
   status: z.enum(['draft', 'reviewed', 'verified', 'archived']).optional(),
 });
+
+const slugOrCustom = z.union([
+  z.string().min(1),
+  z.object({ custom: z.string().min(1) }),
+]);
 
 const herbCreateSchema = z.object({
   code: z.string().min(1),
@@ -27,20 +32,49 @@ const herbCreateSchema = z.object({
   local_name: z.string().optional(),
   family: z.string().optional(),
   part_used: z.string().optional(),
+  description: z.string().optional(),
+  identification_notes: z.string().optional(),
   prabhava: z.string().optional(),
   virya: z.string().optional(),
   vipaka: z.string().optional(),
-  rasa: z.array(z.string()).optional(),
-  guna: z.array(z.string()).optional(),
-  karma: z.array(z.string()).optional(),
-  indications: z.array(z.string()).optional(),
-  dosha_actions: z.record(z.enum(['vata', 'pitta', 'kapha']), z.enum(['pacifies', 'increases'])).optional(),
-  dhatu: z.record(z.string(), z.coerce.number().int().min(0).max(5)).optional(),
-  mala: z.record(z.string(), z.enum(['increases', 'decreases'])).optional(),
-  srotas: z.array(z.string()).optional(),
-  avayava: z.array(z.string()).optional(),
+  rasa: z.array(z.string().min(1)).optional(),
+  guna: z.array(z.string().min(1)).optional(),
+  karma: z.array(slugOrCustom).optional(),
+  indications: z.array(slugOrCustom).optional(),
+  dosha_actions: z
+    .array(
+      z.object({
+        dosha: z.enum(['vata', 'pitta', 'kapha']),
+        effect: z.enum(['pacifies', 'increases']),
+      })
+    )
+    .optional(),
+  dhatu: z
+    .array(
+      z.object({
+        term: z.string().min(1),
+        score: z.number().int().min(0).max(5),
+      })
+    )
+    .optional(),
+  mala: z
+    .array(
+      z.object({
+        term: z.string().min(1),
+        effect: z.enum(['increases', 'decreases']),
+      })
+    )
+    .optional(),
+  srotas: z.array(z.string().min(1)).optional(),
+  avayava: z.array(z.string().min(1)).optional(),
   raw_karma: z.string().optional(),
   raw_indication: z.string().optional(),
+  references: z.array(z.object({
+    source: z.string().optional(),
+    chapter: z.string().optional(),
+    verse: z.string().optional(),
+    notes: z.string().optional(),
+  })).optional(),
 });
 
 const herbUpdateSchema = herbCreateSchema.partial().extend({
@@ -89,7 +123,7 @@ herbRouter.get('/:id', authenticate, async (req, res, next) => {
 });
 
 // POST /api/herbs - create herb (editor+)
-herbRouter.post('/', authenticate, requireRole('editor', 'admin'), async (req, res, next) => {
+herbRouter.post('/', authenticate, requireRole('editor', 'admin', 'domain_expert'), async (req, res, next) => {
   try {
     const body = herbCreateSchema.parse(req.body);
     const herb = await createHerb(body, req.user);
@@ -100,7 +134,7 @@ herbRouter.post('/', authenticate, requireRole('editor', 'admin'), async (req, r
 });
 
 // PUT /api/herbs/:id - update herb (editor+)
-herbRouter.put('/:id', authenticate, requireRole('editor', 'admin'), async (req, res, next) => {
+herbRouter.put('/:id', authenticate, requireRole('editor', 'admin', 'domain_expert'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const body = herbUpdateSchema.parse(req.body);
@@ -115,7 +149,7 @@ herbRouter.put('/:id', authenticate, requireRole('editor', 'admin'), async (req,
 });
 
 // PATCH /api/herbs/:id - partial update (editor+)
-herbRouter.patch('/:id', authenticate, requireRole('editor', 'admin'), async (req, res, next) => {
+herbRouter.patch('/:id', authenticate, requireRole('editor', 'admin', 'domain_expert'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const body = herbUpdateSchema.parse(req.body);

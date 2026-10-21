@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { changeAccountPassword, getAccount, updateAccountPreferences } from "../api/account"
 
 import "../styles/AdminSettingsPage.css"
 
@@ -9,8 +10,6 @@ function AdminSettingsPage() {
   // =========================================
   // SETTINGS STATE
   // =========================================
-
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
 
   const [emailNotifications, setEmailNotifications] = useState(true)
 
@@ -34,8 +33,27 @@ function AdminSettingsPage() {
 
   const [activityLogging, setActivityLogging] =
     useState(true)
+  const [confirmBeforeDelete, setConfirmBeforeDelete] = useState(true)
+  const [autoSavePreferences, setAutoSavePreferences] = useState(true)
 
   const [saveMessage, setSaveMessage] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    getAccount().then(({ preferences = {} }) => {
+      setEmailNotifications(preferences.emailNotifications ?? true)
+      setVerificationNotifications(preferences.verificationNotifications ?? true)
+      setSystemNotifications(preferences.systemNotifications ?? true)
+      setRequireReferences(preferences.requireReferences ?? true)
+      setShowPendingChanges(preferences.showPendingChanges ?? true)
+      setShowAnalytics(preferences.showAnalytics ?? true)
+      setShowRecentActivity(preferences.showRecentActivity ?? true)
+      setActivityLogging(preferences.activityLogging ?? true)
+      setConfirmBeforeDelete(preferences.confirmBeforeDelete ?? true)
+      setAutoSavePreferences(preferences.autoSavePreferences ?? true)
+    }).catch((err) => setError(err.message || "Unable to load settings")).finally(() => setLoading(false))
+  }, [])
 
 
   // =========================================
@@ -99,7 +117,7 @@ function AdminSettingsPage() {
   // PASSWORD VALIDATION
   // =========================================
 
-  const handlePasswordUpdate = () => {
+  const handlePasswordUpdate = async () => {
 
     if (
       !currentPassword ||
@@ -123,25 +141,24 @@ function AdminSettingsPage() {
     }
 
 
-    if (newPassword.length < 8) {
+    if (newPassword.length < 10) {
       setPasswordMessage(
-        "Password must contain at least 8 characters."
+        "Password must contain at least 10 characters."
       )
 
       return
     }
 
 
-    /*
-      Frontend validation is complete.
-
-      The actual password change will be handled
-      by the backend when authentication is connected.
-    */
-
-    setPasswordMessage(
-      "Password validation successful. Backend connection is required to change the actual password."
-    )
+    try {
+      await changeAccountPassword(currentPassword, newPassword)
+      setPasswordMessage("Password updated successfully.")
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+    } catch (err) {
+      setPasswordMessage(err.message || "Unable to update password")
+    }
   }
 
 
@@ -149,11 +166,9 @@ function AdminSettingsPage() {
   // SAVE SETTINGS
   // =========================================
 
-  const handleSave = () => {
+  const handleSave = async () => {
 
     const adminSettings = {
-
-      twoFactorEnabled,
 
       emailNotifications,
 
@@ -169,26 +184,29 @@ function AdminSettingsPage() {
 
       showRecentActivity,
 
-      activityLogging
+      activityLogging,
+      confirmBeforeDelete,
+      autoSavePreferences,
     }
-
-
-    localStorage.setItem(
-      "adminSettings",
-      JSON.stringify(adminSettings)
-    )
-
-
-    setSaveMessage(
-      "Settings updated successfully."
-    )
+    setError("")
+    setSaveMessage("")
+    try {
+      await updateAccountPreferences({ preferences: adminSettings })
+      setSaveMessage("Settings saved successfully.")
+    } catch (err) {
+      setError(err.message || "Unable to save settings")
+    }
   }
 
+
+  if (loading) return <p role="status">Loading settings...</p>
 
   return (
     <div className="admin-settings-overlay">
 
       <div className="admin-settings-modal">
+
+        {error && <p role="alert">{error}</p>}
 
         {/* =========================================
             HEADER
@@ -285,7 +303,7 @@ function AdminSettingsPage() {
               </strong>
 
               <span>
-                Add an additional layer of protection to your account.
+                Two-factor authentication is not configured for this application.
               </span>
 
             </div>
@@ -295,12 +313,8 @@ function AdminSettingsPage() {
 
               <input
                 type="checkbox"
-                checked={twoFactorEnabled}
-                onChange={(event) =>
-                  setTwoFactorEnabled(
-                    event.target.checked
-                  )
-                }
+                checked={false}
+                disabled
               />
 
               <span className="admin-settings-slider"></span>
@@ -321,7 +335,7 @@ function AdminSettingsPage() {
               </strong>
 
               <span>
-                Review devices currently signed into your account.
+                Session management is not available yet.
               </span>
 
             </div>
@@ -330,11 +344,7 @@ function AdminSettingsPage() {
             <button
               type="button"
               className="admin-settings-secondary-button"
-              onClick={() =>
-                alert(
-                  "Active sessions will be available after backend authentication is connected."
-                )
-              }
+              disabled
             >
               View
             </button>
@@ -353,7 +363,7 @@ function AdminSettingsPage() {
               </strong>
 
               <span>
-                Review recent administrator login activity.
+                Login activity reporting is not available yet.
               </span>
 
             </div>
@@ -362,11 +372,7 @@ function AdminSettingsPage() {
             <button
               type="button"
               className="admin-settings-secondary-button"
-              onClick={() =>
-                alert(
-                  "Login activity will be available after backend authentication is connected."
-                )
-              }
+              disabled
             >
               View
             </button>
@@ -416,7 +422,8 @@ function AdminSettingsPage() {
 
               <input
                 type="checkbox"
-                defaultChecked
+                checked={confirmBeforeDelete}
+                onChange={(event) => setConfirmBeforeDelete(event.target.checked)}
               />
 
               <span className="admin-settings-slider"></span>
@@ -447,7 +454,8 @@ function AdminSettingsPage() {
 
               <input
                 type="checkbox"
-                defaultChecked
+                checked={autoSavePreferences}
+                onChange={(event) => setAutoSavePreferences(event.target.checked)}
               />
 
               <span className="admin-settings-slider"></span>
@@ -849,13 +857,10 @@ function AdminSettingsPage() {
             <button
               type="button"
               className="admin-settings-secondary-button"
-              onClick={() =>
-                alert(
-                  "Account data export will be connected to the backend later."
-                )
-              }
+              disabled
+              title="Account export is not available yet."
             >
-              Export
+              Export unavailable
             </button>
 
           </div>

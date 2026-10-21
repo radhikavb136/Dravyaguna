@@ -253,10 +253,15 @@ async function importHerb(client, herb, defaultStatus) {
   await linkScored('herb_dhatu', 'dhatu_id', 'dhatu', herb.dhatu, (raw) =>
     parseScoredAffinity(raw)
   );
+  // Keep recognizable Mala vocabulary terms even when legacy mock-direction
+  // rows cannot be linked to the scored production representation.
+  for (const raw of herb.mala || []) {
+    const term = String(raw).match(/^(.+?):\s*(?:Increases|Decreases)\s*$/i)?.[1]?.trim();
+    if (term) await ensureTerm(client, 'mala', term);
+  }
   await linkScored('herb_mala', 'mala_id', 'mala', herb.mala, parseMalaEntry);
-  await linkScored('herb_srotas', 'srotas_id', 'srotas', herb.srotas, (raw) =>
-    parseScoredAffinity(raw)
-  );
+  // herb_srotas is a presence-only junction in the current schema.
+  await linkMulti('herb_srotas', 'srotas_id', 'srotas', herb.srotas);
   await linkScored('herb_avayava', 'avayava_id', 'avayava', herb.avayava, (raw) =>
     parseScoredAffinity(raw)
   );

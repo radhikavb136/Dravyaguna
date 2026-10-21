@@ -364,8 +364,8 @@ LEFT JOIN LATERAL (
       : `CAST(
           ROUND(
             CASE WHEN $${activeWeightParam} > 0
-              THEN 100.0 * (${earnedExpr}) / $${activeWeightParam}
-              ELSE 0
+              THEN (100.0 * (${earnedExpr})::numeric / $${activeWeightParam})::numeric
+              ELSE 0::numeric
             END
           ) AS numeric(10,1)
         )`;

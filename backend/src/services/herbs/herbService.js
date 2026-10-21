@@ -1,6 +1,12 @@
 import { pool } from '../../db/pool.js';
-import { createCustomTerm } from '../vocabulary/vocabularyService.js';
 import { logAudit } from '../audit/auditService.js';
+import { slugify } from '../../utils/slugify.js';
+
+function badRequest(message) {
+  const err = new Error(message);
+  err.statusCode = 400;
+  return err;
+}
 
 export async function listHerbs({ page, limit, statuses }) {
   const offset = (page - 1) * limit;
@@ -23,6 +29,7 @@ export async function listHerbs({ page, limit, statuses }) {
     pagination: {
       page,
       limit,
+      pageSize: limit,
       total: parseInt(count),
       totalPages: Math.ceil(count / limit),
     },
@@ -45,7 +52,7 @@ export async function getHerbById(id, userRole) {
   }
 
   // Load related data
-  const [rasa, guna, karma, indications, doshaActions, dhatu, mala, srotas, avayava, virya, vipaka] = await Promise.all([
+  const [rasa, guna, karma, indications, doshaActions, dhatu, mala, srotas, avayava, virya, vipaka, references] = await Promise.all([
     pool.query(
       `SELECT rt.canonical_en FROM herb_rasa hr JOIN rasa_terms rt ON hr.rasa_id = rt.id WHERE hr.herb_id = $1`,
       [id]
@@ -90,6 +97,10 @@ export async function getHerbById(id, userRole) {
       `SELECT vt.canonical_en FROM vipaka_terms vt WHERE vt.id = (SELECT vipaka_id FROM herbs WHERE id = $1)`,
       [id]
     ),
+    pool.query(
+      `SELECT source, citation_text, chapter_ref FROM herb_references WHERE herb_id = $1 ORDER BY id`,
+      [id]
+    ),
   ]);
 
   return {
@@ -108,6 +119,14 @@ export async function getHerbById(id, userRole) {
     avayava: avayava.rows.map(a => a.canonical_en),
     virya: virya.rows[0]?.canonical_en || null,
     vipaka: vipaka.rows[0]?.canonical_en || null,
+    references: references.rows.map((row) => {
+      try {
+        const citation = JSON.parse(row.citation_text);
+        return { source: row.source, chapter: row.chapter_ref || '', verse: citation.verse || '', notes: citation.notes || '' };
+      } catch {
+        return { source: row.source, chapter: row.chapter_ref || '', verse: '', notes: row.citation_text || '' };
+      }
+    }),
   };
 }
 
@@ -119,14 +138,14 @@ export async function createHerb(data, user) {
 
     // Get term IDs for vocabulary fields
     const [viryaId, vipakaId] = await Promise.all([
-      data.virya ? getTermId(client, 'virya_terms', data.virya) : null,
-      data.vipaka ? getTermId(client, 'vipaka_terms', data.vipaka) : null,
+      data.virya ? requireTermId(client, 'virya_terms', data.virya) : null,
+      data.vipaka ? requireTermId(client, 'vipaka_terms', data.vipaka) : null,
     ]);
 
     // Insert herb
     const { rows: [herb] } = await client.query(
-      `INSERT INTO herbs (code, english_name, sanskrit_name, botanical_name, local_name, family, part_used, prabhava, virya_id, vipaka_id, status, raw_karma, raw_indication)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'draft', $11, $12)
+      `INSERT INTO herbs (code, english_name, sanskrit_name, botanical_name, local_name, family, part_used, description, identification_notes, prabhava, virya_id, vipaka_id, status, raw_karma, raw_indication)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'draft', $13, $14)
        RETURNING *`,
       [
         data.code,
@@ -136,6 +155,8 @@ export async function createHerb(data, user) {
         data.local_name || null,
         data.family || null,
         data.part_used || null,
+        data.description || null,
+        data.identification_notes || null,
         data.prabhava || null,
         viryaId,
         vipakaId,
@@ -177,17 +198,26 @@ export async function updateHerb(id, data, user) {
     const { rows: [existing] } = await client.query('SELECT * FROM herbs WHERE id = $1', [id]);
     if (!existing) return null;
 
-    // Editors cannot set verified status
     if (user.role === 'editor' && data.status === 'verified') {
       const error = new Error('Editors cannot set status to verified');
       error.code = 'FORBIDDEN';
       throw error;
     }
 
-    // Get term IDs
+    if (data.status === 'archived' && user.role !== 'admin') {
+      const error = new Error('Only admins can archive herbs');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+
+    let nextStatus = data.status !== undefined ? data.status : existing.status;
+    if (existing.status === 'verified' && nextStatus !== 'archived') {
+      nextStatus = 'reviewed';
+    }
+
     const [viryaId, vipakaId] = await Promise.all([
-      data.virya !== undefined ? getTermId(client, 'virya_terms', data.virya) : existing.virya_id,
-      data.vipaka !== undefined ? getTermId(client, 'vipaka_terms', data.vipaka) : existing.vipaka_id,
+      data.virya !== undefined ? requireTermId(client, 'virya_terms', data.virya) : existing.virya_id,
+      data.vipaka !== undefined ? requireTermId(client, 'vipaka_terms', data.vipaka) : existing.vipaka_id,
     ]);
 
     // Update herb
@@ -200,12 +230,14 @@ export async function updateHerb(id, data, user) {
            local_name = COALESCE($6, local_name),
            family = COALESCE($7, family),
            part_used = COALESCE($8, part_used),
-           prabhava = COALESCE($9, prabhava),
-           virya_id = COALESCE($10, virya_id),
-           vipaka_id = COALESCE($11, vipaka_id),
-           status = COALESCE($12, status),
-           raw_karma = COALESCE($13, raw_karma),
-           raw_indication = COALESCE($14, raw_indication),
+           description = COALESCE($9, description),
+           identification_notes = COALESCE($10, identification_notes),
+           prabhava = COALESCE($11, prabhava),
+           virya_id = COALESCE($12, virya_id),
+           vipaka_id = COALESCE($13, vipaka_id),
+           status = COALESCE($14, status),
+           raw_karma = COALESCE($15, raw_karma),
+           raw_indication = COALESCE($16, raw_indication),
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
@@ -218,10 +250,12 @@ export async function updateHerb(id, data, user) {
         data.local_name,
         data.family,
         data.part_used,
+        data.description,
+        data.identification_notes,
         data.prabhava,
         viryaId,
         vipakaId,
-        data.status,
+        nextStatus,
         data.raw_karma,
         data.raw_indication,
       ]
@@ -230,8 +264,8 @@ export async function updateHerb(id, data, user) {
     // Clear and reinsert junction data if provided
     if (data.rasa !== undefined || data.guna !== undefined || data.karma !== undefined ||
         data.indications !== undefined || data.dosha_actions !== undefined || data.dhatu !== undefined ||
-        data.mala !== undefined || data.srotas !== undefined || data.avayava !== undefined) {
-      await clearJunctionData(client, id);
+        data.mala !== undefined || data.srotas !== undefined || data.avayava !== undefined || data.references !== undefined) {
+      await clearJunctionData(client, id, data);
       await insertJunctionData(client, id, data, user);
     }
 
@@ -323,105 +357,145 @@ export async function deleteHerb(id, user) {
   }
 }
 
-async function getTermId(client, table, name) {
+async function requireTermId(client, table, value) {
+  if (value == null || value === '') {
+    return null;
+  }
+  const slug = slugify(value);
   const { rows } = await client.query(
-    `SELECT id FROM ${table} WHERE canonical_en = $1`,
-    [name]
+    `SELECT id FROM ${table}
+     WHERE slug = $1 OR lower(canonical_en) = lower($2)
+     LIMIT 1`,
+    [slug, String(value).trim()]
   );
-  if (rows.length > 0) return rows[0].id;
-
-  // Create custom term if admin
-  const slug = name.toLowerCase().replace(/\s+/g, '-');
-  const { rows: [newTerm] } = await client.query(
-    `INSERT INTO ${table} (canonical_en, slug, is_custom) VALUES ($1, $2, true) RETURNING id`,
-    [name, slug]
-  );
-  return newTerm.id;
+  if (!rows[0]) {
+    throw badRequest(`Unknown term for ${table}: ${value}`);
+  }
+  return rows[0].id;
 }
 
-async function insertJunctionData(client, herbId, data, user) {
-  // Rasa
+async function resolveOpenVocabTerm(client, table, item) {
+  if (item && typeof item === 'object' && item.custom) {
+    const slug = slugify(item.custom);
+    const existing = await client.query(
+      `SELECT id FROM ${table}
+       WHERE slug = $1 OR lower(canonical_en) = lower($2)
+       LIMIT 1`,
+      [slug, item.custom.trim()]
+    );
+    if (existing.rows[0]) {
+      return existing.rows[0].id;
+    }
+    const { rows } = await client.query(
+      `INSERT INTO ${table} (canonical_en, slug, is_custom)
+       VALUES ($1, $2, true)
+       RETURNING id`,
+      [item.custom, slug]
+    );
+    return rows[0].id;
+  }
+  return requireTermId(client, table, item);
+}
+
+async function insertJunctionData(client, herbId, data) {
   if (data.rasa?.length > 0) {
     for (const name of data.rasa) {
-      const termId = await getTermId(client, 'rasa_terms', name);
+      const termId = await requireTermId(client, 'rasa_terms', name);
       await client.query('INSERT INTO herb_rasa (herb_id, rasa_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [herbId, termId]);
     }
   }
 
-  // Guna
   if (data.guna?.length > 0) {
     for (const name of data.guna) {
-      const termId = await getTermId(client, 'guna_terms', name);
+      const termId = await requireTermId(client, 'guna_terms', name);
       await client.query('INSERT INTO herb_guna (herb_id, guna_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [herbId, termId]);
     }
   }
 
-  // Karma
   if (data.karma?.length > 0) {
-    for (const name of data.karma) {
-      const termId = await getTermId(client, 'karma_terms', name);
+    for (const item of data.karma) {
+      const termId = await resolveOpenVocabTerm(client, 'karma_terms', item);
       await client.query('INSERT INTO herb_karma (herb_id, karma_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [herbId, termId]);
     }
   }
 
-  // Indications
   if (data.indications?.length > 0) {
-    for (const name of data.indications) {
-      const termId = await getTermId(client, 'indication_terms', name);
+    for (const item of data.indications) {
+      const termId = await resolveOpenVocabTerm(client, 'indication_terms', item);
       await client.query('INSERT INTO herb_indications (herb_id, indication_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [herbId, termId]);
     }
   }
 
-  // Dosha actions
-  if (data.dosha_actions) {
-    for (const [dosha, effect] of Object.entries(data.dosha_actions)) {
-      await client.query('INSERT INTO herb_dosha_actions (herb_id, dosha, effect) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [herbId, dosha, effect]);
+  if (Array.isArray(data.dosha_actions)) {
+    for (const row of data.dosha_actions) {
+      await client.query(
+        'INSERT INTO herb_dosha_actions (herb_id, dosha, effect) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [herbId, row.dosha, row.effect]
+      );
     }
   }
 
-  // Dhatu
-  if (data.dhatu) {
-    for (const [name, score] of Object.entries(data.dhatu)) {
-      const termId = await getTermId(client, 'dhatu_terms', name);
-      await client.query('INSERT INTO herb_dhatu (herb_id, dhatu_id, score) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [herbId, termId, score]);
+  if (Array.isArray(data.dhatu)) {
+    for (const row of data.dhatu) {
+      const termId = await requireTermId(client, 'dhatu_terms', row.term);
+      await client.query(
+        'INSERT INTO herb_dhatu (herb_id, dhatu_id, score) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [herbId, termId, row.score]
+      );
     }
   }
 
-  // Mala
-  if (data.mala) {
-    for (const [name, effect] of Object.entries(data.mala)) {
-      const termId = await getTermId(client, 'mala_terms', name);
-      await client.query('INSERT INTO herb_mala (herb_id, mala_id, effect) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [herbId, termId, effect]);
+  if (Array.isArray(data.mala)) {
+    for (const row of data.mala) {
+      const termId = await requireTermId(client, 'mala_terms', row.term);
+      await client.query(
+        'INSERT INTO herb_mala (herb_id, mala_id, effect) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [herbId, termId, row.effect]
+      );
     }
   }
 
-  // Srotas
   if (data.srotas?.length > 0) {
     for (const name of data.srotas) {
-      const termId = await getTermId(client, 'srotas_terms', name);
+      const termId = await requireTermId(client, 'srotas_terms', name);
       await client.query('INSERT INTO herb_srotas (herb_id, srotas_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [herbId, termId]);
     }
   }
 
-  // Avayava
   if (data.avayava?.length > 0) {
     for (const name of data.avayava) {
-      const termId = await getTermId(client, 'avayava_terms', name);
+      const termId = await requireTermId(client, 'avayava_terms', name);
       await client.query('INSERT INTO herb_avayava (herb_id, avayava_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [herbId, termId]);
+    }
+  }
+
+  if (Array.isArray(data.references)) {
+    for (const reference of data.references) {
+      const source = reference.source?.trim();
+      if (!source) continue;
+      await client.query(
+        `INSERT INTO herb_references (herb_id, source, citation_text, chapter_ref)
+         VALUES ($1, $2, $3, $4)`,
+        [herbId, source, JSON.stringify({ verse: reference.verse || '', notes: reference.notes || '' }), reference.chapter || null]
+      );
     }
   }
 }
 
-async function clearJunctionData(client, herbId) {
-  await Promise.all([
-    client.query('DELETE FROM herb_rasa WHERE herb_id = $1', [herbId]),
-    client.query('DELETE FROM herb_guna WHERE herb_id = $1', [herbId]),
-    client.query('DELETE FROM herb_karma WHERE herb_id = $1', [herbId]),
-    client.query('DELETE FROM herb_indications WHERE herb_id = $1', [herbId]),
-    client.query('DELETE FROM herb_dosha_actions WHERE herb_id = $1', [herbId]),
-    client.query('DELETE FROM herb_dhatu WHERE herb_id = $1', [herbId]),
-    client.query('DELETE FROM herb_mala WHERE herb_id = $1', [herbId]),
-    client.query('DELETE FROM herb_srotas WHERE herb_id = $1', [herbId]),
-    client.query('DELETE FROM herb_avayava WHERE herb_id = $1', [herbId]),
-  ]);
+async function clearJunctionData(client, herbId, data) {
+  const groups = [
+    ['rasa', 'herb_rasa'],
+    ['guna', 'herb_guna'],
+    ['karma', 'herb_karma'],
+    ['indications', 'herb_indications'],
+    ['dosha_actions', 'herb_dosha_actions'],
+    ['dhatu', 'herb_dhatu'],
+    ['mala', 'herb_mala'],
+    ['srotas', 'herb_srotas'],
+    ['avayava', 'herb_avayava'],
+    ['references', 'herb_references'],
+  ];
+  await Promise.all(groups
+    .filter(([field]) => data[field] !== undefined)
+    .map(([, table]) => client.query(`DELETE FROM ${table} WHERE herb_id = $1`, [herbId])));
 }

@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { getAccount, updateAccountPreferences } from "../api/account"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
@@ -9,19 +10,48 @@ import "../styles/LanguagePage.css"
 
 function LanguagePage() {
   const navigate = useNavigate()
+  const useApi = import.meta.env.VITE_USE_API === "true"
 
   const [selectedLanguage, setSelectedLanguage] = useState(
-    localStorage.getItem("language") || "English"
+    useApi ? "English" : localStorage.getItem("language") || "English"
   )
+  const [loading, setLoading] = useState(useApi)
+  const [error, setError] = useState("")
+  const [message, setMessage] = useState("")
 
-  const handleLanguageChange = (language) => {
+  useEffect(() => {
+    if (!useApi) return
+    getAccount().then(({ preferred_language: language }) => {
+      setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi" })[language] || "English")
+    }).catch((err) => setError(err.message || "Unable to load language preference")).finally(() => setLoading(false))
+  }, [useApi])
+
+  const handleLanguageChange = async (language) => {
+    setError("")
+    setMessage("")
     setSelectedLanguage(language)
-    localStorage.setItem("language", language)
+    if (!useApi) {
+      localStorage.setItem("language", language)
+      return
+    }
+    try {
+      const code = ({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN" })[language]
+      await updateAccountPreferences({ language: code })
+      setMessage("Language preference saved.")
+    } catch (err) {
+      setError(err.message || "Unable to save language preference")
+      try {
+        const { preferred_language: previous } = await getAccount()
+        setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi" })[previous] || "English")
+      } catch { /* preserve the selected value while the load error is visible */ }
+    }
   }
 
   const closeLanguage = () => {
     navigate("/doctor")
   }
+
+  if (loading) return <p role="status">Loading language preference...</p>
 
   return (
     <div className="settings-page-layout">
@@ -56,6 +86,9 @@ function LanguagePage() {
 
               {/* Language Content */}
               <div className="language-modal-content">
+
+                {error && <p role="alert">{error}</p>}
+                {message && <p role="status">{message}</p>}
 
                 {/* Header */}
                 <div className="language-header">

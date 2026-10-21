@@ -20,7 +20,17 @@ const filtersSchema = z.object({
   mala: z.array(z.string()).optional(),
   srotas: z.array(z.string()).optional(),
   avayava: z.array(z.string()).optional(),
-  dosha: z.array(z.string()).optional(),
+  dosha: z
+    .array(
+      z.union([
+        z.string(),
+        z.object({
+          dosha: z.enum(['vata', 'pitta', 'kapha']),
+          effect: z.enum(['pacifies', 'increases']),
+        }),
+      ])
+    )
+    .optional(),
   prabhava: z.array(z.string()).optional(),
 });
 
@@ -32,11 +42,14 @@ const detailedSchema = z.object({
 });
 
 const simpleSchema = z.object({
-  query: z.string().min(1),
+  query: z.string().trim().min(1).optional(),
+  filters: filtersSchema.optional(),
   lang: langSchema,
   limit: z.number().int().min(1).max(200).optional(),
   offset: z.number().int().min(0).optional(),
-});
+}).refine(({ query, filters }) => Boolean(query) || Object.values(filters || {}).some(
+  (value) => Array.isArray(value) && value.length > 0
+), { message: 'A query or at least one filter is required', path: ['query'] });
 
 export const searchRouter = Router();
 
@@ -79,6 +92,7 @@ searchRouter.post('/simple', async (req, res, next) => {
     const body = simpleSchema.parse(req.body);
     const { results, meta } = await runSimpleSearch({
       query: body.query,
+      filters: body.filters,
       role: req.user.role,
       limit: body.limit ?? 50,
       offset: body.offset ?? 0,
@@ -90,6 +104,7 @@ searchRouter.post('/simple', async (req, res, next) => {
       userId: req.user.id,
       mode: 'simple',
       queryText: body.query,
+      filtersJson: body.filters,
       lang: body.lang,
       resultCount: results.length,
       topMatchPct: topMatch,

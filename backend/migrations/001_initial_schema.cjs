@@ -39,7 +39,7 @@ exports.up = (pgm) => {
       created_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
       updated_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
     });
-    pgm.createIndex(name, 'canonical_en', { method: 'gin', opclass: 'gin_trgm_ops' });
+    pgm.sql(`CREATE INDEX ${name}_canonical_en_trgm_idx ON ${name} USING gin (canonical_en gin_trgm_ops);`);
   };
 
   [

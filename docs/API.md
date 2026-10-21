@@ -5,6 +5,10 @@
 http://localhost:4000
 ```
 
+## Health
+
+`GET /api/health` (also available as `GET /health`) checks database connectivity and returns `200 {"status":"ok","database":"ok"}` or `503 {"status":"error","database":"unavailable"}`. No authentication is required.
+
 ## Authentication
 All API endpoints (except `/api/auth/login` and `/api/auth/register`) require JWT authentication via the `Authorization: Bearer <token>` header.
 
@@ -38,11 +42,15 @@ Register a new user.
   "user": {
     "id": "uuid",
     "email": "user@example.com",
-    "role": "clinician"
-  },
-  "token": "jwt_token_here"
+    "full_name": "User Name",
+    "role": "clinician",
+    "status": "active",
+    "created_at": "2026-10-12T10:00:00Z"
+  }
 }
 ```
+
+Public registration always creates a clinician and ignores any supplied role. The user signs in separately to receive a JWT.
 
 ### POST /api/auth/login
 Authenticate a user.
@@ -66,6 +74,24 @@ Authenticate a user.
   "token": "jwt_token_here"
 }
 ```
+
+---
+
+## Account Endpoints
+
+All account routes require a valid JWT and act only on the authenticated account.
+
+### GET /api/account
+Returns account identity, role/status, preferred language, and stored preferences.
+
+### PATCH /api/account/profile
+Updates `fullName` (1–120 characters) and `displayName` (1–80 characters). Email is read-only here.
+
+### PATCH /api/account/preferences
+Accepts `language` (`en-IN`, `hi-IN`, `mr-IN`, `sa-IN`) and/or a validated `preferences` object. Search preferences include `defaultSearch` (`simple` or `detailed`) and `resultsPerPage` (10–100); preference updates are merged into the account record.
+
+### POST /api/account/password
+Changes the authenticated account password. Requires `currentPassword` and `newPassword` (10–128 characters); the current password is verified before storing a new hash.
 
 ---
 
@@ -154,19 +180,19 @@ Create a new herb (editor+ only).
   "family": "Family",
   "part_used": "Part Used",
   "prabhava": "Prabhava",
-  "rasa": ["Tikta"],
-  "guna": ["Laghu"],
-  "virya": "Ushna",
-  "vipaka": "Madhura",
-  "karma": ["Deepana"],
-  "indications": ["agnimandya"],
+  "rasa": ["tikta"],
+  "guna": ["laghu"],
+  "virya": "ushna",
+  "vipaka": "madhura",
+  "karma": ["deepana"],
+  "indications": ["jwara"],
   "dhatu": [
-    {"dhatu": "Rasa", "score": 5}
+    {"term": "rasa", "score": 5}
   ],
   "mala": [
-    {"mala": "Purisha", "effect": "decreases"}
+    {"term": "purisha", "effect": "decreases"}
   ],
-  "srotas": ["Rasavaha"],
+  "srotas": ["rasavaha"],
   "avayava": [],
   "dosha_actions": [
     {"dosha": "vata", "effect": "pacifies"}
@@ -217,15 +243,15 @@ Detailed search with scoring and filters.
 ```json
 {
   "filters": {
-    "rasa": [1],
-    "guna": [1],
-    "karma": [1],
-    "indication": [1],
-    "virya": [1],
-    "vipaka": [1],
-    "dhatu": [1],
-    "mala": [1],
-    "srotas": [1],
+    "rasa": ["tikta"],
+    "guna": ["laghu"],
+    "karma": ["deepana"],
+    "indication": ["jwara"],
+    "virya": ["ushna"],
+    "vipaka": ["madhura"],
+    "dhatu": ["rasa"],
+    "mala": ["purisha"],
+    "srotas": ["rasavaha"],
     "avayava": [],
     "dosha": [{"dosha": "vata", "effect": "pacifies"}],
     "prabhava": ["substring"]
@@ -237,8 +263,8 @@ Detailed search with scoring and filters.
 ```
 
 **Filter Format:**
-- Rasa, Guna, Virya, Vipaka, Karma, Indication, Dhatu, Mala, Srotas, Avayava: array of term IDs (integers)
-- Dosha: array of objects with `dosha` and `effect` properties
+- Rasa, Guna, Virya, Vipaka, Karma, Indication, Dhatu, Mala, Srotas, Avayava: array of **stable slugs** (not display labels, not numeric IDs). Labels are accepted only during transition and logged as deprecated.
+- Dosha: array of `{ "dosha", "effect" }` (`pacifies` | `increases`)
 - Prabhava: array of substrings for text search
 
 **Response:**
@@ -249,13 +275,13 @@ Detailed search with scoring and filters.
     {
       "id": "uuid",
       "code": "HERB_REC_0001",
-      "english_name": "Heart leaved moon seed",
-      "botanical_name": "Cardiospermum halicacabum",
-      "part_used": "Seed",
+      "englishName": "Heart leaved moon seed",
+      "botanicalName": "Cardiospermum halicacabum",
+      "partUsed": "Seed",
       "prabhava": "Specific action",
       "status": "reviewed",
-      "image_url": "https://example.com/image.jpg",
-      "match_percentage": 100.0,
+      "imageUrl": "https://example.com/image.jpg",
+      "matchPercentage": 100.0,
       "breakdown": [
         {
           "group": "rasa",
@@ -286,24 +312,24 @@ Get all vocabulary terms for frontend filters.
 **Response:**
 ```json
 {
-  "rasa": [{"id": 1, "canonical_en": "Tikta"}],
-  "guna": [{"id": 1, "canonical_en": "Laghu"}],
-  "virya": [{"id": 1, "canonical_en": "Ushna"}],
-  "vipaka": [{"id": 1, "canonical_en": "Madhura"}],
-  "karma": [{"id": 1, "canonical_en": "Deepana"}],
+  "rasa": [{"id": 1, "slug": "tikta", "label": "Tikta"}],
+  "guna": [{"id": 1, "slug": "laghu", "label": "Laghu"}],
+  "virya": [{"id": 1, "slug": "ushna", "label": "Ushna"}],
+  "vipaka": [{"id": 1, "slug": "madhura", "label": "Madhura"}],
+  "karma": [{"id": 1, "slug": "deepana", "label": "Deepana"}],
   "indications": [],
-  "dhatu": [{"id": 1, "canonical_en": "Rasa"}],
-  "mala": [{"id": 1, "canonical_en": "Purisha"}],
-  "srotas": [{"id": 1, "canonical_en": "Rasavaha"}],
+  "dhatu": [{"id": 1, "slug": "rasa", "label": "Rasa"}],
+  "mala": [{"id": 1, "slug": "purisha", "label": "Purisha"}],
+  "srotas": [{"id": 1, "slug": "rasavaha", "label": "Rasavaha"}],
   "avayava": [],
   "hasOrganData": false
 }
 ```
 
 ### POST /api/vocabulary/karma
-Create a custom Karma term (admin/domain_expert only).
+Create a custom Karma term (editor+).
 
-**Authorization:** Admin, Domain Expert
+**Authorization:** Editor, Admin, Domain Expert. Editing, merging, and deleting existing terms is admin-only.
 
 **Request:**
 ```json
@@ -323,9 +349,9 @@ Create a custom Karma term (admin/domain_expert only).
 ```
 
 ### POST /api/vocabulary/indications
-Create a custom Indication term (admin/domain_expert only).
+Create a custom Indication term (editor+).
 
-**Authorization:** Admin, Domain Expert
+**Authorization:** Editor, Admin, Domain Expert
 
 **Request:**
 ```json
@@ -386,6 +412,11 @@ Update scoring weights (admin/domain_expert only).
 }
 ```
 
+### PUT /api/scoring/weights/bulk
+Updates a set of scoring weights atomically (admin/domain_expert only). Unknown parameter names reject the entire update. Successful updates are written to the audit log.
+
+**Request:** `{ "weights": { "rasa": 20, "virya": 12 } }`
+
 ---
 
 ## Admin Endpoints
@@ -418,9 +449,9 @@ Get audit log entries (admin only).
 ```
 
 ### GET /api/analytics/search
-Get search analytics (admin only).
+Get search analytics (admin and domain_expert).
 
-**Authorization:** Admin only
+**Authorization:** Admin, Domain Expert
 
 **Response:**
 ```json
@@ -476,6 +507,29 @@ Update user role (admin only).
   "role": "editor"
 }
 ```
+
+An admin cannot change their own role. The last active admin cannot be demoted.
+
+### PATCH /api/users/:id
+Updates a user's `fullName` and/or `email` (admin only). Name/email validation, uniqueness, and audit logging are enforced server-side.
+
+### POST /api/users
+Create a user with a chosen role (admin only). Password minimum length 10.
+
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePass10",
+  "fullName": "User Name",
+  "role": "clinician"
+}
+```
+
+Public `POST /api/auth/register` always creates a clinician and ignores any role field.
+
+### PATCH /api/users/:id/status
+Deactivate or reactivate (admin only). Stored status is `active` | `inactive`. Body may send `deactivated` as an alias for `inactive`. An admin cannot deactivate themselves. The last active admin cannot be deactivated. Inactive users cannot log in.
 
 ---
 

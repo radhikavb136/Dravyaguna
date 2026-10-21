@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
+import { USE_API } from "../api/client"
+import { getHerbById } from "../api/herbs"
 
 import "../styles/ComparePage.css"
 
@@ -12,18 +14,24 @@ function ComparePage() {
   const navigate = useNavigate()
 
   const [selectedHerbs, setSelectedHerbs] = useState([])
+  const [compareError, setCompareError] = useState(null)
+
+  const persistCompareIds = (herbs) => {
+    const ids = herbs.map((herb) => herb.id).filter(Boolean)
+    if (ids.length === 0) {
+      localStorage.removeItem("selectedCompareHerbs")
+    } else {
+      localStorage.setItem("selectedCompareHerbs", JSON.stringify(ids))
+    }
+  }
 
   /*
     =========================================
     LOAD SELECTED HERBS
     =========================================
-    
-    Herbs are added to comparison from:
-    - Herb Library
-    - Search Result Card
 
-    Both pages store the complete herb object
-    inside localStorage.
+    localStorage may hold ids or full objects.
+    When VITE_USE_API=true, herb bodies are loaded from GET /api/herbs/:id.
   */
 
   useEffect(() => {
@@ -37,11 +45,29 @@ function ComparePage() {
     try {
       const parsedHerbs = JSON.parse(savedHerbs)
 
-      if (Array.isArray(parsedHerbs)) {
-        setSelectedHerbs(parsedHerbs)
-      } else {
+      if (!Array.isArray(parsedHerbs)) {
         setSelectedHerbs([])
+        return
       }
+
+      const ids = parsedHerbs
+        .map((item) => (item && typeof item === "object" ? item.id : item))
+        .filter(Boolean)
+
+      if (!USE_API) {
+        setSelectedHerbs(parsedHerbs)
+        return
+      }
+
+      persistCompareIds(ids.map((id) => ({ id })))
+      setCompareError(null)
+      Promise.all(ids.map((id) => getHerbById(id)))
+        .then((herbs) => setSelectedHerbs(herbs.filter(Boolean)))
+        .catch((error) => {
+          console.error("Unable to load comparison herbs:", error)
+          setCompareError("Failed to load comparison herbs from the API")
+          setSelectedHerbs([])
+        })
     } catch (error) {
       console.error(
         "Unable to load comparison herbs:",
@@ -74,15 +100,7 @@ function ComparePage() {
     )
 
     setSelectedHerbs(updatedHerbs)
-
-    if (updatedHerbs.length === 0) {
-      localStorage.removeItem("selectedCompareHerbs")
-    } else {
-      localStorage.setItem(
-        "selectedCompareHerbs",
-        JSON.stringify(updatedHerbs)
-      )
-    }
+    persistCompareIds(updatedHerbs)
   }
 
   /*
@@ -114,11 +132,7 @@ function ComparePage() {
     ]
 
     setSelectedHerbs(updatedHerbs)
-
-    localStorage.setItem(
-      "selectedCompareHerbs",
-      JSON.stringify(updatedHerbs)
-    )
+    persistCompareIds(updatedHerbs)
   }
 
   /*
@@ -307,6 +321,10 @@ function ComparePage() {
 
   const formatRegionalNames = (names) => {
     return formatArray(names)
+  }
+
+  if (compareError) {
+    return <p role="alert">{compareError}</p>
   }
 
   return (

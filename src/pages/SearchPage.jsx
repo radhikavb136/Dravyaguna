@@ -1,5 +1,8 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useSearchParams, useNavigate } from "react-router-dom"
+import { getAccount } from "../api/account"
+import { getFilterOptions } from "../api/vocabulary"
+import { USE_API } from "../api/client"
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
 import DetailedSearch from "../components/DetailedSearch"
@@ -14,17 +17,47 @@ function SearchPage() {
   // READ SAVED SEARCH SETTINGS
   // =========================================
 
-  const savedSettings = JSON.parse(
-    localStorage.getItem("herbSettings") || "null"
-  )
+  const requestedMode = searchParams.get("mode")
+  const [defaultMode, setDefaultMode] = useState("simple")
+  const [preferenceError, setPreferenceError] = useState("")
+  const [searchVocabulary, setSearchVocabulary] = useState(null)
+  const [filtersLoading, setFiltersLoading] = useState(USE_API)
+  const [filtersError, setFiltersError] = useState("")
+  const [filtersRetry, setFiltersRetry] = useState(0)
 
-  const savedDefaultSearch =
-    savedSettings?.defaultSearch || "simple"
+  useEffect(() => {
+    if (requestedMode) return
+    if (USE_API) {
+      getAccount()
+        .then(({ preferences }) => setDefaultMode(preferences?.defaultSearch || "simple"))
+        .catch((error) => setPreferenceError(error.message || "Unable to load search preference"))
+      return
+    }
+    try {
+      const settings = JSON.parse(localStorage.getItem("herbSettings") || "null")
+      setDefaultMode(settings?.defaultSearch || "simple")
+    } catch {
+      setDefaultMode("simple")
+    }
+  }, [requestedMode])
 
-  // URL mode has priority.
-  // If there is no mode in URL, use saved setting.
-  const mode =
-    searchParams.get("mode") || savedDefaultSearch
+  useEffect(() => {
+    if (!USE_API) return undefined
+    let cancelled = false
+    getFilterOptions()
+      .then((options) => {
+        if (!cancelled) setSearchVocabulary(options)
+      })
+      .catch((error) => {
+        if (!cancelled) setFiltersError(error.message || "Unable to load search filters")
+      })
+      .finally(() => {
+        if (!cancelled) setFiltersLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [filtersRetry])
+
+  const mode = requestedMode || defaultMode
 
 
   // =========================================
@@ -131,6 +164,8 @@ function SearchPage() {
               ========================================= */}
 
           <section className="search-page-header">
+
+            {preferenceError && <p role="alert">{preferenceError}</p>}
 
             <div className="search-header-text">
 
@@ -300,6 +335,14 @@ function SearchPage() {
 
                   <div className="simple-search-factors-grid">
 
+                    {USE_API && filtersLoading && <p role="status">Loading clinical filters...</p>}
+                    {USE_API && filtersError && (
+                      <p role="alert">
+                        Unable to load clinical filters: {filtersError}{" "}
+                        <button type="button" onClick={() => { setFiltersLoading(true); setFiltersError(""); setFiltersRetry((count) => count + 1) }}>Retry</button>
+                      </p>
+                    )}
+
                     <div className="simple-search-factor">
 
                       <label htmlFor="rasa">
@@ -318,29 +361,9 @@ function SearchPage() {
                           Any Rasa
                         </option>
 
-                        <option value="Madhura">
-                          Madhura
-                        </option>
-
-                        <option value="Amla">
-                          Amla
-                        </option>
-
-                        <option value="Lavana">
-                          Lavana
-                        </option>
-
-                        <option value="Katu">
-                          Katu
-                        </option>
-
-                        <option value="Tikta">
-                          Tikta
-                        </option>
-
-                        <option value="Kashaya">
-                          Kashaya
-                        </option>
+                        {USE_API
+                          ? (searchVocabulary?.rasa || []).map((term) => <option key={term.id} value={term.slug}>{term.canonical_en}</option>)
+                          : ["Madhura", "Amla", "Lavana", "Katu", "Tikta", "Kashaya"].map((term) => <option key={term} value={term}>{term}</option>)}
 
                       </select>
 
@@ -365,13 +388,9 @@ function SearchPage() {
                           Any Virya
                         </option>
 
-                        <option value="Ushna">
-                          Ushna
-                        </option>
-
-                        <option value="Sheeta">
-                          Sheeta
-                        </option>
+                        {USE_API
+                          ? (searchVocabulary?.virya || []).map((term) => <option key={term.id} value={term.slug}>{term.canonical_en}</option>)
+                          : ["Ushna", "Sheeta"].map((term) => <option key={term} value={term}>{term}</option>)}
 
                       </select>
 
@@ -396,17 +415,9 @@ function SearchPage() {
                           Any Vipaka
                         </option>
 
-                        <option value="Madhura">
-                          Madhura
-                        </option>
-
-                        <option value="Amla">
-                          Amla
-                        </option>
-
-                        <option value="Katu">
-                          Katu
-                        </option>
+                        {USE_API
+                          ? (searchVocabulary?.vipaka || []).map((term) => <option key={term.id} value={term.slug}>{term.canonical_en}</option>)
+                          : ["Madhura", "Amla", "Katu"].map((term) => <option key={term} value={term}>{term}</option>)}
 
                       </select>
 
@@ -431,21 +442,9 @@ function SearchPage() {
                           Any Disease
                         </option>
 
-                        <option value="Diabetes">
-                          Diabetes
-                        </option>
-
-                        <option value="Hypertension">
-                          Hypertension
-                        </option>
-
-                        <option value="Arthritis">
-                          Arthritis
-                        </option>
-
-                        <option value="Asthma">
-                          Asthma
-                        </option>
+                        {USE_API
+                          ? (searchVocabulary?.indications || []).map((term) => <option key={term.id} value={term.slug}>{term.canonical_en}</option>)
+                          : ["Diabetes", "Hypertension", "Arthritis", "Asthma"].map((term) => <option key={term} value={term}>{term}</option>)}
 
                       </select>
 

@@ -1,9 +1,15 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import AdminProfileDropdown from "./AdminProfileDropdown"
+import { getCurrentUser } from "../api/auth"
+import { getBackendRole } from "../utils/roles"
 
 function AdminSidebar() {
   const location = useLocation()
+  const role = getBackendRole(getCurrentUser())
+  const isAdmin = role === "admin"
+  const canEditHerbs = ["admin", "editor", "domain_expert"].includes(role)
+  const canConfigureScoring = ["admin", "domain_expert"].includes(role)
 
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] =
     useState(false)
@@ -48,7 +54,7 @@ function AdminSidebar() {
 
 
         {/* Dashboard */}
-        <Link
+        {["admin", "domain_expert"].includes(role) && <Link
           to="/admin"
           className={`admin-nav-item ${
             location.pathname === "/admin"
@@ -58,11 +64,11 @@ function AdminSidebar() {
         >
           <span>▦</span>
           <span>Dashboard</span>
-        </Link>
+        </Link>}
 
 
         {/* Manage Herbs */}
-        <Link
+        {canEditHerbs && <Link
           to="/admin/manage-herbs"
           className={`admin-nav-item ${
             location.pathname === "/admin/manage-herbs"
@@ -72,11 +78,11 @@ function AdminSidebar() {
         >
           <span>♧</span>
           <span>Manage Herbs</span>
-        </Link>
+        </Link>}
 
 
         {/* Add Herb */}
-        <Link
+        {canEditHerbs && <Link
           to="/admin/add-herb"
           className={`admin-nav-item ${
             location.pathname === "/admin/add-herb"
@@ -86,11 +92,11 @@ function AdminSidebar() {
         >
           <span>＋</span>
           <span>Add Herb</span>
-        </Link>
+        </Link>}
 
 
         {/* Vocabulary */}
-        <Link
+        {canEditHerbs && <Link
           to="/admin/vocabulary"
           className={`admin-nav-item ${
             location.pathname === "/admin/vocabulary"
@@ -100,11 +106,11 @@ function AdminSidebar() {
         >
           <span>▣</span>
           <span>Vocabulary</span>
-        </Link>
+        </Link>}
 
 
         {/* Scoring Configuration */}
-        <Link
+        {canConfigureScoring && <Link
           to="/admin/scoring"
           className={`admin-nav-item ${
             location.pathname === "/admin/scoring"
@@ -114,11 +120,11 @@ function AdminSidebar() {
         >
           <span>⚙</span>
           <span>Scoring Configuration</span>
-        </Link>
+        </Link>}
 
 
         {/* Search Analytics */}
-        <Link
+        {["admin", "domain_expert"].includes(role) && <Link
           to="/admin/search-analytics"
           className={`admin-nav-item ${
             location.pathname === "/admin/search-analytics"
@@ -128,11 +134,11 @@ function AdminSidebar() {
         >
           <span>⌁</span>
           <span>Search Analytics</span>
-        </Link>
+        </Link>}
 
 
         {/* User & Role Management */}
-        <Link
+        {isAdmin && <Link
           to="/admin/users"
           className={`admin-nav-item ${
             location.pathname === "/admin/users"
@@ -142,11 +148,11 @@ function AdminSidebar() {
         >
           <span>♙</span>
           <span>User & Role Management</span>
-        </Link>
+        </Link>}
 
 
         {/* Audit Log */}
-        <Link
+        {isAdmin && <Link
           to="/admin/audit-log"
           className={`admin-nav-item ${
             location.pathname === "/admin/audit-log"
@@ -156,7 +162,7 @@ function AdminSidebar() {
         >
           <span>▤</span>
           <span>Audit Log</span>
-        </Link>
+        </Link>}
 
       </nav>
 

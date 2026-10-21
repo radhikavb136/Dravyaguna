@@ -7,7 +7,9 @@ import HerbResultCard from "../components/HerbResultCard"
 import herbDataset from "../data/herbDataset"
 
 import { addSearchHistory } from "../utils/searchHistory"
-import { searchHerbsDetailed } from "../api/herbs"
+import { searchHerbsDetailed, searchHerbsSimple } from "../api/herbs"
+import { getAccount } from "../api/account"
+import { saveSearch } from "../api/favorites"
 import { USE_API } from "../api/client"
 
 import "../styles/SearchResults.css"
@@ -647,6 +649,18 @@ function SearchResults() {
   const parametersString =
     searchParams.get("parameters") || ""
 
+  const simpleRasa = searchParams.get("rasa") || ""
+  const simpleVirya = searchParams.get("virya") || ""
+  const simpleVipaka = searchParams.get("vipaka") || ""
+  const simpleIndication = searchParams.get("majorDisease") || ""
+  const simpleFilters = {
+    ...(simpleRasa ? { rasa: [simpleRasa] } : {}),
+    ...(simpleVirya ? { virya: [simpleVirya] } : {}),
+    ...(simpleVipaka ? { vipaka: [simpleVipaka] } : {}),
+    ...(simpleIndication ? { indication: [simpleIndication] } : {}),
+  }
+  const hasSimpleFilters = Object.keys(simpleFilters).length > 0
+
   const [showFilters, setShowFilters] =
     useState(false)
 
@@ -668,14 +682,24 @@ function SearchResults() {
   const [apiResults, setApiResults] = useState(null)
   const [apiLoading, setApiLoading] = useState(false)
   const [apiError, setApiError] = useState(null)
+  const [preferenceError, setPreferenceError] = useState("")
+  const [savedSearchMessage, setSavedSearchMessage] = useState("")
+  const [resultsPerPage, setResultsPerPage] = useState(() => {
+    if (USE_API) return 20
+    try {
+      const settings = JSON.parse(localStorage.getItem("herbSettings") || "null")
+      return Number(settings?.resultsPerPage || 20)
+    } catch {
+      return 20
+    }
+  })
 
-    const savedSettings = JSON.parse(
-      localStorage.getItem("herbSettings") || "null"
-    )
-    
-    const resultsPerPage = Number(
-      savedSettings?.resultsPerPage || 20
-    )
+  useEffect(() => {
+    if (!USE_API) return
+    getAccount()
+      .then(({ preferences }) => setResultsPerPage(Number(preferences?.resultsPerPage || 20)))
+      .catch((error) => setPreferenceError(error.message || "Unable to load result display preference"))
+  }, [])
 
   // Call API for detailed search when feature flag is enabled
   useEffect(() => {
@@ -694,7 +718,7 @@ function SearchResults() {
         if (selectedParameters.Virya) apiFilters.virya = selectedParameters.Virya
         if (selectedParameters.Vipaka) apiFilters.vipaka = selectedParameters.Vipaka
         if (selectedParameters.Karma) apiFilters.karma = selectedParameters.Karma
-        if (selectedParameters["Major Diseases / Indications"]) apiFilters.indications = selectedParameters["Major Diseases / Indications"]
+        if (selectedParameters["Major Diseases / Indications"]) apiFilters.indication = selectedParameters["Major Diseases / Indications"]
         if (selectedParameters.Dhatu) apiFilters.dhatu = selectedParameters.Dhatu
         if (selectedParameters.Mala) apiFilters.mala = selectedParameters.Mala
         if (selectedParameters.Srotas) apiFilters.srotas = selectedParameters.Srotas
@@ -706,16 +730,16 @@ function SearchResults() {
           selectedParameters.Dosha.forEach(d => {
             const [dosha, effect] = d.split(' · ')
             if (effect === 'Decreases') {
-              apiFilters.dosha.push({ dosha, effect: 'pacifies' })
+              apiFilters.dosha.push({ dosha: dosha.toLowerCase(), effect: 'pacifies' })
             } else {
-              apiFilters.dosha.push({ dosha, effect: 'increases' })
+              apiFilters.dosha.push({ dosha: dosha.toLowerCase(), effect: 'increases' })
             }
           })
         }
 
         searchHerbsDetailed(apiFilters, 200)
           .then(data => {
-            setApiResults(data.results || [])
+            setApiResults(data || [])
             setApiLoading(false)
           })
           .catch(error => {
@@ -728,10 +752,32 @@ function SearchResults() {
         setApiError('Invalid search parameters')
         setApiLoading(false)
       }
-    } else {
-      setApiResults(null)
+      return
     }
-  }, [mode, parametersString])
+
+    if (USE_API && mode === "simple" && (query || hasSimpleFilters)) {
+      setApiLoading(true)
+      setApiError(null)
+      searchHerbsSimple(query, 200, simpleFilters)
+        .then(data => {
+          setApiResults(data || [])
+          setApiLoading(false)
+        })
+        .catch(error => {
+          console.error('API search error:', error)
+          setApiError(error.message)
+          setApiResults([])
+          setApiLoading(false)
+        })
+      return
+    }
+
+    if (!USE_API) {
+      setApiResults(null)
+    } else {
+      setApiResults([])
+    }
+  }, [mode, parametersString, query, simpleRasa, simpleVirya, simpleVipaka, simpleIndication])
 
 
   /* =========================================
@@ -760,6 +806,18 @@ function SearchResults() {
       }
     }, [parametersString])
 
+  const handleSaveSearch = async () => {
+    const name = window.prompt("Name this search")?.trim()
+    if (!name) return
+    setSavedSearchMessage("")
+    try {
+      await saveSearch(name, { mode, query, parameters: selectedParameters })
+      setSavedSearchMessage("Search saved to your account.")
+    } catch (error) {
+      setSavedSearchMessage(error.message || "Unable to save search")
+    }
+  }
+
 
   /* =========================================
      CREATE BASE RESULTS
@@ -768,10 +826,10 @@ function SearchResults() {
   const baseResults =
     useMemo(() => {
       // Use API results when available
-      if (USE_API && mode === "detailed" && apiResults) {
-        return apiResults.map(herb => ({
+      if (USE_API) {
+        return (apiResults || []).map(herb => ({
           herb,
-          match: herb.matchPercentage || 100, // API returns match percentage
+          match: herb.matchPercentage ?? herb.match ?? 100,
         }))
       }
 
@@ -853,6 +911,7 @@ function SearchResults() {
           )
       )
     }, [
+      apiResults,
       mode,
       query,
       selectedParameters,
@@ -916,6 +975,7 @@ function SearchResults() {
     }, [
       baseResults,
       filters,
+      resultsPerPage,
       sortOption,
     ])
 
@@ -1062,6 +1122,16 @@ useEffect(() => {
 
           <div className="search-results-content">
 
+            {apiLoading && (
+              <p role="status">Loading search results...</p>
+            )}
+
+            {apiError && (
+              <p role="alert">{apiError}</p>
+            )}
+            {preferenceError && <p role="alert">{preferenceError}</p>}
+            {savedSearchMessage && <p role={savedSearchMessage.startsWith("Unable") ? "alert" : "status"}>{savedSearchMessage}</p>}
+
 
             {/* =========================================
                 RESULTS HEADER
@@ -1091,6 +1161,8 @@ useEffect(() => {
 
 
               <div className="results-header-actions">
+
+                {USE_API && <button className="results-filter-button" type="button" onClick={handleSaveSearch}>Save search</button>}
 
                 {/* FILTER BUTTON */}
 
@@ -1491,7 +1563,7 @@ useEffect(() => {
                 NO SEARCH RESULTS
                 ========================================= */}
 
-            {herbResults.length === 0 && (
+            {!apiLoading && !apiError && herbResults.length === 0 && (
 
               <section className="no-search-results">
 

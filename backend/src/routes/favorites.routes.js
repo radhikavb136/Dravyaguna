@@ -8,6 +8,7 @@ import { authenticate } from '../middleware/auth.js';
 import { z } from 'zod';
 
 const router = express.Router();
+const herbIdSchema = z.string().uuid();
 
 // GET /api/favorites - get user's favorites
 router.get('/favorites', authenticate, async (req, res, next) => {
@@ -34,10 +35,9 @@ router.get('/favorites', authenticate, async (req, res, next) => {
 // POST /api/favorites - add favorite
 router.post('/favorites', authenticate, async (req, res, next) => {
   try {
-    const { herb_id } = req.body;
-    if (!herb_id) {
-      return res.status(400).json({ error: 'herb_id is required' });
-    }
+    const parsed = herbIdSchema.safeParse(req.body?.herb_id);
+    if (!parsed.success) return res.status(400).json({ error: 'herb_id must be a UUID' });
+    const herb_id = parsed.data;
 
     const client = await pool.connect();
     try {
@@ -60,6 +60,8 @@ router.post('/favorites', authenticate, async (req, res, next) => {
 // DELETE /api/favorites/:herb_id - remove favorite
 router.delete('/favorites/:herb_id', authenticate, async (req, res, next) => {
   try {
+    const parsed = herbIdSchema.safeParse(req.params.herb_id);
+    if (!parsed.success) return res.status(400).json({ error: 'herb_id must be a UUID' });
     const { herb_id } = req.params;
     const client = await pool.connect();
     try {
@@ -105,7 +107,7 @@ router.get('/saved-searches', authenticate, async (req, res, next) => {
 router.post('/saved-searches', authenticate, async (req, res, next) => {
   try {
     const schema = z.object({
-      name: z.string().min(1),
+      name: z.string().trim().min(1).max(120),
       filters: z.object({}).passthrough(),
     });
     const body = schema.parse(req.body);
@@ -130,14 +132,16 @@ router.post('/saved-searches', authenticate, async (req, res, next) => {
 // DELETE /api/saved-searches/:id - remove saved search
 router.delete('/saved-searches/:id', authenticate, async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const parsedId = z.coerce.number().int().positive().safeParse(req.params.id);
+    if (!parsedId.success) return res.status(400).json({ error: 'Saved search id must be a positive integer' });
+    const id = parsedId.data;
     const client = await pool.connect();
     try {
       const { rows } = await client.query(
         `DELETE FROM saved_searches 
          WHERE user_id = $1 AND id = $2 
          RETURNING *`,
-        [req.user.id, parseInt(id)]
+        [req.user.id, id]
       );
       if (rows.length === 0) {
         return res.status(404).json({ error: 'Saved search not found' });

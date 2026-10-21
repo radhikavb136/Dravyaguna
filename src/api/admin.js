@@ -15,7 +15,7 @@ export async function getAuditLog(params = {}) {
 }
 
 export async function getSearchAnalytics() {
-  return apiClient.get('/api/analytics/search');
+  return apiClient.get('/api/analytics/search?days=90');
 }
 
 export async function getUsers() {
@@ -24,4 +24,12 @@ export async function getUsers() {
 
 export async function updateUserRole(userId, role) {
   return apiClient.patch(`/api/users/${userId}/role`, { role });
+}
+
+export async function updateUserStatus(userId, status) {
+  return apiClient.patch(`/api/users/${userId}/status`, { status });
+}
+
+export async function updateUserDetails(userId, details) {
+  return apiClient.patch(`/api/users/${userId}`, details);
 }

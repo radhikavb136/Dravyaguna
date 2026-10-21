@@ -4,7 +4,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, '../.embedded-pg');
+const dataDir = process.env.EMBEDDED_PG_DATA_DIR
+  ? path.resolve(process.env.EMBEDDED_PG_DATA_DIR)
+  : path.join(__dirname, '../.embedded-pg');
 const port = Number(process.env.EMBEDDED_PG_PORT || 54329);
 
 async function main() {
@@ -19,15 +21,22 @@ async function main() {
     initdbFlags: ['--encoding=UTF8', '--locale=C'],
   });
 
-  await pg.initialise();
+  // Reuse an existing local cluster. Re-running this script must never try to
+  // initialize over project data that is already in the directory.
+  if (!fs.existsSync(path.join(dataDir, 'PG_VERSION'))) {
+    await pg.initialise();
+  }
   await pg.start();
 
   const dbName = 'dravyaguna';
-  try {
-    await pg.createDatabase(dbName);
-  } catch {
-    // already exists
-  }
+  const client = pg.getPgClient();
+  await client.connect();
+  const { rows } = await client.query(
+    'SELECT 1 FROM pg_database WHERE datname = $1',
+    [dbName]
+  );
+  await client.end();
+  if (!rows.length) await pg.createDatabase(dbName);
 
   const url = `postgresql://postgres:postgres@127.0.0.1:${port}/${dbName}`;
   console.log(url);

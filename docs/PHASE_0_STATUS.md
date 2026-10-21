@@ -1,7 +1,9 @@
 # Phase 0 Status
 
 ## Root Cause of Search-Visibility Bug
-The WHERE clause in `buildSearchQuery.js` was checking the computed `match_percentage > 0`, which could include herbs that matched only partial criteria (e.g., only Rasa but not Karma). The fix changed it to check each individual lateral ratio (e.g., `COALESCE(rasa_lat.ratio, 0) > 0 AND COALESCE(karma_lat.ratio, 0) > 0`), ensuring only herbs that match ALL selected criteria are returned.
+Intended live behaviour: return every herb with `match_percentage > 0` (partial matches included) and rank by weighted percent. Tests assert the 100% count and the total separately. An earlier note that search must match every selected group is incorrect and is not the product rule.
+
+Historical: migration 005 dropped and recreated `herb_mala` (already applied). ALTER-only applies from A0 onward.
 
 ## Acceptance Test
 **VERIFIED** - Commit `d630dec`

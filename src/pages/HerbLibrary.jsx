@@ -2,8 +2,9 @@ import { useMemo, useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
-import { listHerbs } from "../api/herbs"
+import { listAllHerbs } from "../api/herbs"
 import { USE_API } from "../api/client"
+import { addFavorite, getFavorites, removeFavorite } from "../api/favorites"
 import "../styles/HerbLibrary.css"
 
 function LeafIcon({ variant = "green" }) {
@@ -330,9 +331,9 @@ function HerbLibrary() {
       setApiLoading(true)
       setApiError(null)
       
-      listHerbs({ limit: 200 })
-        .then(response => {
-          setApiHerbs(response.data)
+      listAllHerbs({ limit: 200 })
+        .then(herbs => {
+          setApiHerbs(herbs)
           setApiLoading(false)
         })
         .catch(error => {
@@ -347,6 +348,17 @@ function HerbLibrary() {
     LOAD FAVORITES
   */
   useEffect(() => {
+    if (USE_API) {
+      getFavorites()
+        .then(response => setFavoriteHerbs(response.data || []))
+        .catch(error => {
+          console.error("Unable to load favorite herbs:", error)
+          setApiError(error.message || "Unable to load favorite status")
+          setFavoriteHerbs([])
+        })
+      return
+    }
+
     try {
       const savedFavorites =
         JSON.parse(localStorage.getItem("favoriteHerbs")) || []
@@ -365,34 +377,41 @@ function HerbLibrary() {
     if (USE_API && apiHerbs) {
       return apiHerbs
     }
+    if (USE_API) {
+      return []
+    }
     return herbs
   }, [USE_API, apiHerbs])
-  useEffect(() => {
-    try {
-      const savedFavorites =
-        JSON.parse(localStorage.getItem("favoriteHerbs")) || []
-
-      setFavoriteHerbs(savedFavorites)
-    } catch (error) {
-      console.error("Unable to load favorite herbs:", error)
-      setFavoriteHerbs([])
-    }
-  }, [])
-
   /*
     CHECK FAVORITE
   */
   const isFavorite = (herbId) => {
     return favoriteHerbs.some(
-      (item) => item.id === herbId
+      (item) => USE_API ? item.herb_id === herbId : item.id === herbId
     )
   }
 
   /*
     ADD / REMOVE FAVORITE
   */
-  const handleFavorite = (event, herb) => {
+  const handleFavorite = async (event, herb) => {
     event.stopPropagation()
+
+    if (USE_API) {
+      try {
+        if (isFavorite(herb.id)) {
+          await removeFavorite(herb.id)
+        } else {
+          await addFavorite(herb.id)
+        }
+        const response = await getFavorites()
+        setFavoriteHerbs(response.data || [])
+      } catch (error) {
+        console.error("Unable to update favorite herb:", error)
+        setApiError(error.message || "Unable to update favorite")
+      }
+      return
+    }
 
     setFavoriteHerbs((previous) => {
       const alreadyFavorite = previous.some(
@@ -485,7 +504,7 @@ function HerbLibrary() {
 
     localStorage.setItem(
       "selectedCompareHerbs",
-      JSON.stringify(selectedHerbs)
+      JSON.stringify(selectedHerbs.map((herb) => herb.id))
     )
 
     navigate("/compare")
@@ -513,6 +532,14 @@ function HerbLibrary() {
 
         <main className="herb-library-content">
           <div className="herb-library-inner">
+
+            {USE_API && apiLoading && (
+              <p role="status">Loading herb library...</p>
+            )}
+
+            {USE_API && apiError && (
+              <p role="alert">{apiError}</p>
+            )}
 
             {/* HEADER */}
             <section className="herb-library-header">
@@ -607,12 +634,6 @@ function HerbLibrary() {
 
                 const guna =
                   herb.guna?.join(" · ")
-
-                const karma =
-                  herb.karma?.slice(0, 2).join(" · ")
-
-                const indications =
-                  herb.indications?.slice(0, 4).join(", ")
 
                 return (
                   <article

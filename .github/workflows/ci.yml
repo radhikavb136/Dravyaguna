@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dravyaguna_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d dravyaguna_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dravyaguna_test
+      JWT_SECRET: ci-only-secret-not-for-production
+      JWT_EXPIRES_IN: 8h
+      FRONTEND_ORIGIN: http://localhost:5173
+      DEV_USER_PASSWORD: CiDevPass1234
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci
+        working-directory: backend
+      - run: npm run migrate
+        working-directory: backend
+      - run: npm run seed
+        working-directory: backend
+      - run: npm run import:frontend
+        working-directory: backend
+      - run: node scripts/seedDevUsers.js
+        working-directory: backend
+      - run: node src/index.js > api.log 2>&1 &
+        working-directory: backend
+      - run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:4000/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat backend/api.log
+          exit 1
+      - run: npm test
+        working-directory: backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build

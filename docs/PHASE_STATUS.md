@@ -5,9 +5,13 @@ Updated 2026-10-21. This is the living status file. `PHASE_0_STATUS.md` and `PHA
 ## Re-verification evidence (2026-10-21)
 
 - `backend`: `$env:DATABASE_URL=<isolated local PostgreSQL>; $env:API_BASE_URL=http://127.0.0.1:4015; $env:NODE_ENV=test; npm.cmd test` → `12 passed, 0 failed, 12 total`.
-- Frontend `npm.cmd test -- --run` → `Test Files 4 passed (4); Tests 20 passed (20)`.
+- Frontend `npm.cmd test -- --run` → `Test Files 5 passed (5); Tests 21 passed (21)`.
 - Frontend `npm.cmd run lint` → exit 0, 0 errors, 39 warnings.
-- Frontend `npm.cmd run build` → exit 0; Vite reports a 610.33 kB minified JS chunk warning.
+- Frontend `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
+- Backend `npm.cmd test` → `15 passed, 0 failed, 15 total` against the isolated local database.
+- Backend `npm.cmd run migrate` applied `011_enable_rls_public_tables`; `npm.cmd run check:rls` → `All public tables have row-level security enabled.`
+- Migration 005 is already applied and historically recreated `herb_mala`; it must not be rerun. All new schema changes are additive/ALTER-only.
+- Local production smoke: Vite preview root and `/herb-library` both returned HTTP 200; production-mode API `/api/health` returned HTTP 200 with API/database `ok`.
 - Backend `npm.cmd run migrate`: no migrations pending when explicitly pointed at the isolated local PostgreSQL database at port 54333.
 - Backend `npm.cmd test`: 12/12 passed against the isolated database. Herb regression cases prove editors and reviewers cannot archive through the general update endpoint while Admin can. Admin audit tests confirm user creation, role changes, status changes, and name/email edits are recorded. Other cases cover verification, domain expert scoring/analytics, immediate token permission revocation, vocabulary relinking/protected deletion, and the Phase B simple-search threshold of 0.45.
 - Chromium with the local API: clinician login, profile, language, and search settings persisted after reload; restored seed values afterward.
@@ -46,32 +50,37 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 - The isolated importer/migration fixes, match rounding correction, and custom vocabulary slug/canonical lookup fix are retained.
 - Simple search trigram similarity now uses the Phase B threshold (0.45); synonym quality/coverage still depends on the pending domain-approved seed list.
 
-## Area status
+## Current status table
 
-| Area | Backend | Frontend / UI | Overall |
+| Phase | Feature | Status | Evidence / remaining work |
 |---|---|---|---|
-| Startup, migrations, local DB | VERIFIED (local embedded DB, health check, migrations) | VERIFIED (Vite dev app) | VERIFIED locally |
-| Auth and role enforcement | VERIFIED by API suite, including immediate role/status revocation | Admin and clinician login verified in Chromium; role-gate unit tests pass | VERIFIED locally (full browser route denial still pending) |
-| Herb library/detail and pagination | VERIFIED by API suite | Library and detail read paths verified in Chromium; multi-page UI not exercised | VERIFIED locally for read paths |
-| Simple/detailed search and scoring | VERIFIED by API suite, including transactional weights | Simple search and displayed backend results verified in Chromium; detailed filter UI not exercised | VERIFIED locally for simple search; detailed UI partial |
-| Herb CRUD and verification | VERIFIED by API suite (including clinician/editor verification denial, expert verification allowed) | Draft create/edit description and identification-note persistence verified; Verify action still not browser-tested after role fix | WIRED-UNVERIFIED |
-| Vocabulary create/update/merge/delete | VERIFIED by API suite, including live herb relinking and protected deletion | Karma create/edit persistence verified; merge/relink/protected deletion not browser-tested | WIRED-UNVERIFIED |
-| Admin profile/language/settings | VERIFIED by account API tests | VERIFIED in Chromium; persistence checked after reload | VERIFIED |
-| Clinician profile/language/settings | Account API and preference validation tested | Profile, language, and search preferences persisted after reload | VERIFIED locally |
-| User role/status/name/email | VERIFIED by API suite, including authorization and validation | Name/email and role edits persisted in Chromium; status mutation not browser-tested | WIRED-UNVERIFIED |
-| Audit log and analytics | VERIFIED for route data and role restrictions | Both admin pages loaded without API/browser errors | VERIFIED locally for read paths |
-| Favorites | VERIFIED by API suite | Add, reload, list, and remove verified in Chromium | VERIFIED locally |
-| Saved searches | VERIFIED by API suite | Create, list, run, delete verified in Chromium | VERIFIED locally |
-| Compare | n/a | Stores only herb IDs locally and fetches content from API | WIRED-UNVERIFIED |
+| A0 | Test foundation and local DB guard | VERIFIED | `backend npm test`: 15 passed, 0 failed; frontend `npm test -- --run`: 21 passed, 0 failed. |
+| A | Authentication and role enforcement | VERIFIED | Backend auth/RBAC and frontend role-boundary automated suites passed in those commands. |
+| A | Herb library, details, CRUD, verification, archive | WIRED-UNVERIFIED | API suite passes; end-to-end page and role workflows still need automated browser tests. |
+| A | Detailed search and scoring | WIRED-UNVERIFIED | API suite passes; detailed search UI workflow and search-after-weight-change UI remain unverified. |
+| A | Vocabulary management | WIRED-UNVERIFIED | API suite covers validation, merge/relink, and protected deletion; UI workflows need automated browser coverage. |
+| A | User/role management, analytics, audit | WIRED-UNVERIFIED | API suite covers permissions, persistence, and audit events; browser workflows need automated coverage. |
+| A | Profile, language, settings | WIRED-UNVERIFIED | Account API tests pass; browser persistence claims are not automated tests. |
+| A | Favorites and saved searches | WIRED-UNVERIFIED | API tests pass; browser workflows need automated coverage. |
+| A | Compare | WIRED-UNVERIFIED | Selection stores herb IDs locally and reads herb data through APIs; workflow is not automated. |
+| B1 | Approved-only Simple Search mapping and UI | WIRED-UNVERIFIED | Search API and threshold tests exist; approved starter synonym CSV, response contract tests, and complete UI contract remain. |
+| B2 | Expert-approved vocabulary import/relink | BLOCKED | Requires the Ayurveda expert's approved mapping file. |
+| B3 | Database export | NOT STARTED | Admin CSV/XLSX export endpoint and script are absent. |
+| B4 | Query/performance work | NOT STARTED | Ranking/breakdown query optimization and before/after measurements remain. |
+| C | Translation providers, cache, verification, UI | NOT STARTED | Mock provider workflow is not implemented; live providers require keys. |
+| D | Grounded explain API, cache, InfoIcon | NOT STARTED | Mock LLM flow and UI component are not implemented. |
+| E | Image upload and password reset | NOT STARTED | Upload and reset flows are not implemented. |
+| F | RLS | VERIFIED | Local `npm run check:rls`: all public tables enabled; backend suite verifies no public policies. Supabase project review remains. |
+| F | Production configuration and first-admin safety | WIRED-UNVERIFIED | Render/Vercel configs, names-only env examples, and seed guards are present; local API/SPA smoke checks pass, but first-admin creation against staging is not run. |
+| G | Staging deployment | BLOCKED | Needs staging Supabase URL, hosting accounts, frontend origin, and deployment secrets. |
 
 ## Remaining critical work
 
-1. Browser-test herb verification/publish, vocabulary merge/relink/protected deletion, user status mutation, detailed search filters, and compare selection. Backend tests cover herb verification permissions, archive authorization, and vocabulary merge/relink/protection; browser confirmation remains open. `agent-browser` is not installed in this environment.
-2. Add browser-level coverage for admin profile/language/settings and user name/email; existing Chromium reports verify account preference reloads and name/email edits, while dedicated automated frontend workflow coverage is still limited.
-3. Review remaining failure/empty/loading states across pages, especially herb verification and vocabulary merge; continue removing any server-mode mock fallbacks that imply success.
-4. Diagnose the intermittent local API HTTP 500 if it recurs; it did not reproduce on the last fresh-server retry.
-5. Validate production configuration and smoke-test only against the intended allowlisted development Supabase project after its exact reference is confirmed in environment configuration.
-6. Resolve data/search product issues in `KNOWN_ISSUES.md` with domain-approved input.
+1. Finish B1 Simple Search with a draft-for-review starter synonym set, matched/unmatched response contract, relative fuzzy cutoff, and negative tests for unapproved matches.
+2. Implement the smallest mock-backed C translation, D explain/InfoIcon, and E upload/reset workflows with the requested focused automated tests.
+3. Add export, search performance, and expert-approved mapping work for B2-B4; B2 remains blocked pending approved source data.
+4. Add automated browser coverage where the environment supports it. `agent-browser` is not installed; do not label manual browser claims VERIFIED.
+5. Deploy to staging and verify only after a staging Supabase target, hosting accounts, and secrets are supplied. Do not run migrations against the unverified Supabase URL.
 
 ## External launch dependencies
 

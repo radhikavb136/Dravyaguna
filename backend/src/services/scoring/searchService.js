@@ -37,19 +37,16 @@ export async function runDetailedSearch({ filters, role, limit, offset }) {
   };
 }
 
-export async function runSimpleSearch({ query, role, limit, offset }) {
+export async function runSimpleSearch({ query, filters: requestedFilters = {}, role, limit, offset }) {
   const mapped = await mapQueryToFilterIds(query);
-  const filters = {
-    karma: [],
-    indication: [],
-  };
+  const filters = { ...requestedFilters };
 
   if (mapped.karmaIds.length) {
     const { rows } = await pool.query(
       `SELECT canonical_en FROM karma_terms WHERE id = ANY($1::int[])`,
       [mapped.karmaIds]
     );
-    filters.karma = rows.map((r) => r.canonical_en);
+    filters.karma = [...new Set([...(filters.karma || []), ...rows.map((r) => r.canonical_en)])];
   }
 
   if (mapped.indicationIds.length) {
@@ -57,7 +54,7 @@ export async function runSimpleSearch({ query, role, limit, offset }) {
       `SELECT canonical_en FROM indication_terms WHERE id = ANY($1::int[])`,
       [mapped.indicationIds]
     );
-    filters.indication = rows.map((r) => r.canonical_en);
+    filters.indication = [...new Set([...(filters.indication || []), ...rows.map((r) => r.canonical_en)])];
   }
 
   const searchResult = await runDetailedSearch({

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { getCurrentUser } from "../api/auth"
 
 function DashboardNavbar() {
   const navigate = useNavigate()
@@ -8,11 +9,10 @@ function DashboardNavbar() {
 
   const profileRef = useRef(null)
 
-  const savedUser = JSON.parse(
-    localStorage.getItem("herbUser") || "null"
-  )
-
   const useApi = import.meta.env.VITE_USE_API === 'true'
+  const savedUser = useApi
+    ? getCurrentUser()
+    : JSON.parse(localStorage.getItem("herbUser") || "null")
 
   const doctorName = savedUser?.fullName || "Doctor"
   const doctorEmail = savedUser?.email || "Ayurvedic Physician"

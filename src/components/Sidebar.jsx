@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
+import { getCurrentUser } from "../api/auth"
+import { USE_API } from "../api/client"
 
 function Sidebar() {
   const location = useLocation()
@@ -9,9 +11,9 @@ function Sidebar() {
 
   const profileRef = useRef(null)
 
-  const savedUser = JSON.parse(
-    localStorage.getItem("herbUser") || "null"
-  )
+  const savedUser = USE_API
+    ? getCurrentUser()
+    : JSON.parse(localStorage.getItem("herbUser") || "null")
 
   const doctorName = savedUser?.fullName || "Doctor"
   const profilePhoto = savedUser?.profilePhoto || ""

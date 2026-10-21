@@ -5,9 +5,9 @@ const { Pool } = pg;
 
 export const pool = new Pool({
   connectionString: env.databaseUrl,
-  max: 20, // Reduce for cloud connection limits
-  idleTimeoutMillis: 10000, // Keep connections alive longer
-  connectionTimeoutMillis: 10000, // Increase for cloud latency
+  max: env.pgPoolMax,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 10000,
 });
 
 pool.on('error', (err) => {

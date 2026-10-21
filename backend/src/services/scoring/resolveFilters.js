@@ -48,9 +48,20 @@ async function resolveTermIds(vocabulary, values) {
   const vocabMap = termCache.get(vocabulary);
 
   return values.map((v) => {
-    const slug = slugify(v);
-    const id = vocabMap.get(slug.toLowerCase()) ?? vocabMap.get(String(v).toLowerCase());
-    return id ?? null;
+    const raw = String(v).trim();
+    const slug = slugify(raw);
+    const bySlug = vocabMap.get(slug);
+    if (bySlug) {
+      return bySlug;
+    }
+    const byLabel = vocabMap.get(raw.toLowerCase());
+    if (byLabel) {
+      console.warn(
+        `[deprecated] filter ${vocabulary} used display label "${raw}"; send slug instead`
+      );
+      return byLabel;
+    }
+    return null;
   });
 }
 
@@ -81,7 +92,7 @@ function parseMalaSelection(option) {
 
   const term = match[1].trim();
   const effectRaw = match[2].toLowerCase();
-  const effect = effectRaw === 'increases' ? 'increases' : 'pacifies';
+  const effect = effectRaw === 'increases' ? 'increases' : 'decreases';
 
   return { term, effect };
 }
@@ -130,7 +141,12 @@ export async function resolveSearchFilters(filters) {
   ]);
 
   const doshaSelections = dosha
-    .map(parseDoshaSelection)
+    .map((item) => {
+      if (item && typeof item === 'object' && item.dosha) {
+        return { dosha: item.dosha, effect: item.effect };
+      }
+      return parseDoshaSelection(item);
+    })
     .filter(Boolean);
 
   const malaSelections = mala

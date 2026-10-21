@@ -6,23 +6,26 @@ import "../styles/DetailedSearch.css"
 
 function DetailedSearch() {
   const [vocabulary, setVocabulary] = useState(null)
-  const [loadingVocabulary, setLoadingVocabulary] = useState(false)
+  const [vocabularyLoading, setVocabularyLoading] = useState(USE_API)
+  const [vocabularyError, setVocabularyError] = useState("")
+  const [retryCount, setRetryCount] = useState(0)
 
   // Load vocabulary from API when feature flag is enabled
   useEffect(() => {
-    if (USE_API) {
-      setLoadingVocabulary(true)
-      getFilterOptions()
-        .then(data => {
-          setVocabulary(data)
-          setLoadingVocabulary(false)
-        })
-        .catch(error => {
-          console.error('Failed to load vocabulary:', error)
-          setLoadingVocabulary(false)
-        })
-    }
-  }, [])
+    if (!USE_API) return undefined
+    let cancelled = false
+    getFilterOptions()
+      .then(data => {
+        if (!cancelled) setVocabulary(data)
+      })
+      .catch(error => {
+        if (!cancelled) setVocabularyError(error.message || "Unable to load search filters")
+      })
+      .finally(() => {
+        if (!cancelled) setVocabularyLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [retryCount])
 
   // Hardcoded parameters for fallback when API is disabled
   const hardcodedParameters = [
@@ -181,27 +184,28 @@ function DetailedSearch() {
 
   // Convert vocabulary API data to the format expected by the component
   const getParameters = () => {
-    if (USE_API && vocabulary) {
+    if (USE_API) {
+      if (!vocabulary) return []
       return [
         {
           title: "Rasa",
           subtitle: "taste profile",
-          options: vocabulary.rasa.map(t => t.canonical_en),
+          options: (vocabulary.rasa || []).map(t => t.slug || t.canonical_en),
         },
         {
           title: "Guna",
           subtitle: "qualities",
-          options: vocabulary.guna.map(t => t.canonical_en),
+          options: (vocabulary.guna || []).map(t => t.slug || t.canonical_en),
         },
         {
           title: "Virya",
           subtitle: "potency / action",
-          options: vocabulary.virya.map(t => t.canonical_en),
+          options: (vocabulary.virya || []).map(t => t.slug || t.canonical_en),
         },
         {
           title: "Vipaka",
           subtitle: "post-digestive effect",
-          options: vocabulary.vipaka.map(t => t.canonical_en),
+          options: (vocabulary.vipaka || []).map(t => t.slug || t.canonical_en),
         },
         {
           title: "Dosha",
@@ -218,32 +222,32 @@ function DetailedSearch() {
         {
           title: "Dhatu",
           subtitle: "tissue system",
-          options: vocabulary.dhatu.map(t => t.canonical_en),
+          options: (vocabulary.dhatu || []).map(t => t.slug || t.canonical_en),
         },
         {
           title: "Mala",
           subtitle: "waste pathways",
-          options: vocabulary.mala.map(t => t.canonical_en),
+          options: (vocabulary.mala || []).map(t => t.slug || t.canonical_en),
         },
         {
           title: "Srotas",
           subtitle: "body channels",
-          options: vocabulary.srotas.map(t => t.canonical_en),
+          options: (vocabulary.srotas || []).map(t => t.slug || t.canonical_en),
         },
         {
           title: "Karma",
           subtitle: "therapeutic action",
-          options: vocabulary.karma.map(t => t.canonical_en),
+          options: (vocabulary.karma || []).map(t => t.slug || t.canonical_en),
         },
         {
           title: "Major Diseases / Indications",
           subtitle: "clinical indications",
-          options: vocabulary.indications.map(t => t.canonical_en),
+          options: (vocabulary.indications || []).map(t => t.slug || t.canonical_en),
         },
         {
           title: "Organ / Avayava",
           subtitle: "body organs",
-          options: vocabulary.avayava.map(t => t.canonical_en),
+          options: (vocabulary.avayava || []).map(t => t.slug || t.canonical_en),
           disabled: !vocabulary.hasOrganData,
           disabledMessage: "No data yet",
         },
@@ -255,158 +259,6 @@ function DetailedSearch() {
   }
 
   const parameters = getParameters()
-    {
-      title: "Rasa",
-      subtitle: "taste profile",
-      options: [
-        "Madhura",
-        "Amla",
-        "Lavana",
-        "Katu",
-        "Tikta",
-        "Kashay",
-      ],
-    },
-    {
-      title: "Guna",
-      subtitle: "qualities",
-      options: [
-        "Guru",
-        "Laghu",
-        "Snigdha",
-        "Ruksha",
-        "Tikshna",
-        "Manda",
-        "Sthira",
-        "Vishada",
-      ],
-    },
-    {
-      title: "Virya",
-      subtitle: "potency / action",
-      options: [
-        "Ushna",
-        "Sheeta",
-      ],
-    },
-    {
-      title: "Vipaka",
-      subtitle: "post-digestive effect",
-      options: [
-        "Madhura",
-        "Katu",
-        "Amla",
-      ],
-    },
-    {
-      title: "Dosha",
-      subtitle: "dosha action",
-      options: [
-        "Vata · Increases",
-        "Vata · Decreases",
-        "Pitta · Increases",
-        "Pitta · Decreases",
-        "Kapha · Increases",
-        "Kapha · Decreases",
-      ],
-    },
-    {
-      title: "Dhatu",
-      subtitle: "tissue system",
-      options: [
-        "Rasa",
-        "Rakta",
-        "Mamsa",
-        "Meda",
-        "Asthi",
-        "Majja",
-        "Shukra",
-      ],
-    },
-    {
-      title: "Mala",
-      subtitle: "waste pathways",
-      options: [
-        "Purisha",
-        "Mutra",
-        "Sweda",
-      ],
-    },
-    {
-      title: "Srotas",
-      subtitle: "body channels",
-      options: [
-        "Pranavaha",
-        "Annavaha",
-        "Udakavaha",
-        "Rasavaha",
-        "Raktavaha",
-        "Mamsavaha",
-        "Medovaha",
-        "Asthivaha",
-        "Majjavaha",
-        "Shukravaha",
-        "Mutravaha",
-        "Swedavaha",
-        "Purishavaha",
-        "Artavavaha",
-      ],
-    },
-    {
-      title: "Karma",
-      subtitle: "therapeutic action",
-      options: [
-        "Rasayana",
-        "Balya",
-        "Deepana",
-        "Pachana",
-        "Grahi",
-        "Rechana",
-        "Virechana",
-        "Vamana",
-        "Lekhana",
-        "Medohara",
-        "Shothahara",
-        "Vedanasthapana",
-        "Kandughna",
-        "Kushtaghna",
-        "Krimighna",
-        "Vajikarana",
-        "Mutrala",
-        "Hridya",
-        "Others",
-      ],
-    },
-    {
-      title: "Major Diseases / Indications",
-      subtitle: "clinical indications",
-      options: [
-        "Agnimandya",
-        "Ajeerna",
-        "Amavata",
-        "Amlapitta",
-        "Arsha",
-        "Ashmari",
-        "Atisara",
-        "Chardi",
-        "Grahani",
-        "Jvara",
-        "Kasa",
-        "Kandu",
-        "Krimi Roga",
-        "Kushta",
-        "Mutra Vikara",
-        "Prameha",
-        "Rakta Pitta",
-        "Sandhi Shoola",
-        "Shotha",
-        "Shwasa",
-        "Udara Roga",
-        "Vataroga",
-        "Vrana",
-      ],
-    },
-  ]
 
   const navigate = useNavigate()
 
@@ -515,7 +367,14 @@ function DetailedSearch() {
         </button>
       </div>
 
-      <div className="parameter-grid">
+      {USE_API && vocabularyLoading ? (
+        <p role="status">Loading search filters...</p>
+      ) : USE_API && vocabularyError ? (
+        <div role="alert">
+          <p>Unable to load search filters: {vocabularyError}</p>
+          <button type="button" onClick={() => { setVocabularyLoading(true); setVocabularyError(""); setRetryCount(count => count + 1) }}>Retry</button>
+        </div>
+      ) : <div className="parameter-grid">
         {parameters.map((parameter) => (
           <div
             className="parameter-wrapper"
@@ -561,7 +420,7 @@ function DetailedSearch() {
             </fieldset>
           </div>
         ))}
-      </div>
+      </div>}
     </section>
   )
 }

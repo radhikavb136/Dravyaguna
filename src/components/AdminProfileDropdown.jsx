@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { getAccount } from "../api/account"
+import { logout } from "../api/auth"
 
 function AdminProfileDropdown({
   isOpen,
@@ -13,17 +15,11 @@ function AdminProfileDropdown({
   // ADMIN USER DATA
   // =========================================
 
-  const getAdminUser = () => {
-    try {
-      return JSON.parse(
-        localStorage.getItem("adminUser") || "null"
-      )
-    } catch {
-      return null
-    }
-  }
+  const [account, setAccount] = useState(null)
 
-  const [adminUser, setAdminUser] = useState(getAdminUser())
+  async function loadAccount() {
+    try { setAccount(await getAccount()) } catch { setAccount(null) }
+  }
 
 
   // =========================================
@@ -32,9 +28,8 @@ function AdminProfileDropdown({
 
   useEffect(() => {
 
-    const handleProfileUpdate = () => {
-      setAdminUser(getAdminUser())
-    }
+    const handleProfileUpdate = () => { loadAccount() }
+    loadAccount()
 
     window.addEventListener(
       "adminProfileUpdated",
@@ -55,18 +50,9 @@ function AdminProfileDropdown({
   // ADMIN INFORMATION
   // =========================================
 
-  const fullName =
-    adminUser?.displayName ||
-    adminUser?.fullName ||
-    "Dr. Anand Sharma"
+  const fullName = account?.display_name || account?.full_name || "Account"
 
-  const role =
-    adminUser?.role ||
-    "Administrator"
-
-  const profilePhoto =
-    adminUser?.profilePhoto ||
-    ""
+  const role = ({ admin: "Admin", editor: "Editor", domain_expert: "Ayurvedic Reviewer", clinician: "Doctor" })[account?.role] || ""
 
 
   // =========================================
@@ -142,7 +128,8 @@ function AdminProfileDropdown({
 
     // Logout
     if (option === "Log Out") {
-      console.log("Log Out clicked")
+      logout()
+      navigate("/auth")
       return
     }
 
@@ -170,19 +157,7 @@ function AdminProfileDropdown({
 
         <div className="admin-profile-avatar">
 
-          {profilePhoto ? (
-
-            <img
-              src={profilePhoto}
-              alt="Administrator"
-              className="admin-profile-avatar-image"
-            />
-
-          ) : (
-
-            initials
-
-          )}
+          {initials}
 
         </div>
 

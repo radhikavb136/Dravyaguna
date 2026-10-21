@@ -10,11 +10,17 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  fullName: z.string().min(1),
-});
+const registerSchema = z
+  .object({
+    email: z.string().email(),
+    password: z.string().min(10),
+    fullName: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
+    role: z.unknown().optional(),
+  })
+  .refine((body) => Boolean(body.fullName || body.name), {
+    message: 'fullName is required',
+  });
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -26,7 +32,11 @@ export const authRouter = Router();
 authRouter.post('/register', async (req, res, next) => {
   try {
     const body = registerSchema.parse(req.body);
-    const user = await registerUser(body);
+    const user = await registerUser({
+      email: body.email,
+      password: body.password,
+      fullName: body.fullName || body.name,
+    });
     res.status(201).json({ user });
   } catch (err) {
     if (err.code === '23505') {

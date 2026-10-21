@@ -12,16 +12,21 @@ function adaptHerb(backendHerb) {
   return {
     id: backendHerb.id,
     code: backendHerb.code,
-    englishName: backendHerb.english_name,
-    botanicalName: backendHerb.botanical_name,
-    sanskritName: backendHerb.sanskrit_name,
-    localName: backendHerb.local_name,
+    englishName: backendHerb.english_name ?? backendHerb.englishName,
+    botanicalName: backendHerb.botanical_name ?? backendHerb.botanicalName,
+    sanskritName: backendHerb.sanskrit_name ?? backendHerb.sanskritName,
+    localName: backendHerb.local_name ?? backendHerb.localName,
     family: backendHerb.family,
-    partUsed: backendHerb.part_used,
+    partUsed: backendHerb.part_used ?? backendHerb.partUsed,
+    description: backendHerb.description,
+    identificationNotes: backendHerb.identification_notes ?? backendHerb.identificationNotes,
+    classicalReferences: backendHerb.references ?? backendHerb.classical_references ?? [],
     prabhava: backendHerb.prabhava,
-    imageUrl: backendHerb.image_url,
+    imageUrl: backendHerb.image_url ?? backendHerb.imageUrl,
     status: backendHerb.status,
     verificationStatus: backendHerb.status,
+    createdAt: backendHerb.created_at ?? backendHerb.createdAt,
+    updatedAt: backendHerb.updated_at ?? backendHerb.updatedAt,
     
     // Arrays (from relationships)
     rasa: backendHerb.rasa || [],
@@ -48,7 +53,8 @@ function adaptHerb(backendHerb) {
     rawIndication: backendHerb.raw_indication,
     
     // Search match
-    match: backendHerb.match_percentage,
+    match: backendHerb.match_percentage ?? backendHerb.matchPercentage,
+    matchPercentage: backendHerb.matchPercentage ?? backendHerb.match_percentage,
     breakdown: backendHerb.breakdown,
   };
 }
@@ -85,8 +91,14 @@ function convertDoshaToBackend(doshaObj) {
     return [];
   }
   return Object.entries(doshaObj)
-    .filter(([_, effect]) => effect)
-    .map(([dosha, effect]) => ({ dosha, effect }));
+    .filter(([, effect]) => effect)
+      .map(([dosha, effect]) => ({
+        dosha: dosha.toLowerCase(),
+        effect: ['decreases', 'decrease'].includes(String(effect).toLowerCase())
+          ? 'pacifies'
+          : String(effect).toLowerCase(),
+      }))
+      .filter(({ effect }) => ['pacifies', 'increases'].includes(effect));
 }
 
 /**
@@ -94,16 +106,58 @@ function convertDoshaToBackend(doshaObj) {
  * Input: ['Purisha · decreases', 'Mutra · increases']
  * Output: [{mala: 'Purisha', effect: 'decreases'}, {mala: 'Mutra', effect: 'increases'}]
  */
-function convertMalaToBackend(malaStrings) {
-  if (!Array.isArray(malaStrings)) {
-    return [];
+function convertMalaToBackend(mala) {
+  const normalizeEffect = (value) => {
+    const effect = String(value || '').trim().toLowerCase();
+    if (effect === 'decreases' || effect === 'decrease') return 'decreases';
+    if (effect === 'increases' || effect === 'increase') return 'increases';
+    return null;
+  };
+  if (Array.isArray(mala)) {
+    return mala
+      .map((item) => {
+        if (item && typeof item === 'object' && item.term && item.effect) {
+          const effect = normalizeEffect(item.effect);
+          return effect ? { term: item.term, effect } : null;
+        }
+        if (typeof item !== 'string') {
+          return null;
+        }
+        const [term, effect] = item.split('·').map((s) => s.trim());
+        const normalizedEffect = normalizeEffect(effect);
+        return term && normalizedEffect ? { term, effect: normalizedEffect } : null;
+      })
+      .filter(Boolean);
   }
-  return malaStrings
-    .map(str => {
-      const [mala, effect] = str.split('·').map(s => s.trim());
-      return { mala, effect };
-    })
-    .filter(item => item.mala && item.effect);
+  if (mala && typeof mala === 'object') {
+    return Object.entries(mala)
+      .filter(([, effect]) => effect)
+      .map(([term, effect]) => {
+        const normalizedEffect = normalizeEffect(effect);
+        return normalizedEffect ? { term, effect: normalizedEffect } : null;
+      })
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function convertDhatuToBackend(dhatu) {
+  if (Array.isArray(dhatu)) {
+    return dhatu;
+  }
+  if (dhatu && typeof dhatu === 'object') {
+    return Object.entries(dhatu)
+      .filter(([, score]) => score !== '' && score != null)
+      .map(([term, score]) => ({ term, score: Number(score) }));
+  }
+  return [];
+}
+
+function convertDoshaPayload(herbData) {
+  if (Array.isArray(herbData.dosha_actions)) {
+    return herbData.dosha_actions;
+  }
+  return convertDoshaToBackend(herbData.dosha);
 }
 
 /**
@@ -124,6 +178,19 @@ export async function listHerbs(params = {}) {
   };
 }
 
+export async function listAllHerbs({ status, limit = 200 } = {}) {
+  const herbs = []
+  let page = 1
+  let totalPages
+  do {
+    const result = await listHerbs({ page, limit, status })
+    herbs.push(...result.data)
+    totalPages = result.pagination?.totalPages || page
+    page += 1
+  } while (page <= totalPages)
+  return herbs
+}
+
 /**
  * Get herb by ID
  */
@@ -141,10 +208,12 @@ export async function getHerb(id, lang = 'en-IN') {
 export async function createHerb(herbData) {
   const backendData = {
     ...herbData,
-    dosha_actions: convertDoshaToBackend(herbData.dosha),
+    dosha_actions: convertDoshaPayload(herbData),
     mala: convertMalaToBackend(herbData.mala),
+    dhatu: convertDhatuToBackend(herbData.dhatu),
   };
-  
+  delete backendData.dosha;
+
   const response = await apiClient.post('/api/herbs', backendData);
   return adaptHerb(response);
 }
@@ -155,10 +224,12 @@ export async function createHerb(herbData) {
 export async function updateHerb(id, herbData) {
   const backendData = {
     ...herbData,
-    dosha_actions: convertDoshaToBackend(herbData.dosha),
+    dosha_actions: convertDoshaPayload(herbData),
     mala: convertMalaToBackend(herbData.mala),
+    dhatu: convertDhatuToBackend(herbData.dhatu),
   };
-  
+  delete backendData.dosha;
+
   const response = await apiClient.put(`/api/herbs/${id}`, backendData);
   return adaptHerb(response);
 }
@@ -207,6 +278,15 @@ export async function searchHerbsDetailed(filters, limit = 50) {
     limit,
   });
   
+  return response.results.map(adaptHerb);
+}
+
+export async function searchHerbsSimple(query, limit = 50, filters = {}) {
+  const body = { ...(query?.trim() ? { query: query.trim() } : {}), limit };
+  if (Object.values(filters).some((value) => Array.isArray(value) && value.length > 0)) {
+    body.filters = filters;
+  }
+  const response = await apiClient.post('/api/search/simple', body);
   return response.results.map(adaptHerb);
 }
 

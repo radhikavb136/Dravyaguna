@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
-import { getUsers, updateUserRole } from "../api/admin"
-import { getCurrentUser } from "../api/auth"
-import { users as initialUsers } from "../data/users"
+import { getUsers, updateUserRole, updateUserStatus, updateUserDetails } from "../api/admin"
+import { ROLE_PERMISSION_MATRIX } from "../utils/roles"
 import "../styles/UserRoleManagement.css"
 
 
@@ -61,55 +60,30 @@ function UserRoleManagement() {
   const [userList, setUserList] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
-    loadCurrentUser()
     loadUsers()
   }, [])
-
-  const loadCurrentUser = () => {
-    const user = getCurrentUser()
-    setCurrentUser(user)
-  }
 
   const loadUsers = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const useApi = import.meta.env.VITE_USE_API === 'true'
-      
-      if (useApi) {
-        const response = await getUsers()
-        setUserList(response.data || [])
-      } else {
-        // Fallback to localStorage for mock data
-        const savedUsers = localStorage.getItem("dravyaguna_users")
-        if (savedUsers) {
-          try {
-            setUserList(JSON.parse(savedUsers))
-          } catch {
-            setUserList(initialUsers)
-          }
-        } else {
-          setUserList(initialUsers)
-        }
-      }
+      const response = await getUsers()
+      setUserList((response.data || []).map((user) => ({
+        ...user,
+        backendRole: user.role,
+        name: user.full_name || user.name || user.email,
+        createdAt: user.created_at || user.createdAt,
+        role: ({ admin: "Admin", editor: "Editor", domain_expert: "Ayurvedic Reviewer", clinician: "Doctor" })[user.role] || user.role,
+        status: user.status === "active" ? "Active" : "Inactive",
+        initials: (user.full_name || user.email || "?").split(/[\s@]/).filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase(),
+      })))
     } catch (err) {
       console.error('Failed to load users:', err)
-      setError('Failed to load users')
-      // Fallback to localStorage on error
-      try {
-        const savedUsers = localStorage.getItem("dravyaguna_users")
-        if (savedUsers) {
-          setUserList(JSON.parse(savedUsers))
-        } else {
-          setUserList(initialUsers)
-        }
-      } catch {
-        setUserList(initialUsers)
-      }
+      setError(err.message || 'Failed to load users')
+      setUserList([])
     } finally {
       setLoading(false)
     }
@@ -146,7 +120,7 @@ function UserRoleManagement() {
      DEACTIVATE USER
      ========================================= */
 
-  const handleDeactivate = (userId) => {
+  const handleDeactivate = async (userId) => {
 
     const user = userList.find(
       (user) => user.id === userId
@@ -164,16 +138,8 @@ function UserRoleManagement() {
       return
     }
 
-    setUserList((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === userId
-          ? {
-              ...user,
-              status: "Inactive",
-            }
-          : user
-      )
-    )
+    try { await updateUserStatus(userId, "inactive"); await loadUsers() }
+    catch (err) { setError(err.message || "Failed to deactivate user") }
   }
 
 
@@ -181,7 +147,7 @@ function UserRoleManagement() {
      ACTIVATE USER
      ========================================= */
 
-  const handleActivate = (userId) => {
+  const handleActivate = async (userId) => {
 
     const user = userList.find(
       (user) => user.id === userId
@@ -199,16 +165,8 @@ function UserRoleManagement() {
       return
     }
 
-    setUserList((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === userId
-          ? {
-              ...user,
-              status: "Active",
-            }
-          : user
-      )
-    )
+    try { await updateUserStatus(userId, "active"); await loadUsers() }
+    catch (err) { setError(err.message || "Failed to activate user") }
   }
 
 
@@ -221,52 +179,7 @@ function UserRoleManagement() {
      false = role does not have permission
      ========================================= */
 
-  const permissionRules = {
-
-    "Admin": {
-      "Search herbs": true,
-      "View herb details": true,
-      "Add herbs": true,
-      "Edit herbs": true,
-      "Review herbs": true,
-      "Verify herbs": true,
-      "Manage vocabulary": true,
-      "Change scoring weights": true,
-      "View analytics": true,
-      "Manage users": true,
-      "View audit log": true,
-    },
-
-    "Ayurvedic Reviewer": {
-      "Search herbs": true,
-      "View herb details": true,
-      "Add herbs": true,
-      "Edit herbs": true,
-      "Review herbs": true,
-      "Verify herbs": false,
-      "Manage vocabulary": false,
-      "Change scoring weights": false,
-      "View analytics": true,
-      "Manage users": false,
-      "View audit log": true,
-    },
-
-    "Doctor": {
-      "Search herbs": true,
-      "View herb details": true,
-      "Add herbs": false,
-      "Edit herbs": false,
-      "Review herbs": false,
-      "Verify herbs": false,
-      "Manage vocabulary": false,
-      "Change scoring weights": false,
-      "View analytics": false,
-      "Manage users": false,
-      "View audit log": false,
-    },
-
-  }
-
+  const permissionRules = ROLE_PERMISSION_MATRIX
 
   /* =========================================
      PERMISSION LIST
@@ -295,7 +208,10 @@ function UserRoleManagement() {
       restricted: true,
     },
     {
-      permission: "Manage vocabulary",
+      permission: "Add vocabulary terms",
+    },
+    {
+      permission: "Edit/merge/delete vocabulary",
     },
     {
       permission: "Change scoring weights",
@@ -375,20 +291,6 @@ function UserRoleManagement() {
 
 
   /* =========================================
-     SAVE USERS TO LOCAL STORAGE
-     ========================================= */
-
-  useEffect(() => {
-
-    localStorage.setItem(
-      "dravyaguna_users",
-      JSON.stringify(userList)
-    )
-
-  }, [userList])
-
-
-  /* =========================================
      DYNAMIC STATISTICS
      ========================================= */
 
@@ -410,9 +312,9 @@ function UserRoleManagement() {
       (user) => user.role === "Admin"
     ).length
 
-  const pendingCount =
+  const inactiveCount =
     userList.filter(
-      (user) => user.status === "Pending"
+      (user) => user.status === "Inactive"
     ).length
 
 
@@ -473,45 +375,30 @@ function UserRoleManagement() {
 
   const handleSaveEdit = async () => {
     try {
-      const useApi = import.meta.env.VITE_USE_API === 'true'
-      
-      if (useApi) {
-        // Update user role via API
-        await updateUserRole(editingUser.id, editForm.role)
-        // Reload users from API
-        await loadUsers()
-      } else {
-        // Fallback to localStorage for mock data
-        setUserList((currentUsers) =>
-          currentUsers.map((user) =>
-            user.id === editingUser.id
-              ? {
-                  ...user,
-                  name: editForm.name,
-                  email: editForm.email,
-                  role: editForm.role,
-                  status: editForm.status,
-
-                  initials: editForm.name
-                    .split(" ")
-                    .filter(Boolean)
-                    .map((word) => word[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase(),
-                }
-              : user
-          )
-        )
+      const role = ({ Admin: "admin", Editor: "editor", "Ayurvedic Reviewer": "domain_expert", Doctor: "clinician" })[editForm.role] || editForm.role
+      const status = editForm.status.toLowerCase()
+      if (editForm.name.trim() !== editingUser.name || editForm.email.trim().toLowerCase() !== editingUser.email.toLowerCase()) {
+        await updateUserDetails(editingUser.id, { fullName: editForm.name.trim(), email: editForm.email.trim() })
       }
+      if (role !== editingUser.backendRole) await updateUserRole(editingUser.id, role)
+      if (status !== editingUser.status.toLowerCase()) await updateUserStatus(editingUser.id, status)
+      await loadUsers()
 
       setEditingUser(null)
     } catch (err) {
       console.error('Failed to update user:', err)
-      alert('Failed to update user')
+      setError(err.message || 'Failed to update user')
     }
   }
 
+
+  if (loading) {
+    return <p role="status">Loading users...</p>
+  }
+
+  if (error) {
+    return <p role="alert">{error}</p>
+  }
 
   return (
 
@@ -567,8 +454,8 @@ function UserRoleManagement() {
         </div>
 
         <div className="user-role-stat-card">
-          <strong>{pendingCount}</strong>
-          <span>Pending Accounts</span>
+          <strong>{inactiveCount}</strong>
+          <span>Inactive Accounts</span>
         </div>
 
       </section>
@@ -1151,12 +1038,7 @@ function UserRoleManagement() {
                 <input
                   type="text"
                   value={editForm.name}
-                  onChange={(event) =>
-                    setEditForm({
-                      ...editForm,
-                      name: event.target.value,
-                    })
-                  }
+                  onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
                 />
 
               </div>
@@ -1173,12 +1055,7 @@ function UserRoleManagement() {
                 <input
                   type="email"
                   value={editForm.email}
-                  onChange={(event) =>
-                    setEditForm({
-                      ...editForm,
-                      email: event.target.value,
-                    })
-                  }
+                  onChange={(event) => setEditForm({ ...editForm, email: event.target.value })}
                 />
 
               </div>
@@ -1204,6 +1081,10 @@ function UserRoleManagement() {
 
                   <option value="Admin">
                     Admin
+                  </option>
+
+                  <option value="Editor">
+                    Editor
                   </option>
 
                   <option value="Ayurvedic Reviewer">
@@ -1243,10 +1124,6 @@ function UserRoleManagement() {
 
                   <option value="Inactive">
                     Inactive
-                  </option>
-
-                  <option value="Pending">
-                    Pending
                   </option>
 
                 </select>

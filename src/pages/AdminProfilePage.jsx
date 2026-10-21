@@ -1,5 +1,6 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { getAccount, updateAccountProfile } from "../api/account"
 
 import "../styles/AdminProfilePage.css"
 
@@ -10,27 +11,22 @@ function AdminProfilePage() {
   // ADMIN USER
   // =========================================
 
-  const savedAdmin = JSON.parse(
-    localStorage.getItem("adminUser") || "null"
-  )
+  const [account, setAccount] = useState(null)
+  const [fullName, setFullName] = useState("")
+  const [displayName, setDisplayName] = useState("")
+  const [profilePhoto, setProfilePhoto] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const email = account?.email || ""
+  const role = account?.role || ""
 
-  const [fullName, setFullName] = useState(
-    savedAdmin?.fullName || "Dr. Anand Sharma"
-  )
-
-  const [displayName, setDisplayName] = useState(
-    savedAdmin?.displayName ||
-      savedAdmin?.fullName ||
-      "Dr. Anand Sharma"
-  )
-
-  const [email] = useState(
-    savedAdmin?.email || "admin@dravyaguna.com"
-  )
-
-  const [profilePhoto, setProfilePhoto] = useState(
-    savedAdmin?.profilePhoto || ""
-  )
+  useEffect(() => {
+    getAccount().then((data) => {
+      setAccount(data)
+      setFullName(data.full_name || "")
+      setDisplayName(data.display_name || data.full_name || "")
+    }).catch((err) => setError(err.message || "Unable to load profile")).finally(() => setLoading(false))
+  }, [])
 
   const [saveMessage, setSaveMessage] = useState("")
 
@@ -84,35 +80,24 @@ function AdminProfilePage() {
   // SAVE PROFILE
   // =========================================
 
-  const handleSave = () => {
-    const updatedAdmin = {
-      ...(savedAdmin || {}),
-
-      fullName:
-        fullName.trim() || "Dr. Anand Sharma",
-
-      displayName:
-        displayName.trim() ||
-        fullName.trim() ||
-        "Dr. Anand Sharma",
-
-      email,
-
-      role: "Administrator",
-
-      profilePhoto
+  const handleSave = async () => {
+    setSaveMessage("")
+    setError("")
+    try {
+      const updated = await updateAccountProfile({
+        fullName: fullName.trim(),
+        displayName: displayName.trim(),
+      })
+      setAccount(updated)
+      setFullName(updated.full_name)
+      setDisplayName(updated.display_name)
+      window.dispatchEvent(new Event("adminProfileUpdated"))
+      setSaveMessage(profilePhoto
+        ? "Profile details saved. The selected photo is only a temporary preview; photo uploads are not configured."
+        : "Profile details saved successfully.")
+    } catch (err) {
+      setError(err.message || "Unable to save profile")
     }
-
-    localStorage.setItem(
-      "adminUser",
-      JSON.stringify(updatedAdmin)
-    )
-    
-    window.dispatchEvent(new Event("adminProfileUpdated"))
-
-    setSaveMessage(
-      "Profile updated successfully."
-    )
   }
 
   // =========================================
@@ -127,6 +112,9 @@ function AdminProfilePage() {
     .join("")
     .slice(0, 2)
     .toUpperCase()
+
+  if (loading) return <p role="status">Loading profile...</p>
+  if (error && !account) return <p role="alert">{error}</p>
 
   return (
     <div className="admin-profile-page">
@@ -165,6 +153,8 @@ function AdminProfilePage() {
         </button>
 
       </div>
+
+      {error && <p role="alert">{error}</p>}
 
 
       {/* =========================================
@@ -337,7 +327,7 @@ function AdminProfilePage() {
             </label>
 
             <div className="admin-profile-readonly">
-              Administrator
+            {role}
             </div>
 
           </div>
@@ -374,8 +364,8 @@ function AdminProfilePage() {
               Account status
             </span>
 
-            <strong className="admin-status-active">
-              Active
+            <strong className={`admin-status-${account.status}`}>
+              {account.status}
             </strong>
 
           </div>
@@ -388,7 +378,7 @@ function AdminProfilePage() {
             </span>
 
             <strong>
-              Administrator
+              {role}
             </strong>
 
           </div>
@@ -401,7 +391,7 @@ function AdminProfilePage() {
             </span>
 
             <strong>
-              Full access
+              {role === "admin" ? "Full access" : "Restricted access"}
             </strong>
 
           </div>

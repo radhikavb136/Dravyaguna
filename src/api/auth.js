@@ -21,9 +21,7 @@ const REVERSE_ROLE_MAP = {
   'editor': 'Editor',
 };
 
-export async function login(email, password, role) {
-  const backendRole = ROLE_MAP[role] || role.toLowerCase();
-  
+export async function login(email, password) {
   const response = await apiClient.post('/api/auth/login', {
     email,
     password,
@@ -36,6 +34,7 @@ export async function login(email, password, role) {
     user: {
       id: response.user.id,
       email: response.user.email,
+      fullName: response.user.fullName,
       role: REVERSE_ROLE_MAP[response.user.role] || response.user.role,
       backendRole: response.user.role,
     },
@@ -58,15 +57,24 @@ export async function register(email, password, name, role) {
 export function logout() {
   apiClient.clearToken();
   localStorage.removeItem('user');
+  localStorage.removeItem('isAuthenticated');
 }
 
 export function isAuthenticated() {
-  return !!apiClient.getToken();
+  return import.meta.env.VITE_USE_API === 'true'
+    ? !!apiClient.getToken()
+    : localStorage.getItem('isAuthenticated') === 'true';
 }
 
 export function getCurrentUser() {
   const userStr = localStorage.getItem('user');
-  return userStr ? JSON.parse(userStr) : null;
+  if (!userStr) return null;
+  try {
+    return JSON.parse(userStr);
+  } catch {
+    localStorage.removeItem('user');
+    return null;
+  }
 }
 
 export function setCurrentUser(user) {

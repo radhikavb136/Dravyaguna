@@ -20,11 +20,11 @@ npm run dev
 - JWT_SECRET
 - FRONTEND_ORIGIN
 
-**Dev Users:**
-- dev-admin@test.com / Dev123456 → admin
-- dev-editor@test.com / Dev123456 → editor
-- dev-expert@test.com / Dev123456 → domain_expert
-- dev-clinician@test.com / Dev123456 → clinician
+**Dev Users** (password min 10; default seed `Dev1234567`, or `DEV_USER_PASSWORD`):
+- dev-admin@test.com → admin
+- dev-editor@test.com → editor
+- dev-expert@test.com → domain_expert
+- dev-clinician@test.com → clinician
 
 ---
 
@@ -103,7 +103,7 @@ npm run dev
 
 ---
 
-### 5. Manage Herbs (NOT STARTED - Uses Mock Data)
+### 5. Manage Herbs (API-backed in API mode; CRUD browser check pending)
 **Editor:**
 - [ ] View herb list
 - [ ] Click "Add Herb"
@@ -124,7 +124,7 @@ npm run dev
 
 ---
 
-### 6. Add/Edit Herb (NOT STARTED - Uses Mock Data)
+### 6. Add/Edit Herb (API-backed in API mode; validation is covered by backend tests)
 **Editor:**
 - [ ] Fill all fields
 - [ ] Submit
@@ -139,7 +139,7 @@ npm run dev
 
 ---
 
-### 7. Scoring Configuration (NOT STARTED - Hardcoded Weights)
+### 7. Scoring Configuration (API-backed; browser persistence verified)
 **Admin/Domain Expert:**
 - [ ] View current weights
 - [ ] Change a weight
@@ -153,7 +153,7 @@ npm run dev
 
 ---
 
-### 8. Vocabulary Management (NOT STARTED - Local State)
+### 8. Vocabulary Management (API-backed; browser mutation check pending)
 **Admin/Domain Expert:**
 - [ ] View vocabulary terms
 - [ ] Add custom Karma term
@@ -168,7 +168,7 @@ npm run dev
 
 ---
 
-### 9. Audit Log (NOT STARTED - Local State)
+### 9. Audit Log (API-backed; admin page load verified)
 **Admin:**
 - [ ] View audit log entries
 - [ ] Verify actor, action, entity_type shown
@@ -180,7 +180,7 @@ npm run dev
 
 ---
 
-### 10. Search Analytics (NOT STARTED - LocalStorage)
+### 10. Search Analytics (API-backed; admin page load verified)
 **Admin:**
 - [ ] View search analytics
 - [ ] Verify search counts by day
@@ -191,7 +191,7 @@ npm run dev
 
 ---
 
-### 11. User & Role Management (NOT STARTED - Mock Data)
+### 11. User & Role Management (API-backed; name/email persistence verified)
 **Admin:**
 - [ ] View user list
 - [ ] Change user role
@@ -202,7 +202,7 @@ npm run dev
 
 ---
 
-### 12. Compare (NOT STARTED - LocalStorage)
+### 12. Compare (temporary herb selection uses browser storage; UI flow pending)
 **All Roles:**
 - [ ] Add herbs to comparison
 - [ ] View comparison page
@@ -211,7 +211,7 @@ npm run dev
 
 ---
 
-### 13. Favorites (NOT STARTED - LocalStorage)
+### 13. Favorites (API-backed; browser add/list/remove verified)
 **All Roles:**
 - [ ] Add herb to favorites
 - [ ] View favorites page
@@ -221,7 +221,7 @@ npm run dev
 
 ---
 
-### 14. Saved Searches (NOT STARTED - LocalStorage)
+### 14. Saved Searches (API-backed; browser create/list/run/delete verified)
 **All Roles:**
 - [ ] Save current search
 - [ ] Name the search
@@ -231,9 +231,9 @@ npm run dev
 
 ---
 
-## Notes
+## Current verification notes
 
-- Pages marked "NOT STARTED" use mock data/localStorage and need API integration
-- Backend APIs are all VERIFIED and working
-- Frontend API client layer is VERIFIED
-- Only Herb Library, Herb Detail, Detailed Search, and AuthPage use the real API
+- Browser-verified scopes include admin and clinician login, clinician profile/language/settings persistence, admin profile/language/settings persistence, admin read pages, user name/email edit, scoring save/restore, herb library/detail, favorites, simple search, and saved searches. See `PHASE_STATUS.md` for environment and exact limits.
+- Browser checks use an isolated local PostgreSQL database. They do not verify the Supabase URL in `backend/.env`; the test guard requires the exact development project reference before permitting that target.
+- Backend API tests cover auth, role restrictions, herb CRUD, vocabulary operations, scoring, admin data, favorites, saved searches, and account APIs. They do not replace the remaining browser checks above.
+- Demo mode (`VITE_USE_API=false`) may use local storage for mock data. In API mode, server-owned actions should display request failures instead of reporting local-only success.

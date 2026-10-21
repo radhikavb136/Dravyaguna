@@ -1,6 +1,6 @@
 import { pool } from '../../db/pool.js';
 
-const SIMILARITY_THRESHOLD = 0.25;
+export const SIMILARITY_THRESHOLD = 0.45;
 
 /**
  * Maps natural-language query tokens to karma / indication term IDs (canonical English).

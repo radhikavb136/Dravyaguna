@@ -103,16 +103,6 @@ function SearchInsights() {
   // GET SEARCH VALUE
   // =========================================================
 
-  const getSearchValue = (search) => {
-    return (
-      search.query ||
-      search.searchQuery ||
-      search.term ||
-      search.value ||
-      ""
-    )
-  }
-
   // =========================================================
   // GET DOSHA
   // =========================================================

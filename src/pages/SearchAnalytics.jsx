@@ -1,7 +1,5 @@
 import { useMemo, useState, useEffect } from "react"
 import { getSearchAnalytics } from "../api/admin"
-import { getSearchHistory } from "../utils/searchHistory"
-import { getCurrentUser } from "../api/auth"
 import "../styles/SearchAnalytics.css"
 
 
@@ -35,6 +33,7 @@ function formatSearchLabel(search) {
 
 
 function getSearchDisplayName(search) {
+  if (search.mode === "aggregate") return "Daily aggregate"
   if (search.mode === "detailed") {
     return "Structured parameter search"
   }
@@ -44,6 +43,7 @@ function getSearchDisplayName(search) {
 
 
 function getSearchType(search) {
+  if (search.mode === "aggregate") return "Aggregate"
   return search.mode === "detailed"
     ? "Detailed"
     : "Simple"
@@ -69,46 +69,37 @@ function SearchAnalytics() {
   const [analyticsData, setAnalyticsData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
-    loadCurrentUser()
     loadAnalytics()
   }, [])
-
-  const loadCurrentUser = () => {
-    const user = getCurrentUser()
-    setCurrentUser(user)
-  }
 
   const loadAnalytics = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const useApi = import.meta.env.VITE_USE_API === 'true'
-      
-      if (useApi) {
-        const response = await getSearchAnalytics()
-        setAnalyticsData(response.data || [])
-      } else {
-        // Fallback to localStorage for mock data
-        setAnalyticsData([])
-      }
+      const response = await getSearchAnalytics()
+      setAnalyticsData(response.data || [])
     } catch (err) {
       console.error('Failed to load analytics:', err)
-      setError('Failed to load analytics')
+      setError(err.message || 'Failed to load analytics')
       setAnalyticsData([])
     } finally {
       setLoading(false)
     }
   }
 
-  /* =========================================
-     READ SEARCH HISTORY (fallback)
-     ========================================= */
-
-  const searchHistory = getSearchHistory()
+  // The API exposes daily aggregates only; do not fabricate per-query data.
+  const searchHistory = analyticsData.map((entry) => ({
+    timestamp: entry.date,
+    mode: entry.mode,
+    search_count: Number(entry.search_count) || 0,
+    averageMatch: Number(entry.average_match) || 0,
+    zeroMatchCount: Number(entry.zero_match_count) || 0,
+    weakMatchCount: Number(entry.weak_match_count) || 0,
+    resultCount: Number(entry.average_result_count) || 0,
+  }))
 
 
   /* =========================================
@@ -165,7 +156,7 @@ function SearchAnalytics() {
      ========================================= */
 
   const totalSearches =
-    filteredHistory.length
+    filteredHistory.reduce((total, search) => total + search.search_count, 0)
 
 
   const searchesThisMonth =
@@ -188,7 +179,7 @@ function SearchAnalytics() {
             now.getFullYear()
         )
       }
-    ).length
+    ).reduce((total, search) => total + search.search_count, 0)
 
 
   const averageMatch =
@@ -196,13 +187,10 @@ function SearchAnalytics() {
       ? Math.round(
           filteredHistory.reduce(
             (total, search) =>
-              total +
-              Number(
-                search.averageMatch || 0
-              ),
+            total + (search.averageMatch * search.search_count),
             0
           ) /
-            filteredHistory.length
+            Math.max(totalSearches, 1)
         )
       : 0
 
@@ -210,15 +198,13 @@ function SearchAnalytics() {
   const zeroMatchSearches =
     filteredHistory.filter(
       (search) =>
-        search.zeroMatch
-    ).length
+        search.zeroMatchCount > 0
+    ).reduce((total, search) => total + search.zeroMatchCount, 0)
 
 
-  const weakMatchSearches =
-    filteredHistory.filter(
-      (search) =>
-        search.weakMatch
-    ).length
+  const weakMatchSearches = filteredHistory.reduce(
+    (total, search) => total + search.weakMatchCount, 0
+  )
 
 
   /* =========================================
@@ -421,14 +407,14 @@ function SearchAnalytics() {
     filteredHistory.filter(
       (search) =>
         search.mode === "simple"
-    ).length
+    ).reduce((total, search) => total + search.search_count, 0)
 
 
   const detailedSearches =
     filteredHistory.filter(
       (search) =>
         search.mode === "detailed"
-    ).length
+    ).reduce((total, search) => total + search.search_count, 0)
 
 
   /* =========================================
@@ -477,7 +463,7 @@ function SearchAnalytics() {
 
           monthMap.get(
             key
-          ).count += 1
+          ).count += search.search_count || 0
         }
       )
 
@@ -497,6 +483,14 @@ function SearchAnalytics() {
   /* =========================================
      RENDER
      ========================================= */
+
+  if (loading) {
+    return <p role="status">Loading search analytics...</p>
+  }
+
+  if (error) {
+    return <p role="alert">{error}</p>
+  }
 
   return (
     <div className="analytics-page">

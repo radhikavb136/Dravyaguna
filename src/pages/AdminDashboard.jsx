@@ -1,63 +1,35 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { listAllHerbs } from "../api/herbs"
 import "../styles/AdminDashboard.css"
 
 function AdminDashboard() {
   const navigate = useNavigate()
 
   const [herbs, setHerbs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   // =====================================================
   // LOAD REAL HERB DATA
   // =====================================================
 
-  const loadHerbs = () => {
+  const loadHerbs = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const savedHerbs = JSON.parse(
-        localStorage.getItem("herbs") || "[]"
-      )
-
-      if (Array.isArray(savedHerbs)) {
-        setHerbs(savedHerbs)
-      } else {
-        setHerbs([])
-      }
+        const allHerbs = await listAllHerbs({ limit: 200 })
+      setHerbs(allHerbs)
     } catch (error) {
       console.error("Failed to load herbs:", error)
-      setHerbs([])
+      setError(error.message || "Failed to load dashboard data")
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
     loadHerbs()
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        loadHerbs()
-      }
-    }
-
-    window.addEventListener(
-      "storage",
-      loadHerbs
-    )
-
-    document.addEventListener(
-      "visibilitychange",
-      handleVisibilityChange
-    )
-
-    return () => {
-      window.removeEventListener(
-        "storage",
-        loadHerbs
-      )
-
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange
-      )
-    }
   }, [])
 
   // =====================================================
@@ -68,18 +40,18 @@ function AdminDashboard() {
 
   const verifiedHerbs = herbs.filter(
     (herb) =>
-      herb.verificationStatus === "Verified"
+    String(herb.verificationStatus).toLowerCase() === "verified"
   ).length
 
   const reviewedHerbs = herbs.filter(
     (herb) =>
-      herb.verificationStatus === "Reviewed"
+    String(herb.verificationStatus).toLowerCase() === "reviewed"
   ).length
 
   const draftHerbs = herbs.filter(
     (herb) =>
       !herb.verificationStatus ||
-      herb.verificationStatus === "Draft"
+      String(herb.verificationStatus).toLowerCase() === "draft"
   ).length
 
   const verifiedPercentage =
@@ -138,40 +110,8 @@ function AdminDashboard() {
   // from the real vocabulary dataset.
 
   const vocabularyConflicts = useMemo(() => {
-    try {
-      const vocabulary = JSON.parse(
-        localStorage.getItem("vocabulary") || "[]"
-      )
-
-      if (!Array.isArray(vocabulary)) {
-        return 0
-      }
-
-      const seenTerms = new Set()
-      let conflicts = 0
-
-      vocabulary.forEach((item) => {
-        if (item.status !== "Active") {
-          return
-        }
-
-        const normalizedTerm =
-          `${item.category}:${item.term}`
-            .trim()
-            .toLowerCase()
-
-        if (seenTerms.has(normalizedTerm)) {
-          conflicts += 1
-        } else {
-          seenTerms.add(normalizedTerm)
-        }
-      })
-
-      return conflicts
-    } catch {
-      return 0
-    }
-  }, [herbs])
+    return null
+  }, [])
 
   // =====================================================
   // RECENT HERB ACTIVITY
@@ -196,6 +136,9 @@ function AdminDashboard() {
       })
       .slice(0, 4)
   }, [herbs])
+
+  if (loading) return <p role="status">Loading dashboard...</p>
+  if (error) return <p role="alert">{error}</p>
 
   // =====================================================
   // TIME FORMATTER
@@ -729,7 +672,7 @@ function AdminDashboard() {
                   <div className="admin-activity-content">
 
                     <strong>
-                      {herb.herbNameEnglish ||
+                    {herb.englishName ||
                         herb.sanskritName ||
                         "Unnamed Herb"}
                     </strong>

@@ -1,5 +1,6 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { getAccount, updateAccountProfile } from "../api/account"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
@@ -9,9 +10,8 @@ import "../styles/ProfilePage.css"
 function ProfilePage() {
   const navigate = useNavigate()
 
-  const savedUser = JSON.parse(
-    localStorage.getItem("herbUser") || "null"
-  )
+  const useApi = import.meta.env.VITE_USE_API === "true"
+  const savedUser = useApi ? null : JSON.parse(localStorage.getItem("herbUser") || "null")
 
   const [fullName, setFullName] = useState(
     savedUser?.fullName || "Doctor"
@@ -26,10 +26,23 @@ function ProfilePage() {
   )
 
   const [saveMessage, setSaveMessage] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(useApi)
+  const [account, setAccount] = useState(savedUser)
+
+  useEffect(() => {
+    if (!useApi) return
+    getAccount().then((user) => {
+      setAccount(user)
+      setFullName(user.full_name || "")
+      setDisplayName(user.display_name || user.full_name || "")
+      setProfilePhoto("")
+    }).catch((err) => setError(err.message || "Unable to load profile")).finally(() => setLoading(false))
+  }, [useApi])
 
   const fileInputRef = useRef(null)
 
-  const email = savedUser?.email || "Not available"
+  const email = account?.email || "Not available"
 
   const closeProfile = () => {
     navigate("/doctor")
@@ -72,7 +85,23 @@ function ProfilePage() {
   // SAVE PROFILE
   // =========================================
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSaveMessage("")
+    setError("")
+    if (useApi) {
+      try {
+        const user = await updateAccountProfile({ fullName: fullName.trim(), displayName: displayName.trim() })
+        setAccount(user)
+        setFullName(user.full_name)
+        setDisplayName(user.display_name)
+        setSaveMessage(profilePhoto
+          ? "Profile saved. Photo upload is not configured; the selected image is only a preview."
+          : "Profile updated successfully.")
+      } catch (err) {
+        setError(err.message || "Unable to save profile")
+      }
+      return
+    }
     const updatedUser = {
       ...(savedUser || {}),
       fullName: fullName.trim() || "Doctor",
@@ -108,6 +137,8 @@ function ProfilePage() {
     .join("")
     .slice(0, 2)
     .toUpperCase()
+
+  if (loading) return <p role="status">Loading profile...</p>
 
   return (
     <div className="profile-page-layout">
@@ -157,6 +188,8 @@ function ProfilePage() {
                 </p>
 
               </div>
+
+              {error && <p role="alert">{error}</p>}
 
 
               {/* =========================================
@@ -311,8 +344,8 @@ function ProfilePage() {
                       Account status
                     </span>
 
-                    <strong>
-                      Active
+            <strong>
+                      {account?.status || "Active"}
                     </strong>
 
                   </div>
@@ -324,7 +357,7 @@ function ProfilePage() {
                     </span>
 
                     <strong>
-                      Doctor
+                      {account?.role || "Doctor"}
                     </strong>
 
                   </div>

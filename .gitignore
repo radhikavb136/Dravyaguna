@@ -13,13 +13,16 @@ dist-ssr
 *.local
 
 # Environment and data
-.env
+.env*
+!.env.example
 Dataset/
 vocab_review.csv
 *.xlsx
+backend/test-rerun-logs/
 
 # Embedded PostgreSQL
 backend/.embedded-pg/
+backend/.embedded-pg-*/
 
 # Editor directories and files
 .vscode/*
