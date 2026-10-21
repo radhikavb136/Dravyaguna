@@ -20,7 +20,7 @@ Updated 2026-10-21. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 
 ## Product capabilities requiring external services
 
-- Password reset remains unimplemented. Email address changes also require a verification-mail service.
+- Password reset API, hashed single-use tokens, expiry, throttling, and UI are wired and backend-tested; the sender is a no-output stub, so real users cannot receive links until SMTP delivery is implemented and configured. Email address changes likewise require a verification-mail service.
 - Herb image upload is wired with magic-byte/size checks and backend role enforcement; persistent upload is blocked until Supabase Storage URL, service-role key, bucket, and read policy are configured. Tests refuse external storage writes.
 - Explain/RAG runs through the mock provider by default and has an OpenAI Responses adapter; live generation remains unverified and requires `LLM_API_KEY` plus `LLM_MODEL`.
 - Two-factor setup, session listing/revocation, account export, and audit rollback are unavailable; the unsupported controls are disabled or marked unavailable in the UI.

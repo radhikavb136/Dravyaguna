@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom"
 
 import LandingPage from "./pages/LandingPage"
 import AuthPage from "./pages/AuthPage"
+import PasswordResetPage from "./pages/PasswordResetPage"
 import DoctorHome from "./pages/DoctorHome"
 import AdminDashboard from "./pages/AdminDashboard"
 import SearchPage from "./pages/SearchPage"
@@ -45,6 +46,7 @@ function App() {
         {/* Public Pages */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/password-reset" element={<PasswordResetPage />} />
 
         {/* Doctor Dashboard */}
         <Route path="/doctor" element={<AuthenticatedRoute><DoctorHome /></AuthenticatedRoute>} />

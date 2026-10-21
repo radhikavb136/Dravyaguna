@@ -1041,6 +1041,8 @@ function AuthPage() {
               : "Create Account"}
           </button>
 
+          {isLogin && <Link to="/password-reset">Forgot password?</Link>}
+
         </form>
 
 

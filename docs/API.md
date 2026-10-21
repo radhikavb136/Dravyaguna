@@ -702,3 +702,7 @@ Translations are stored in `translation_cache`; editing a herb clears its cached
 
 `POST /api/upload/herb-image/:herbId` accepts raw image bytes with `Content-Type: image/jpeg`, `image/png`, or `image/webp`. Editors, domain experts, and admins may upload; the backend checks magic bytes and the 2 MB limit, writes to the configured Supabase Storage bucket, and stores only the public URL in `herbs.image_url`. It returns `503` when Storage is not configured; external writes are disabled in tests.
 
+## Password reset
+
+`POST /api/auth/password-reset/request` accepts `{ email }` and returns the same `202` response for existing and unknown accounts. `POST /api/auth/password-reset/confirm` accepts `{ token, password }`; passwords must contain at least 10 characters. Tokens are stored as SHA-256 hashes, expire after 30 minutes, and are single-use. Both endpoints are rate-limited. Email sending is currently a no-output stub, so delivery is unavailable until an SMTP adapter and credentials are supplied.
+
