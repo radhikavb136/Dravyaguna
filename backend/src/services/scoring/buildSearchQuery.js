@@ -2,27 +2,20 @@
  * Single-query weighted search using LEFT JOIN LATERAL per active parameter group.
  */
 
-function multiSelectLateral(group, junctionTable, termTable, termCol, paramIndex, extraJoinCondition = '') {
+function multiSelectLateral(group, junctionTable, termTable, termCol, paramIndex, extraJoinCondition = '', includeBreakdown = true) {
   const alias = `${group}_lat`;
+  const breakdownColumn = includeBreakdown ? `,
+    jsonb_build_object(
+      'group', '${group}', 'weight', $w_${group},
+      'ratio', COUNT(*) FILTER (WHERE j.${termCol} IS NOT NULL)::float / NULLIF(cardinality($${paramIndex}::int[]), 0),
+      'items', COALESCE(jsonb_agg(jsonb_build_object('id', t.id, 'label', t.canonical_en, 'matched', j.${termCol} IS NOT NULL) ORDER BY t.canonical_en), '[]'::jsonb)
+    ) AS breakdown` : '';
   return {
     join: `
 LEFT JOIN LATERAL (
   SELECT
     COUNT(*) FILTER (WHERE j.${termCol} IS NOT NULL)::float
-      / NULLIF(cardinality($${paramIndex}::int[]), 0) AS ratio,
-    jsonb_build_object(
-      'group', '${group}',
-      'weight', $w_${group},
-      'ratio', COUNT(*) FILTER (WHERE j.${termCol} IS NOT NULL)::float
-        / NULLIF(cardinality($${paramIndex}::int[]), 0),
-      'items', COALESCE(jsonb_agg(
-        jsonb_build_object(
-          'id', t.id,
-          'label', t.canonical_en,
-          'matched', j.${termCol} IS NOT NULL
-        ) ORDER BY t.canonical_en
-      ), '[]'::jsonb)
-    ) AS breakdown
+      / NULLIF(cardinality($${paramIndex}::int[]), 0) AS ratio${breakdownColumn}
   FROM unnest($${paramIndex}::int[]) AS sel(${termCol})
   JOIN ${termTable} t ON t.id = sel.${termCol}
   LEFT JOIN ${junctionTable} j
@@ -36,28 +29,20 @@ LEFT JOIN LATERAL (
   };
 }
 
-function malaWithEffectLateral(group, junctionTable, termTable, termCol, paramIndex) {
+function malaWithEffectLateral(group, junctionTable, termTable, termCol, paramIndex, includeBreakdown = true) {
   const alias = `${group}_lat`;
+  const breakdownColumn = includeBreakdown ? `,
+    jsonb_build_object(
+      'group', '${group}', 'weight', $w_${group},
+      'ratio', COUNT(*) FILTER (WHERE j.${termCol} IS NOT NULL AND j.effect = sel.effect)::float / NULLIF(jsonb_array_length($${paramIndex}::jsonb), 0),
+      'items', COALESCE(jsonb_agg(jsonb_build_object('id', t.id, 'label', t.canonical_en, 'matched', j.${termCol} IS NOT NULL AND j.effect = sel.effect, 'effect', sel.effect) ORDER BY t.canonical_en), '[]'::jsonb)
+    ) AS breakdown` : '';
   return {
     join: `
 LEFT JOIN LATERAL (
   SELECT
     COUNT(*) FILTER (WHERE j.${termCol} IS NOT NULL AND j.effect = sel.effect)::float
-      / NULLIF(jsonb_array_length($${paramIndex}::jsonb), 0) AS ratio,
-    jsonb_build_object(
-      'group', '${group}',
-      'weight', $w_${group},
-      'ratio', COUNT(*) FILTER (WHERE j.${termCol} IS NOT NULL AND j.effect = sel.effect)::float
-        / NULLIF(jsonb_array_length($${paramIndex}::jsonb), 0),
-      'items', COALESCE(jsonb_agg(
-        jsonb_build_object(
-          'id', t.id,
-          'label', t.canonical_en,
-          'matched', j.${termCol} IS NOT NULL AND j.effect = sel.effect,
-          'effect', sel.effect
-        ) ORDER BY t.canonical_en
-      ), '[]'::jsonb)
-    ) AS breakdown
+      / NULLIF(jsonb_array_length($${paramIndex}::jsonb), 0) AS ratio${breakdownColumn}
   FROM jsonb_to_recordset($${paramIndex}::jsonb) AS sel(${termCol} int, effect dosha_effect)
   JOIN ${termTable} t ON t.id = sel.${termCol}
   LEFT JOIN ${junctionTable} j
@@ -71,26 +56,19 @@ LEFT JOIN LATERAL (
   };
 }
 
-function scoredLateral(group, junctionTable, termTable, termCol, paramIndex) {
+function scoredLateral(group, junctionTable, termTable, termCol, paramIndex, includeBreakdown = true) {
   const alias = `${group}_lat`;
+  const breakdownColumn = includeBreakdown ? `,
+    jsonb_build_object(
+      'group', '${group}', 'weight', $w_${group},
+      'ratio', AVG(COALESCE(j.score, 0)::float / 5.0),
+      'items', COALESCE(jsonb_agg(jsonb_build_object('id', t.id, 'label', t.canonical_en, 'matched', COALESCE(j.score, 0) > 0, 'score', COALESCE(j.score, 0)) ORDER BY t.canonical_en), '[]'::jsonb)
+    ) AS breakdown` : '';
   return {
     join: `
 LEFT JOIN LATERAL (
   SELECT
-    AVG(COALESCE(j.score, 0)::float / 5.0) AS ratio,
-    jsonb_build_object(
-      'group', '${group}',
-      'weight', $w_${group},
-      'ratio', AVG(COALESCE(j.score, 0)::float / 5.0),
-      'items', COALESCE(jsonb_agg(
-        jsonb_build_object(
-          'id', t.id,
-          'label', t.canonical_en,
-          'matched', COALESCE(j.score, 0) > 0,
-          'score', COALESCE(j.score, 0)
-        ) ORDER BY t.canonical_en
-      ), '[]'::jsonb)
-    ) AS breakdown
+    AVG(COALESCE(j.score, 0)::float / 5.0) AS ratio${breakdownColumn}
   FROM unnest($${paramIndex}::int[]) AS sel(${termCol})
   JOIN ${termTable} t ON t.id = sel.${termCol}
   LEFT JOIN ${junctionTable} j
@@ -171,8 +149,10 @@ const GROUP_DEFS = [
   },
 ];
 
-export function buildSearchQuery(criteria, weights, options) {
+function buildSingleSearchQuery(criteria, weights, options) {
   const { statuses, limit = 50, offset = 0 } = options;
+  const includeBreakdown = options.includeBreakdown !== false;
+  const detailOnly = options.detailOnly === true;
   const params = [statuses];
   let paramIndex = 2;
 
@@ -195,17 +175,17 @@ export function buildSearchQuery(criteria, weights, options) {
 
     const lateral =
       def.kind === 'scored'
-        ? scoredLateral(def.key, def.junction, def.termTable, def.termCol, paramIndex)
+        ? scoredLateral(def.key, def.junction, def.termTable, def.termCol, paramIndex, includeBreakdown)
         : def.kind === 'mala_with_effect'
-        ? malaWithEffectLateral(def.key, def.junction, def.termTable, def.termCol, paramIndex)
-        : multiSelectLateral(def.key, def.junction, def.termTable, def.termCol, paramIndex, def.extraJoinCondition || '');
+        ? malaWithEffectLateral(def.key, def.junction, def.termTable, def.termCol, paramIndex, includeBreakdown)
+        : multiSelectLateral(def.key, def.junction, def.termTable, def.termCol, paramIndex, def.extraJoinCondition || '', includeBreakdown);
 
     joins.push(lateral.join);
     ratioParts.push({
       weight: weights[def.key] ?? 0,
       ratio: lateral.ratioExpr,
     });
-    breakdownParts.push(lateral.breakdownExpr);
+    if (includeBreakdown) breakdownParts.push(lateral.breakdownExpr);
     paramIndex += 1;
   }
 
@@ -220,7 +200,7 @@ export function buildSearchQuery(criteria, weights, options) {
     viryaJoin = `
 LEFT JOIN LATERAL (
   SELECT
-    CASE WHEN h.virya_id = $${idx} THEN 1.0 ELSE 0.0 END AS ratio,
+    CASE WHEN h.virya_id = $${idx} THEN 1.0 ELSE 0.0 END AS ratio${includeBreakdown ? `,
     jsonb_build_object(
       'group', 'virya',
       'weight', $w_virya,
@@ -232,13 +212,13 @@ LEFT JOIN LATERAL (
           'matched', h.virya_id = $${idx}
         )
       )
-    ) AS breakdown
+    ) AS breakdown` : ''}
   FROM virya_terms vt
   WHERE vt.id = $${idx}
 ) virya_lat ON true`;
     joins.push(viryaJoin);
     ratioParts.push({ weight: weights.virya ?? 0, ratio: 'virya_lat.ratio' });
-    breakdownParts.push('virya_lat.breakdown');
+    if (includeBreakdown) breakdownParts.push('virya_lat.breakdown');
   }
 
   // Vipaka
@@ -250,7 +230,7 @@ LEFT JOIN LATERAL (
     joins.push(`
 LEFT JOIN LATERAL (
   SELECT
-    CASE WHEN h.vipaka_id = $${idx} THEN 1.0 ELSE 0.0 END AS ratio,
+    CASE WHEN h.vipaka_id = $${idx} THEN 1.0 ELSE 0.0 END AS ratio${includeBreakdown ? `,
     jsonb_build_object(
       'group', 'vipaka',
       'weight', $w_vipaka,
@@ -262,12 +242,12 @@ LEFT JOIN LATERAL (
           'matched', h.vipaka_id = $${idx}
         )
       )
-    ) AS breakdown
+    ) AS breakdown` : ''}
   FROM vipaka_terms vt
   WHERE vt.id = $${idx}
 ) vipaka_lat ON true`);
     ratioParts.push({ weight: weights.vipaka ?? 0, ratio: 'vipaka_lat.ratio' });
-    breakdownParts.push('vipaka_lat.breakdown');
+    if (includeBreakdown) breakdownParts.push('vipaka_lat.breakdown');
   }
 
   // Dosha direction selections
@@ -280,7 +260,7 @@ LEFT JOIN LATERAL (
 LEFT JOIN LATERAL (
   SELECT
     COUNT(*) FILTER (WHERE hda.herb_id IS NOT NULL)::float
-      / NULLIF(jsonb_array_length($${idx}::jsonb), 0) AS ratio,
+      / NULLIF(jsonb_array_length($${idx}::jsonb), 0) AS ratio${includeBreakdown ? `,
     jsonb_build_object(
       'group', 'dosha',
       'weight', $w_dosha,
@@ -293,7 +273,7 @@ LEFT JOIN LATERAL (
           'matched', hda.herb_id IS NOT NULL
         )
       ), '[]'::jsonb)
-    ) AS breakdown
+    ) AS breakdown` : ''}
   FROM jsonb_to_recordset($${idx}::jsonb) AS sel(dosha dosha_type, effect dosha_effect)
   LEFT JOIN herb_dosha_actions hda
     ON hda.herb_id = h.id
@@ -301,7 +281,7 @@ LEFT JOIN LATERAL (
    AND hda.effect = sel.effect
 ) dosha_lat ON jsonb_array_length($${idx}::jsonb) > 0`);
     ratioParts.push({ weight: weights.dosha ?? 0, ratio: 'dosha_lat.ratio' });
-    breakdownParts.push('dosha_lat.breakdown');
+    if (includeBreakdown) breakdownParts.push('dosha_lat.breakdown');
   }
 
   // Prabhava substring terms
@@ -315,7 +295,7 @@ LEFT JOIN LATERAL (
   SELECT
     COUNT(*) FILTER (
       WHERE lower(COALESCE(h.prabhava, '')) LIKE '%' || term || '%'
-    )::float / NULLIF(cardinality($${idx}::text[]), 0) AS ratio,
+    )::float / NULLIF(cardinality($${idx}::text[]), 0) AS ratio${includeBreakdown ? `,
     jsonb_build_object(
       'group', 'prabhava',
       'weight', $w_prabhava,
@@ -328,23 +308,22 @@ LEFT JOIN LATERAL (
           'matched', lower(COALESCE(h.prabhava, '')) LIKE '%' || term || '%'
         )
       ), '[]'::jsonb)
-    ) AS breakdown
+    ) AS breakdown` : ''}
   FROM unnest($${idx}::text[]) AS u(term)
 ) prabhava_lat ON cardinality($${idx}::text[]) > 0`);
     ratioParts.push({ weight: weights.prabhava ?? 0, ratio: 'prabhava_lat.ratio' });
-    breakdownParts.push('prabhava_lat.breakdown');
+    if (includeBreakdown) breakdownParts.push('prabhava_lat.breakdown');
   }
 
-  params.push(activeWeightSum);
   const activeWeightParam = paramIndex;
-  paramIndex += 1;
+  if (!detailOnly) {
+    params.push(activeWeightSum);
+    paramIndex += 1;
+  }
 
-  params.push(limit);
   const limitParam = paramIndex;
-  paramIndex += 1;
-
-  params.push(offset);
-  const offsetParam = paramIndex;
+  const offsetParam = paramIndex + 1;
+  if (!detailOnly) params.push(limit, offset);
 
   const earnedExpr =
     ratioParts.length === 0
@@ -358,7 +337,7 @@ LEFT JOIN LATERAL (
       ? `'[]'::jsonb`
       : `jsonb_build_array(${breakdownParts.join(', ')})`;
 
-  const matchPctExpr =
+  const matchPctExpr = detailOnly ? '0::numeric' :
     ratioParts.length === 0
       ? '0::numeric'
       : `CAST(
@@ -375,7 +354,12 @@ LEFT JOIN LATERAL (
     return acc;
   }, {});
 
-  let sql = `
+  let sql = detailOnly ? `
+SELECT h.id, ${breakdownExpr} AS breakdown
+FROM herbs h
+${joins.join('\n')}
+WHERE h.status = ANY($1::herb_status[])
+  AND EXISTS (SELECT 1 FROM ranked r WHERE r.id = h.id)` : `
 SELECT
   h.id,
   h.code,
@@ -385,18 +369,36 @@ SELECT
   h.prabhava,
   h.status,
   h.image_url,
-  ${matchPctExpr} AS match_percentage,
-  ${breakdownExpr} AS breakdown
+  ${matchPctExpr} AS match_percentage${includeBreakdown ? `,\n  ${breakdownExpr} AS breakdown` : ''}
 FROM herbs h
 ${joins.join('\n')}
 WHERE h.status = ANY($1::herb_status[])
-${ratioParts.length > 0 ? `AND ${matchPctExpr} > 0` : ''}
-ORDER BY match_percentage DESC, h.english_name ASC
-LIMIT $${limitParam} OFFSET $${offsetParam}`;
+${ratioParts.length > 0 && !detailOnly ? `AND ${matchPctExpr} > 0` : ''}
+${detailOnly ? '' : `ORDER BY match_percentage DESC, h.english_name ASC\nLIMIT $${limitParam} OFFSET $${offsetParam}`}`;
 
   for (const [token, value] of Object.entries(weightReplacements)) {
     sql = sql.split(token).join(value);
   }
 
   return { sql, params, activeWeightSum, paramByKey };
+}
+
+function shiftParameters(sql, offset) {
+  return sql.replace(/\$(\d+)/g, (_match, index) => `$${Number(index) + offset}`);
+}
+
+export function buildSearchQuery(criteria, weights, options) {
+  const ranked = buildSingleSearchQuery(criteria, weights, { ...options, includeBreakdown: false });
+  const details = buildSingleSearchQuery(criteria, weights, { ...options, detailOnly: true, includeBreakdown: true });
+  const sql = `
+WITH ranked AS MATERIALIZED (
+  ${ranked.sql}
+), details AS MATERIALIZED (
+  ${shiftParameters(details.sql, ranked.params.length)}
+)
+SELECT ranked.*, COALESCE(details.breakdown, '[]'::jsonb) AS breakdown
+FROM ranked
+LEFT JOIN details ON details.id = ranked.id
+ORDER BY ranked.match_percentage DESC, ranked.english_name ASC`;
+  return { sql, params: [...ranked.params, ...details.params], activeWeightSum: ranked.activeWeightSum, paramByKey: ranked.paramByKey };
 }

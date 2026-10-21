@@ -18,6 +18,7 @@
     "check:rls": "node scripts/checkRls.js",
     "admin:first": "node scripts/createFirstAdmin.js",
     "export:herbs": "node scripts/exportHerbs.js",
+    "measure:search-concurrency": "node scripts/measureSearchConcurrency.js",
     "weights:reset": "node scripts/resetScoringWeights.js",
     "dev-users:passwords": "node scripts/setDevUserPasswords.js",
     "loadtest:search": "node scripts/loadTestSearch.js",

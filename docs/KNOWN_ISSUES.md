@@ -28,6 +28,7 @@ Updated 2026-10-21. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 - Explain retrieval currently uses stored herb records, recalculated scoring and stored herb references; there is no external vector index. Clinical explanations still depend on the quality and completeness of the source records, and live text generation needs the configured provider credentials.
 - Billing/payment is not connected to a payment provider.
 - Admin database export supports CSV; XLSX export returns an explicit 501 until an XLSX writer is added.
+- Search ranking now limits candidates before building breakdown JSON; local EXPLAIN and pool 5/10 measurements are documented in `PHASE_STATUS.md`. Supabase performance and the historical reported throughput plateau remain unverified.
 - Production hosting, secrets, monitoring, backup/restore, and database policy deployment have not been verified. Review RLS/policies and service-role access before production.
 - Migration 011 enables RLS on every public table and adds no policies. This was applied and checked only on the isolated local test database. Supabase Security Advisor/Table Editor verification remains outstanding.
 - Render/Vercel deployment configs and names-only env templates are present, but no staging deployment was performed because the staging database URL, hosting accounts, and deployment secrets are unavailable.
