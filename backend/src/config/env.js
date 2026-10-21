@@ -33,4 +33,7 @@ export const env = {
   importDefaultStatus: process.env.IMPORT_DEFAULT_STATUS || 'reviewed',
   pgPoolMax: Number(process.env.PG_POOL_MAX || 10),
   prodDbRef: process.env.PROD_DB_REF || '',
+  llmProvider: process.env.LLM_PROVIDER || 'mock',
+  llmApiKey: process.env.LLM_API_KEY || '',
+  llmModel: process.env.LLM_MODEL || '',
 };

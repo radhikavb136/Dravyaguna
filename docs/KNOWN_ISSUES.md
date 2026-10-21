@@ -20,11 +20,12 @@ Updated 2026-10-21. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 
 ## Product capabilities requiring external services
 
-- Password reset returns HTTP 501 until SMTP/email token delivery is configured. Email address changes likewise require a verification-mail service.
-- Herb profile photo selection is preview-only; persistent upload needs configured object storage and access controls.
+- Password reset returns HTTP 501 until the password-reset implementation is added; real email delivery requires SMTP configuration. Email address changes likewise require a verification-mail service.
+- Herb profile photo selection is preview-only; persistent upload needs configured Supabase Storage and access controls.
+- Explain/RAG runs through the mock provider by default and has an OpenAI Responses adapter; live generation remains unverified and requires `LLM_API_KEY` plus `LLM_MODEL`.
 - Two-factor setup, session listing/revocation, account export, and audit rollback are unavailable; the unsupported controls are disabled or marked unavailable in the UI.
 - Translation needs a provider, approved translations, and verification workflow. The language setting currently records a preference; it does not translate the full interface.
-- RAG needs an available retrieval/vector service and curated source content.
+- Explain retrieval currently uses stored herb records, recalculated scoring and stored herb references; there is no external vector index. Clinical explanations still depend on the quality and completeness of the source records, and live text generation needs the configured provider credentials.
 - Billing/payment is not connected to a payment provider.
 - Production hosting, secrets, monitoring, backup/restore, and database policy deployment have not been verified. Review RLS/policies and service-role access before production.
 - Migration 011 enables RLS on every public table and adds no policies. This was applied and checked only on the isolated local test database. Supabase Security Advisor/Table Editor verification remains outstanding.

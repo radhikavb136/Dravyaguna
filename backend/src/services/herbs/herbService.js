@@ -269,6 +269,8 @@ export async function updateHerb(id, data, user) {
       await insertJunctionData(client, id, data, user);
     }
 
+    await client.query('DELETE FROM rag_explanation_cache WHERE herb_id = $1', [id]);
+
     await client.query('COMMIT');
 
     await logAudit({
@@ -302,6 +304,7 @@ export async function verifyHerb(id, user) {
       `UPDATE herbs SET status = 'verified', updated_at = NOW() WHERE id = $1 RETURNING *`,
       [id]
     );
+    await client.query('DELETE FROM rag_explanation_cache WHERE herb_id = $1', [id]);
 
     await client.query('COMMIT');
 
@@ -336,6 +339,7 @@ export async function deleteHerb(id, user) {
       `UPDATE herbs SET status = 'archived', updated_at = NOW() WHERE id = $1 RETURNING *`,
       [id]
     );
+    await client.query('DELETE FROM rag_explanation_cache WHERE herb_id = $1', [id]);
 
     await client.query('COMMIT');
 

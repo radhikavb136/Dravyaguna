@@ -9,7 +9,7 @@ import {
 
 const langSchema = z.enum(['en-IN', 'hi-IN', 'mr-IN', 'sa-IN']).optional();
 
-const filtersSchema = z.object({
+export const filtersSchema = z.object({
   rasa: z.array(z.string()).optional(),
   guna: z.array(z.string()).optional(),
   karma: z.array(z.string()).optional(),

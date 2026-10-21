@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { getFilterOptions } from "../api/vocabulary"
+import InfoIcon from "./InfoIcon"
 import { USE_API } from "../api/client"
 import "../styles/DetailedSearch.css"
 
@@ -191,21 +192,29 @@ function DetailedSearch() {
           title: "Rasa",
           subtitle: "taste profile",
           options: (vocabulary.rasa || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "rasa",
+          terms: vocabulary.rasa || [],
         },
         {
           title: "Guna",
           subtitle: "qualities",
           options: (vocabulary.guna || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "guna",
+          terms: vocabulary.guna || [],
         },
         {
           title: "Virya",
           subtitle: "potency / action",
           options: (vocabulary.virya || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "virya",
+          terms: vocabulary.virya || [],
         },
         {
           title: "Vipaka",
           subtitle: "post-digestive effect",
           options: (vocabulary.vipaka || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "vipaka",
+          terms: vocabulary.vipaka || [],
         },
         {
           title: "Dosha",
@@ -218,36 +227,49 @@ function DetailedSearch() {
             "Kapha · Increases",
             "Kapha · Decreases",
           ],
+          vocabularyKey: "dosha",
         },
         {
           title: "Dhatu",
           subtitle: "tissue system",
           options: (vocabulary.dhatu || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "dhatu",
+          terms: vocabulary.dhatu || [],
         },
         {
           title: "Mala",
           subtitle: "waste pathways",
           options: (vocabulary.mala || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "mala",
+          terms: vocabulary.mala || [],
         },
         {
           title: "Srotas",
           subtitle: "body channels",
           options: (vocabulary.srotas || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "srotas",
+          terms: vocabulary.srotas || [],
         },
         {
           title: "Karma",
           subtitle: "therapeutic action",
           options: (vocabulary.karma || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "karma",
+          terms: vocabulary.karma || [],
         },
         {
           title: "Major Diseases / Indications",
           subtitle: "clinical indications",
           options: (vocabulary.indications || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "indication",
+          terms: vocabulary.indications || [],
         },
         {
           title: "Organ / Avayava",
           subtitle: "body organs",
           options: (vocabulary.avayava || []).map(t => t.slug || t.canonical_en),
+          vocabularyKey: "avayava",
+          terms: vocabulary.avayava || [],
           disabled: !vocabulary.hasOrganData,
           disabledMessage: "No data yet",
         },
@@ -396,10 +418,11 @@ function DetailedSearch() {
                     selectedParameters[parameter.title]?.includes(
                       option
                     )
+                  const term = parameter.terms?.find((item) => item.slug === option || item.canonical_en === option)
 
                   return (
+                    <span className="parameter-option-with-info" key={option}>
                     <button
-                      key={option}
                       type="button"
                       className={`parameter-chip ${
                         isSelected ? "selected" : ""
@@ -414,6 +437,13 @@ function DetailedSearch() {
                     >
                       {option}
                     </button>
+                    <InfoIcon
+                      vocabulary={parameter.vocabularyKey}
+                      termName={term?.canonical_en || option}
+                      definition={term?.definition_en || ""}
+                      definitionStatus={term?.definition_status || "draft"}
+                    />
+                    </span>
                   )
                 })}
               </div>

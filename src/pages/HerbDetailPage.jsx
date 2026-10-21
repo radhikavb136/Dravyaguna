@@ -7,6 +7,7 @@ import herbDataset from "../data/herbDataset"
 import { getHerbById } from "../api/herbs"
 import { USE_API } from "../api/client"
 import { addFavorite, getFavorites, removeFavorite } from "../api/favorites"
+import InfoIcon from "../components/InfoIcon"
 
 import "../styles/HerbDetailPage.css"
 
@@ -67,10 +68,10 @@ function DetailField({ label, value }) {
 }
 
 
-function PropertyCard({ label, value }) {
+function PropertyCard({ label, value, vocabulary, termName }) {
   return (
     <div className="property-card">
-      <span>{label}</span>
+      <span>{label}{vocabulary && <InfoIcon vocabulary={vocabulary} termName={termName || value} />}</span>
       <strong>{value || "—"}</strong>
     </div>
   )
@@ -512,6 +513,7 @@ function HerbDetailPage() {
                 <h2>
                   Classical properties
                 </h2>
+                <InfoIcon herbId={herb.id} />
 
               </div>
 
@@ -521,24 +523,30 @@ function HerbDetailPage() {
                 <PropertyCard
                   label="RASA"
                   value={rasa}
+                  vocabulary="rasa"
+                  termName={herb.rasa}
                 />
 
 
                 <PropertyCard
                   label="GUNA"
                   value={guna}
+                  vocabulary="guna"
+                  termName={herb.guna}
                 />
 
 
                 <PropertyCard
                   label="VIRYA"
                   value={herb.virya}
+                  vocabulary="virya"
                 />
 
 
                 <PropertyCard
                   label="VIPAKA"
                   value={herb.vipaka}
+                  vocabulary="vipaka"
                 />
 
               </div>
@@ -561,6 +569,7 @@ function HerbDetailPage() {
                 <h2>
                   Dosha actions
                 </h2>
+                <InfoIcon vocabulary="dosha" termName={Object.keys(herb.dosha || {})} />
 
               </div>
 
@@ -604,6 +613,7 @@ function HerbDetailPage() {
                 <h2>
                   Dhatu actions
                 </h2>
+                <InfoIcon vocabulary="dhatu" termName={Object.keys(herb.dhatu || {})} />
 
               </div>
 
@@ -651,6 +661,7 @@ function HerbDetailPage() {
                 <h2>
                   Mala actions
                 </h2>
+                <InfoIcon vocabulary="mala" termName={mala.map((item) => typeof item === 'object' ? item.mala : String(item).split('·')[0].trim())} />
 
               </div>
 
@@ -712,6 +723,7 @@ function HerbDetailPage() {
                 <h2>
                   Srotas actions
                 </h2>
+                <InfoIcon vocabulary="srotas" termName={srotas} />
 
               </div>
 
@@ -819,6 +831,7 @@ function HerbDetailPage() {
                 <h2>
                   Karma
                 </h2>
+                <InfoIcon vocabulary="karma" termName={karma} />
 
               </div>
 
@@ -850,6 +863,7 @@ function HerbDetailPage() {
                 <h2>
                   Major diseases / indications
                 </h2>
+                <InfoIcon vocabulary="indication" termName={indications} />
 
               </div>
 

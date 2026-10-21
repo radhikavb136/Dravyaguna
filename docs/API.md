@@ -315,8 +315,13 @@ Search text and optional clinical filters with the same weighted ranking as deta
 
 Only existing canonical Karma/Indication vocabulary and `term_synonyms` rows with `approval_status: "approved"` are eligible. Existing synonym rows default to `draft` after migration 012. Exact approved synonyms are preferred; PostgreSQL trigram suggestions require similarity at least `0.45`, are filtered to at least 80% of the strongest candidate for that token, and remain request-only (no vocabulary/herb link is written). `backend/data/search-synonyms-starter.csv` is a draft for expert review and is not imported. Search analytics logging runs asynchronously.
 
+### POST /api/explain
+Authenticated clinician, editor, domain expert, or admin. Body is `{ "herb_id": "uuid", "filters": {}, "lang": "en-IN" }`. Herb visibility is checked using the authenticated user's current role; supplied filters are validated and scoring is recomputed server-side. The response includes `explanation`, `ai_generated`, `citations`, `lang`, `provider`, and structured scoring. Provider failures return `explanation_unavailable: true` with the structured breakdown. Responses are cached by herb, normalized filters, language and provider; the cache is invalidated on herb update, verification or archive. Each user is limited to 10 requests per minute.
+
+`LLM_PROVIDER` defaults to `mock`. `LLM_PROVIDER=openai` uses the [OpenAI Responses API](https://platform.openai.com/docs/api-reference/responses/create) and requires `LLM_API_KEY` and `LLM_MODEL`; choose a currently supported model from the [official model catalog](https://platform.openai.com/docs/models), and provide its name through configuration rather than embedding one in code. The prompt sends only the retrieved herb record, recomputed score and stored references, forbidding unsupported clinical claims, dosages and contraindications.
+
 ### GET /api/vocabulary/filters
-Get all vocabulary terms for frontend filters.
+Get all vocabulary terms for frontend filters. Terms include `definition_en` and `definition_status` (`draft` | `verified`); definitions remain empty/draft until the Ayurveda expert supplies and verifies them.
 
 **Response:**
 ```json

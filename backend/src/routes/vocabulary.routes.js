@@ -66,46 +66,48 @@ router.get('/filters', async (req, res) => {
           label: row.canonical_en,
           canonical_en: row.canonical_en,
           is_custom: row.is_custom || false,
+          definition_en: row.definition_en || '',
+          definition_status: row.definition_status || 'draft',
         }));
 
       const rasa = await client.query(
-        'SELECT id, slug, canonical_en FROM rasa_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, definition_en, definition_status FROM rasa_terms ORDER BY canonical_en'
       );
 
       const guna = await client.query(
-        'SELECT id, slug, canonical_en FROM guna_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, definition_en, definition_status FROM guna_terms ORDER BY canonical_en'
       );
 
       const virya = await client.query(
-        'SELECT id, slug, canonical_en FROM virya_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, definition_en, definition_status FROM virya_terms ORDER BY canonical_en'
       );
 
       const vipaka = await client.query(
-        'SELECT id, slug, canonical_en FROM vipaka_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, definition_en, definition_status FROM vipaka_terms ORDER BY canonical_en'
       );
 
       const karma = await client.query(
-        'SELECT id, slug, canonical_en, is_custom FROM karma_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, is_custom, definition_en, definition_status FROM karma_terms ORDER BY canonical_en'
       );
 
       const indications = await client.query(
-        'SELECT id, slug, canonical_en, is_custom FROM indication_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, is_custom, definition_en, definition_status FROM indication_terms ORDER BY canonical_en'
       );
 
       const dhatu = await client.query(
-        'SELECT id, slug, canonical_en FROM dhatu_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, definition_en, definition_status FROM dhatu_terms ORDER BY canonical_en'
       );
 
       const mala = await client.query(
-        'SELECT id, slug, canonical_en FROM mala_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, definition_en, definition_status FROM mala_terms ORDER BY canonical_en'
       );
 
       const srotas = await client.query(
-        'SELECT id, slug, canonical_en FROM srotas_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, definition_en, definition_status FROM srotas_terms ORDER BY canonical_en'
       );
 
       const avayava = await client.query(
-        'SELECT id, slug, canonical_en FROM avayava_terms ORDER BY canonical_en'
+        'SELECT id, slug, canonical_en, definition_en, definition_status FROM avayava_terms ORDER BY canonical_en'
       );
 
       res.json({

@@ -222,6 +222,12 @@
   
     gap: 7px;
   }
+
+  .parameter-option-with-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
   
   .parameter-chip {
     min-height: 34px;

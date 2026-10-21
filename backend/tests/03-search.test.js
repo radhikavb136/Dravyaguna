@@ -89,5 +89,6 @@ export async function run() {
   assert(filters.ok, 'filters');
   assert(filters.data.rasa[0]?.slug, 'filter slug');
   assert(filters.data.rasa[0]?.label, 'filter label');
+  assert(['draft', 'verified'].includes(filters.data.rasa[0]?.definition_status), 'vocabulary definition status is returned');
   assertEqual(filters.data.hasOrganData, false, 'organ data flag');
 }

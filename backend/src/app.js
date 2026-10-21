@@ -13,6 +13,7 @@ import { vocabularyRouter } from './routes/vocabulary.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { favoritesRouter } from './routes/favorites.routes.js';
 import { accountRouter } from './routes/account.routes.js';
+import { explainRouter } from './routes/explain.routes.js';
 
 export function createApp() {
   const app = express();
@@ -48,6 +49,7 @@ export function createApp() {
 
   app.use('/api/auth', authRouter);
   app.use('/api/account', accountRouter);
+  app.use('/api/explain', explainRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/scoring/weights', weightsRouter);
   app.use('/api/herbs', herbRouter);

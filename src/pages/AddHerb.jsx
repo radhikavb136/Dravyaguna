@@ -4,6 +4,7 @@ import { createHerb, getHerbById, updateHerb } from "../api/herbs"
 import { getFilterOptions } from "../api/vocabulary"
 import { getCurrentUser } from "../api/auth"
 import { getBackendRole } from "../utils/roles"
+import InfoIcon from "../components/InfoIcon"
 import "../styles/AddHerb.css"
 
 function AddHerb() {
@@ -888,6 +889,18 @@ function AddHerb() {
   // RENDER
   // =====================================================
 
+  const sectionInfo = {
+    "03": { vocabulary: "rasa", termName: formData.rasa },
+    "04": { vocabulary: "guna", termName: formData.guna },
+    "05": { vocabulary: "virya", termName: formData.virya },
+    "06": { vocabulary: "vipaka", termName: formData.vipaka },
+    "08": { vocabulary: "dosha", termName: Object.keys(formData.dosha || {}) },
+    "09": { vocabulary: "dhatu", termName: Object.keys(formData.dhatu || {}) },
+    "10": { vocabulary: "mala", termName: Object.keys(formData.mala || {}) },
+    "11": { vocabulary: "srotas", termName: Object.keys(formData.srotas || {}) },
+    "12": { vocabulary: "karma", termName: formData.importantKarma.split(",").map((term) => term.trim()).filter(Boolean) },
+  }
+
   return (
     <div className="add-herb-page">
 
@@ -913,6 +926,7 @@ function AddHerb() {
               ? "Review Herb"
               : "Add New Herb"}
           </h1>
+          {import.meta.env.VITE_USE_API === "true" && selectedHerbId && <InfoIcon herbId={selectedHerbId} />}
 
           <p className="add-herb-description">
             {isViewMode
@@ -1100,6 +1114,21 @@ function AddHerb() {
             {openSection === section.number && (
 
               <div className="add-herb-section-body">
+                {sectionInfo[section.number] && (
+                  <InfoIcon
+                    vocabulary={sectionInfo[section.number].vocabulary}
+                    termName={sectionInfo[section.number].termName}
+                  />
+                )}
+                {section.number === "07" && import.meta.env.VITE_USE_API === "true" && selectedHerbId && (
+                  <InfoIcon herbId={selectedHerbId} />
+                )}
+                {section.number === "12" && (
+                  <InfoIcon
+                    vocabulary="indication"
+                    termName={formData.clinicalIndications.split(/[,\n]/).map((term) => term.trim()).filter(Boolean)}
+                  />
+                )}
 
                 {/* 01 BASIC */}
 
