@@ -8,6 +8,9 @@ import { getHerbById } from "../api/herbs"
 import { USE_API } from "../api/client"
 import { addFavorite, getFavorites, removeFavorite } from "../api/favorites"
 import InfoIcon from "../components/InfoIcon"
+import { getCurrentUser } from "../api/auth"
+import { verifyTranslation } from "../api/translations"
+import { getBackendRole } from "../utils/roles"
 
 import "../styles/HerbDetailPage.css"
 
@@ -105,6 +108,24 @@ function HerbDetailPage() {
   const [apiError, setApiError] = useState(null)
   const [favoriteBusy, setFavoriteBusy] = useState(false)
   const [language, setLanguage] = useState(() => localStorage.getItem('dravyaguna-language') || 'en-IN')
+  const [translationBusy, setTranslationBusy] = useState(false)
+  const [translationMessage, setTranslationMessage] = useState('')
+  const canVerifyTranslation = ['admin', 'domain_expert'].includes(getBackendRole(getCurrentUser()))
+
+  const handleVerifyTranslation = async (fieldName) => {
+    setTranslationBusy(true)
+    setTranslationMessage('')
+    try {
+      const verified = await verifyTranslation({ contentId: id, fieldName, language })
+      setApiHerb((previous) => previous ? {
+        ...previous,
+        translations: { ...previous.translations, [fieldName]: { ...previous.translations?.[fieldName], status: verified.status } },
+      } : previous)
+      setTranslationMessage('Translation verified.')
+    } catch (error) {
+      setApiError(error.message || 'Unable to verify translation.')
+    } finally { setTranslationBusy(false) }
+  }
 
 
   /* =========================================
@@ -477,6 +498,7 @@ function HerbDetailPage() {
                   value={herb.translations?.part_used?.text || herb.partUsed}
                 />
                 {herb.translations?.part_used?.status === 'machine_translated' && <small>Machine-translated</small>}
+                {herb.translations?.part_used?.status === 'machine_translated' && canVerifyTranslation && <button type="button" disabled={translationBusy} onClick={() => handleVerifyTranslation('part_used')}>Verify translation</button>}
 
 
                 <DetailField
@@ -496,8 +518,10 @@ function HerbDetailPage() {
                   {herb.translations?.description?.text || herb.description}
                   {herb.translations?.description?.status === 'machine_translated' && <small> Machine-translated</small>}
                   {herb.translations?.description?.translation_unavailable && <small> Translation unavailable; showing original.</small>}
+                  {herb.translations?.description?.status === 'machine_translated' && canVerifyTranslation && <button type="button" disabled={translationBusy} onClick={() => handleVerifyTranslation('description')}>Verify translation</button>}
                 </p>
               )}
+              {translationMessage && <p role="status">{translationMessage}</p>}
 
               <button
                 className={`herb-favorite-button${isFavorite ? " favorite-active" : ""}`}
@@ -802,6 +826,7 @@ function HerbDetailPage() {
                   {herb.translations?.prabhava?.text || herb.prabhava || "—"}
                 </p>
                 {herb.translations?.prabhava?.status === 'machine_translated' && <small>Machine-translated</small>}
+                {herb.translations?.prabhava?.status === 'machine_translated' && canVerifyTranslation && <button type="button" disabled={translationBusy} onClick={() => handleVerifyTranslation('prabhava')}>Verify translation</button>}
 
               </div>
 
