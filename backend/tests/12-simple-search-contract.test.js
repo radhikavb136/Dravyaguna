@@ -69,7 +69,7 @@ export async function run() {
       body: { query: 'औषधि' },
     });
     assertEqual(unsupported.status, 200, 'unsupported language degrades to a response');
-    assert(unsupported.data.note?.includes('not supported yet'), 'unsupported language has a clear note');
+    assert(unsupported.data.note?.includes('not interpreted'), 'untranslated query is clearly reported as not interpreted');
   } finally {
     if (synonymId) await pool.query('DELETE FROM term_synonyms WHERE id = $1', [synonymId]);
     await pool.end();

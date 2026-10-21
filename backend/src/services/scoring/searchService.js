@@ -3,6 +3,7 @@ import { clinicianVisibleStatuses, canSeeDraftHerbs } from '../../utils/roles.js
 import { buildSearchQuery } from './buildSearchQuery.js';
 import { getScoringWeights } from './weightsCache.js';
 import { resolveSearchFilters } from './resolveFilters.js';
+import { translateSearchQueryToEnglish } from '../translations/searchTranslationService.js';
 import {
   detectSearchLanguage,
   mapQueryToFilterIds,
@@ -41,14 +42,34 @@ export async function runDetailedSearch({ filters, role, limit, offset }) {
   };
 }
 
-export async function runSimpleSearch({ query, lang, filters: requestedFilters = {}, role, limit, offset }) {
+export async function runSimpleSearch({ query, lang, filters: requestedFilters = {}, role, limit, offset, translationProvider }) {
   const normalizedQuery = normalizeSimpleQuery(query);
   const detectedLanguage = detectSearchLanguage(normalizedQuery);
-  const language = lang || detectedLanguage;
-  const unsupportedLanguage = language !== 'en-IN';
-  const mapped = unsupportedLanguage
-    ? { karmaIds: [], indicationIds: [], matchedTerms: [], unmatchedTokens: normalizedQuery.split(/\s+/u).filter(Boolean) }
-    : await mapQueryToFilterIds(normalizedQuery);
+  const language = detectedLanguage === 'hi-IN'
+    ? (lang === 'mr-IN' ? 'mr-IN' : 'hi-IN')
+    : (lang || detectedLanguage);
+  let searchText = normalizedQuery;
+  let note;
+  if (language === 'hi-IN' || language === 'mr-IN') {
+    try {
+      const translated = await translateSearchQueryToEnglish(normalizedQuery, language, translationProvider);
+      if (translated.unavailable) {
+        note = 'Search translation is not configured. The query was not interpreted.';
+        searchText = '';
+      } else {
+        searchText = normalizeSimpleQuery(translated.text);
+      }
+    } catch {
+      note = 'Search translation is temporarily unavailable. The query was not interpreted.';
+      searchText = '';
+    }
+  } else if (language !== 'en-IN') {
+    note = 'This search language is not supported yet. Search text is not interpreted.';
+    searchText = '';
+  }
+  const mapped = searchText
+    ? await mapQueryToFilterIds(searchText)
+    : { karmaIds: [], indicationIds: [], matchedTerms: [], unmatchedTokens: normalizedQuery.split(/\s+/u).filter(Boolean) };
   const filters = { ...requestedFilters };
 
   if (mapped.karmaIds.length) {
@@ -81,9 +102,7 @@ export async function runSimpleSearch({ query, lang, filters: requestedFilters =
         matched_terms: mapped.matchedTerms,
         unmatched_tokens: mapped.unmatchedTokens,
         language,
-        note: unsupportedLanguage
-          ? 'This search language is not supported yet. Search text is not interpreted until translation is available.'
-          : undefined,
+        note,
       },
     };
   }
@@ -103,9 +122,7 @@ export async function runSimpleSearch({ query, lang, filters: requestedFilters =
       matched_terms: mapped.matchedTerms,
       unmatched_tokens: mapped.unmatchedTokens,
       language,
-      note: unsupportedLanguage
-        ? 'This search language is not supported yet. Search text is not interpreted until translation is available.'
-        : undefined,
+      note,
     },
   };
 }

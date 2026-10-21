@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import {
@@ -53,6 +54,15 @@ const simpleSchema = z.object({
 
 export const searchRouter = Router();
 
+const queryTranslationLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 30,
+  keyGenerator: (req) => req.user.id,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).json({ error: 'Search translation rate limit exceeded. Try again shortly.' }),
+});
+
 searchRouter.use(authenticate);
 
 searchRouter.post('/detailed', async (req, res, next) => {
@@ -87,7 +97,12 @@ searchRouter.post('/detailed', async (req, res, next) => {
   }
 });
 
-searchRouter.post('/simple', async (req, res, next) => {
+searchRouter.post('/simple', (req, res, next) => {
+  const translatedQuery = ['hi-IN', 'mr-IN'].includes(req.body?.lang)
+    || /[\u0900-\u097f]/u.test(String(req.body?.query || ''));
+  if (translatedQuery) return queryTranslationLimiter(req, res, next);
+  return next();
+}, async (req, res, next) => {
   try {
     const body = simpleSchema.parse(req.body);
     const { results, meta } = await runSimpleSearch({

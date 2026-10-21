@@ -47,6 +47,32 @@ describe("herb search API adapters", () => {
     )
   })
 
+  it("forwards the account language and preserves an unavailable-translation message", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [],
+        matched_terms: [],
+        unmatched_tokens: ["दीपन"],
+        lang: "hi-IN",
+        note: "Search translation is not configured. The query was not interpreted.",
+      }),
+    })
+
+    const { searchHerbsSimple } = await import("./herbs.js")
+    const response = await searchHerbsSimple("दीपन", 25, {}, { lang: "hi-IN" })
+
+    expect(response.note).toContain("not configured")
+    expect(response.language).toBe("hi-IN")
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "http://localhost:4000/api/search/simple",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ query: "दीपन", limit: 25, lang: "hi-IN" }),
+      })
+    )
+  })
+
   it("preserves camel-case match scores returned by search endpoints", async () => {
     globalThis.fetch.mockResolvedValue({
       ok: true,

@@ -55,6 +55,9 @@ async function translateAzure(text, source, target) {
 }
 
 export function createTranslationProvider() {
+  // Automated tests must not make billable provider requests, even if developer
+  // credentials happen to be present in the process environment.
+  if (env.nodeEnv === 'test') return createMockTranslationProvider();
   const providers = [];
   if (env.sarvamApiKey) providers.push(['sarvam', translateSarvam]);
   if (env.googleTranslateApiKey) providers.push(['google', translateGoogle]);

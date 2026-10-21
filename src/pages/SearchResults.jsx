@@ -685,6 +685,8 @@ function SearchResults() {
   const [apiError, setApiError] = useState(null)
   const [preferenceError, setPreferenceError] = useState("")
   const [savedSearchMessage, setSavedSearchMessage] = useState("")
+  const [preferredLanguage, setPreferredLanguage] = useState("en-IN")
+  const [accountPreferencesLoaded, setAccountPreferencesLoaded] = useState(!USE_API)
   const [resultsPerPage, setResultsPerPage] = useState(() => {
     if (USE_API) return 20
     try {
@@ -698,8 +700,12 @@ function SearchResults() {
   useEffect(() => {
     if (!USE_API) return
     getAccount()
-      .then(({ preferences }) => setResultsPerPage(Number(preferences?.resultsPerPage || 20)))
+      .then(({ preferences, preferred_language: language }) => {
+        setResultsPerPage(Number(preferences?.resultsPerPage || 20))
+        setPreferredLanguage(language || "en-IN")
+      })
       .catch((error) => setPreferenceError(error.message || "Unable to load result display preference"))
+      .finally(() => setAccountPreferencesLoaded(true))
   }, [])
 
   // Call API for detailed search when feature flag is enabled
@@ -757,23 +763,26 @@ function SearchResults() {
       return
     }
 
-    if (USE_API && mode === "simple" && (query || hasSimpleFilters)) {
+    if (USE_API && mode === "simple" && accountPreferencesLoaded && (query || hasSimpleFilters)) {
       setApiLoading(true)
       setApiError(null)
-      searchHerbsSimple(query, 200, simpleFilters)
+      let cancelled = false
+      searchHerbsSimple(query, 200, simpleFilters, { lang: preferredLanguage })
         .then(response => {
+          if (cancelled) return
           setApiResults(response.results || [])
           setSimpleSearchMeta(response)
           setApiLoading(false)
         })
         .catch(error => {
+          if (cancelled) return
           console.error('API search error:', error)
           setApiError(error.message)
           setApiResults([])
           setSimpleSearchMeta(null)
           setApiLoading(false)
         })
-      return
+      return () => { cancelled = true }
     }
 
     if (!USE_API) {
@@ -782,7 +791,7 @@ function SearchResults() {
       setApiResults([])
       setSimpleSearchMeta(null)
     }
-  }, [mode, parametersString, query, simpleRasa, simpleVirya, simpleVipaka, simpleIndication])
+  }, [mode, parametersString, query, simpleRasa, simpleVirya, simpleVipaka, simpleIndication, preferredLanguage, accountPreferencesLoaded])
 
 
   /* =========================================
