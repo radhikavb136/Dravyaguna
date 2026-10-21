@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { createHerb, getHerbById, updateHerb } from "../api/herbs"
+import { createHerb, getHerbById, updateHerb, uploadHerbImage } from "../api/herbs"
 import { getFilterOptions } from "../api/vocabulary"
 import { getCurrentUser } from "../api/auth"
 import { getBackendRole } from "../utils/roles"
@@ -40,6 +40,7 @@ function AddHerb() {
   })
 
   const [imageName, setImageName] = useState("")
+  const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState("")
   const [isDragging, setIsDragging] = useState(false)
   const [herbId, setHerbId] = useState("")
@@ -588,19 +589,21 @@ function AddHerb() {
     const allowedTypes = [
       "image/png",
       "image/jpeg",
+      "image/webp",
     ]
 
     if (!allowedTypes.includes(file.type)) {
-      alert("Please select a PNG or JPG/JPEG image.")
+      alert("Please select a PNG, JPG/JPEG, or WebP image.")
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Image size must be less than 5 MB.")
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image size must be 2 MB or smaller.")
       return
     }
 
     setImageName(file.name)
+    setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
   }
 
@@ -757,12 +760,14 @@ function AddHerb() {
         if ((isEditMode || herbId) && herbId) {
           // Update existing herb
           await updateHerb(herbId, herbData)
+          if (imageFile) { await uploadHerbImage(herbId, imageFile); setImageFile(null) }
         } else {
           // Create new herb (always as draft initially)
           herbData.status = "draft"
           const created = await createHerb(herbData)
           setHerbId(created.id)
           setHerbCode(created.code)
+          if (imageFile) { await uploadHerbImage(created.id, imageFile); setImageFile(null) }
         }
       } else {
         // Fallback to localStorage for mock data
@@ -991,14 +996,12 @@ function AddHerb() {
       <section className="add-herb-image-card">
 
         <h2>Herb Image</h2>
-        {import.meta.env.VITE_USE_API === "true" && (
-          <p role="note">Image selection is a local preview; persistent herb image storage is not configured.</p>
-        )}
+        {import.meta.env.VITE_USE_API === "true" && <p role="note">Images are stored only after the herb record exists and Supabase Storage is configured.</p>}
 
         <input
           ref={imageInputRef}
           type="file"
-          accept="image/png,image/jpeg"
+          accept="image/png,image/jpeg,image/webp"
           onChange={handleImageChange}
           style={{ display: "none" }}
         />
@@ -1053,7 +1056,7 @@ function AddHerb() {
               </h3>
 
               <p>
-                PNG, JPG or JPEG · Max 5 MB
+                PNG, JPG, JPEG or WebP · Max 2 MB
               </p>
             </>
           )}

@@ -15,6 +15,7 @@ import { favoritesRouter } from './routes/favorites.routes.js';
 import { accountRouter } from './routes/account.routes.js';
 import { explainRouter } from './routes/explain.routes.js';
 import { translationsRouter } from './routes/translations.routes.js';
+import { uploadRouter } from './routes/upload.routes.js';
 
 export function createApp() {
   const app = express();
@@ -52,6 +53,7 @@ export function createApp() {
   app.use('/api/account', accountRouter);
   app.use('/api/explain', explainRouter);
   app.use('/api/translations', translationsRouter);
+  app.use('/api/upload', uploadRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/scoring/weights', weightsRouter);
   app.use('/api/herbs', herbRouter);

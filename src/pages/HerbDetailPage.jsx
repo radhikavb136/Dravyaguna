@@ -405,7 +405,7 @@ function HerbDetailPage() {
                 </label>
 
                 <div className="herb-detail-icon-wrapper">
-                  <LeafIcon />
+                  {herb.imageUrl ? <img src={herb.imageUrl} alt={herb.englishName} className="detail-leaf-icon" /> : <LeafIcon />}
                 </div>
 
 

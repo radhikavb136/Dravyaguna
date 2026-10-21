@@ -252,6 +252,10 @@ export async function deleteHerb(id) {
   return adaptHerb(response);
 }
 
+export async function uploadHerbImage(id, file) {
+  return apiClient.postBinary(`/api/upload/herb-image/${encodeURIComponent(id)}`, file);
+}
+
 /**
  * Detailed search
  */

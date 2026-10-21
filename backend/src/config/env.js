@@ -40,4 +40,7 @@ export const env = {
   googleTranslateApiKey: process.env.GOOGLE_TRANSLATE_API_KEY || '',
   azureTranslatorKey: process.env.AZURE_TRANSLATOR_KEY || '',
   azureTranslatorRegion: process.env.AZURE_TRANSLATOR_REGION || '',
+  supabaseUrl: process.env.SUPABASE_URL || '',
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || '',
 };

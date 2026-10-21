@@ -20,8 +20,8 @@ Updated 2026-10-21. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 
 ## Product capabilities requiring external services
 
-- Password reset returns HTTP 501 until the password-reset implementation is added; real email delivery requires SMTP configuration. Email address changes likewise require a verification-mail service.
-- Herb profile photo selection is preview-only; persistent upload needs configured Supabase Storage and access controls.
+- Password reset remains unimplemented. Email address changes also require a verification-mail service.
+- Herb image upload is wired with magic-byte/size checks and backend role enforcement; persistent upload is blocked until Supabase Storage URL, service-role key, bucket, and read policy are configured. Tests refuse external storage writes.
 - Explain/RAG runs through the mock provider by default and has an OpenAI Responses adapter; live generation remains unverified and requires `LLM_API_KEY` plus `LLM_MODEL`.
 - Two-factor setup, session listing/revocation, account export, and audit rollback are unavailable; the unsupported controls are disabled or marked unavailable in the UI.
 - Herb detail can request and cache descriptive field translations through Sarvam, Google, Azure, or the mock provider, and admins/domain experts can verify cached output. Live providers remain unverified without keys; mock text is not clinical content. Search-query translation, full interface localization, and vocabulary definition translations are not implemented. User language preference and the herb-detail selector are present but do not translate unrelated pages.

@@ -92,6 +92,10 @@ class ApiClient {
     });
   }
 
+  postBinary(endpoint, blob) {
+    return this.request(endpoint, { method: 'POST', body: blob, headers: { 'Content-Type': blob.type } });
+  }
+
   put(endpoint, data, options = {}) {
     return this.request(endpoint, {
       ...options,
