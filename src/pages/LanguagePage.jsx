@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { getAccount, updateAccountPreferences } from "../api/account"
+import { setInterfaceLanguage } from "../i18n/useUiText"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
@@ -22,7 +23,8 @@ function LanguagePage() {
   useEffect(() => {
     if (!useApi) return
     getAccount().then(({ preferred_language: language }) => {
-      setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi" })[language] || "English")
+      setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi", "sa-IN": "Sanskrit" })[language] || "English")
+      setInterfaceLanguage(language)
     }).catch((err) => setError(err.message || "Unable to load language preference")).finally(() => setLoading(false))
   }, [useApi])
 
@@ -32,17 +34,20 @@ function LanguagePage() {
     setSelectedLanguage(language)
     if (!useApi) {
       localStorage.setItem("language", language)
+      setInterfaceLanguage(({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN", Sanskrit: "sa-IN" })[language])
       return
     }
     try {
-      const code = ({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN" })[language]
+      const code = ({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN", Sanskrit: "sa-IN" })[language]
       await updateAccountPreferences({ language: code })
+      setInterfaceLanguage(code)
       setMessage("Language preference saved.")
     } catch (err) {
       setError(err.message || "Unable to save language preference")
       try {
         const { preferred_language: previous } = await getAccount()
-        setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi" })[previous] || "English")
+        setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi", "sa-IN": "Sanskrit" })[previous] || "English")
+        setInterfaceLanguage(previous)
       } catch { /* preserve the selected value while the load error is visible */ }
     }
   }
@@ -183,6 +188,22 @@ function LanguagePage() {
                       {selectedLanguage === "Marathi" && "✓"}
                     </span>
 
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`language-option ${
+                      selectedLanguage === "Sanskrit" ? "selected" : ""
+                    }`}
+                    onClick={() => handleLanguageChange("Sanskrit")}
+                  >
+                    <div>
+                      <h2>संस्कृतम्</h2>
+                      <p>Sanskrit</p>
+                    </div>
+                    <span className="language-radio">
+                      {selectedLanguage === "Sanskrit" && "✓"}
+                    </span>
                   </button>
 
                 </div>

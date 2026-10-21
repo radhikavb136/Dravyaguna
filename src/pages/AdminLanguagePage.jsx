@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { getAccount, updateAccountPreferences } from "../api/account"
+import { setInterfaceLanguage } from "../i18n/useUiText"
 
 import "../styles/AdminLanguagePage.css"
 
@@ -17,6 +18,7 @@ function AdminLanguagePage() {
   useEffect(() => {
     getAccount().then(({ preferred_language: language }) => {
       setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi", "sa-IN": "Sanskrit" })[language] || "English")
+      setInterfaceLanguage(language)
     }).catch((err) => setError(err.message || "Unable to load language preference")).finally(() => setLoading(false))
   }, [])
 
@@ -37,6 +39,7 @@ function AdminLanguagePage() {
     setSaveMessage("")
     try {
       await updateAccountPreferences({ language: ({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN", Sanskrit: "sa-IN" })[selectedLanguage] })
+      setInterfaceLanguage(({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN", Sanskrit: "sa-IN" })[selectedLanguage])
       setSaveMessage("Language preference saved successfully.")
     } catch (err) {
       setError(err.message || "Unable to save language preference")

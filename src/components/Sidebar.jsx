@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { getCurrentUser } from "../api/auth"
 import { USE_API } from "../api/client"
+import { useUiText } from "../i18n/useUiText"
 
 function Sidebar() {
+  const t = useUiText()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -154,7 +156,7 @@ function Sidebar() {
         <div className="nav-section">
 
           <p className="nav-label">
-            WORKSPACE
+            {t("workspace").toUpperCase()}
           </p>
 
 
@@ -173,7 +175,7 @@ function Sidebar() {
             </span>
 
             <span>
-              Home
+              {t("home")}
             </span>
           </Link>
 
@@ -193,7 +195,7 @@ function Sidebar() {
             </span>
 
             <span>
-              Search
+              {t("search")}
             </span>
           </Link>
 
@@ -213,7 +215,7 @@ function Sidebar() {
             </span>
 
             <span>
-              Compare
+              {t("compare")}
             </span>
           </Link>
 
@@ -233,7 +235,7 @@ function Sidebar() {
             </span>
 
             <span>
-              Favorites
+              {t("favorites")}
             </span>
           </Link>
 
@@ -291,7 +293,7 @@ function Sidebar() {
               </strong>
 
               <span>
-                Ayurvedic Physician
+                {t("physician")}
               </span>
 
             </div>
@@ -346,7 +348,7 @@ function Sidebar() {
                   </span>
 
                   <span>
-                    Profile
+                    {t("profile")}
                   </span>
                 </button>
 
@@ -365,7 +367,7 @@ function Sidebar() {
                   </span>
 
                   <span>
-                    Settings
+                    {t("settings")}
                   </span>
                 </button>
 
@@ -384,7 +386,7 @@ function Sidebar() {
                   </span>
 
                   <span>
-                    Language
+                    {t("language")}
                   </span>
                 </button>
 
@@ -403,7 +405,7 @@ function Sidebar() {
                   </span>
 
                   <span>
-                    Help & support
+                    {t("helpSupport")}
                   </span>
                 </button>
 
@@ -422,7 +424,7 @@ function Sidebar() {
                   </span>
 
                   <span>
-                    Upgrade plan
+                    {t("upgrade")}
                   </span>
                 </button>
 
@@ -441,7 +443,7 @@ function Sidebar() {
                   </span>
 
                   <span>
-                    Learn more
+                    {t("learnMore")}
                   </span>
 
                   <span className="profile-menu-arrow">
@@ -471,7 +473,7 @@ function Sidebar() {
                   </span>
 
                   <span>
-                    Log out
+                    {t("logout")}
                   </span>
 
                 </button>

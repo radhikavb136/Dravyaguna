@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { getCurrentUser } from "../api/auth"
+import { useUiText } from "../i18n/useUiText"
 
 function DashboardNavbar() {
+  const t = useUiText()
   const navigate = useNavigate()
 
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -98,9 +100,9 @@ function DashboardNavbar() {
 
       {/* Breadcrumb */}
       <div className="breadcrumb">
-        <span>Workspace</span>
+        <span>{t("workspace")}</span>
         <span className="breadcrumb-separator">›</span>
-        <strong>Home</strong>
+        <strong>{t("home")}</strong>
         {useApi && (
           <span className="api-indicator" style={{marginLeft: '10px', fontSize: '11px', color: '#28a745', background: '#e6fffa', padding: '2px 8px', borderRadius: '4px'}}>
             Using API
@@ -196,7 +198,7 @@ function DashboardNavbar() {
                     ◉
                   </span>
 
-                  <span>Profile</span>
+                  <span>{t("profile")}</span>
                 </button>
 
 
@@ -211,7 +213,7 @@ function DashboardNavbar() {
                     ⚙
                   </span>
 
-                  <span>Settings</span>
+                  <span>{t("settings")}</span>
                 </button>
 
 
@@ -226,7 +228,7 @@ function DashboardNavbar() {
                     ◎
                   </span>
 
-                  <span>Language</span>
+                  <span>{t("language")}</span>
                 </button>
 
 
@@ -241,7 +243,7 @@ function DashboardNavbar() {
                     ?
                   </span>
 
-                  <span>Help & support</span>
+                  <span>{t("helpSupport")}</span>
                 </button>
 
 
@@ -256,7 +258,7 @@ function DashboardNavbar() {
                     ✦
                   </span>
 
-                  <span>Upgrade plan</span>
+                  <span>{t("upgrade")}</span>
                 </button>
 
 
@@ -271,7 +273,7 @@ function DashboardNavbar() {
                     ◇
                   </span>
 
-                  <span>Learn more</span>
+                  <span>{t("learnMore")}</span>
 
                   <span className="profile-menu-arrow">
                     ›
@@ -295,7 +297,7 @@ function DashboardNavbar() {
                     ↪
                   </span>
 
-                  <span>Log out</span>
+                  <span>{t("logout")}</span>
                 </button>
 
               </div>
