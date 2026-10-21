@@ -12,6 +12,10 @@
 
  Do not run migrations, imports, seeds, or tests against the Supabase URL in `.env` until its exact development project has been verified. `npm test` enforces `DEV_DB_REF` for Supabase pooler targets; never guess that value or point it at production. The embedded database is disposable local development/test infrastructure and must not contain irreplaceable records.
 
+### Company dataset import
+
+With the ignored `Dataset/herbs.xlsx` present, inspect it read-only from `backend/` with `node scripts/importRealDatasetDryRun.js`. The dry run has no database connection and reports the source row and quality-flag totals. `node scripts/importRealDataset.js` upserts herb records and relationship data, so review its target and existing values first; it requires `ALLOW_REMOTE_DATA_IMPORT=YES` for a remote or production target and refuses to overwrite an existing generated vocabulary-review file. The generated draft is separate from `backend/scripts/vocab_review.csv`. Never run the importer against production without explicit project-owner approval and a recovery plan.
+
  The API listens on port 4000 and the frontend on port 5173. The API health check is available at `/api/health` and verifies PostgreSQL readiness.
 
  ## Verification

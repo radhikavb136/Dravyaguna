@@ -17,6 +17,7 @@ dist-ssr
 !.env.example
 Dataset/
 vocab_review.csv
+vocab_review.generated.csv
 *.xlsx
 backend/test-rerun-logs/
 

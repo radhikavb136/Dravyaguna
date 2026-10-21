@@ -1,12 +1,15 @@
 /**
  * Real import from Dataset/herbs.xlsx
- * Single transaction, idempotent upsert on record_id, stores raw text, writes vocab_review.csv
+ * Single transaction, idempotent upsert on record_id, preserves numeric quality flags,
+ * and writes a separate generated review CSV without overwriting expert review data.
  */
 import dotenv from 'dotenv';
-import xlsx from 'xlsx';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
+import { isSourceQualityFlag, sourceReviewStatus } from '../src/services/herbs/sourceQuality.js';
+import { readXlsxRows } from '../src/utils/xlsxReader.js';
+import { assertDatasetImportTarget } from '../src/utils/datasetImportSafety.js';
 import fs from 'fs';
 
 dotenv.config();
@@ -15,7 +18,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const EXCEL_PATH = path.join(__dirname, '../../Dataset/herbs.xlsx');
-const REVIEW_CSV_PATH = path.join(__dirname, 'vocab_review.csv');
+const REVIEW_CSV_PATH = process.env.VOCAB_REVIEW_OUTPUT
+  ? path.resolve(process.env.VOCAB_REVIEW_OUTPUT)
+  : path.join(__dirname, 'vocab_review.generated.csv');
 
 // Standard closed vocabularies
 const STANDARD_VOCABULARIES = {
@@ -151,11 +156,13 @@ function simpleTrigramSimilarity(a, b) {
 }
 
 async function importRealDataset() {
+  assertDatasetImportTarget({
+    databaseUrl: process.env.DATABASE_URL,
+    nodeEnv: process.env.NODE_ENV,
+    allowRemoteImport: process.env.ALLOW_REMOTE_DATA_IMPORT,
+  });
   console.log(`Reading Excel file: ${EXCEL_PATH}`);
-  const workbook = xlsx.readFile(EXCEL_PATH);
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const rawData = xlsx.utils.sheet_to_json(worksheet, { defval: null });
+const rawData = readXlsxRows(fs.readFileSync(EXCEL_PATH));
 
   console.log(`\n=== Sheet: ${sheetName} ===`);
   console.log(`Total rows: ${rawData.length}`);
@@ -216,15 +223,12 @@ async function importRealDataset() {
       const prabhava = row['Prabhava'];
 
       // Quality flags
-      const missingIdentity = row['quality_missing_identity'] === true || row['quality_missing_identity'] === 'true';
-      const duplicateBotanical = row['quality_duplicate_botanical'] === true || row['quality_duplicate_botanical'] === 'true';
-      const conflictingDuplicate = row['quality_has_conflicting_duplicate'] === true || row['quality_has_conflicting_duplicate'] === 'true';
+      const missingIdentity = isSourceQualityFlag(row['quality_missing_identity']);
+      const duplicateBotanical = isSourceQualityFlag(row['quality_duplicate_botanical']);
+      const conflictingDuplicate = isSourceQualityFlag(row['quality_has_conflicting_duplicate']);
 
       // Status determination
-      let status = 'draft';
-      if (!missingIdentity && !duplicateBotanical && !conflictingDuplicate) {
-        status = 'reviewed';
-      }
+      const status = sourceReviewStatus(row);
 
       // Missing identity check
       if (!englishName && !sanskritName) {
@@ -495,7 +499,7 @@ async function importRealDataset() {
     const csvRows = reviewCsv.map(row =>
       `${row.category},"${row.raw_token}","${row.normalized_form}",${row.count},"${row.suggestion}","${row.approved_canonical}"`
     ).join('\n');
-    fs.writeFileSync(REVIEW_CSV_PATH, csvHeader + csvRows);
+    fs.writeFileSync(REVIEW_CSV_PATH, csvHeader + csvRows, { flag: 'wx' });
 
     await client.query('COMMIT');
     console.log('Transaction committed successfully');

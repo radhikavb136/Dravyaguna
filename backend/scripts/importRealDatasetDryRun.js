@@ -1,14 +1,12 @@
 /**
  * Dry run import from Dataset/herbs.xlsx
- * Corrected version with proper quality column parsing, vocabulary seeding, and review CSV generation.
+ * Read-only source-data validation. Does not access or write to a database.
  */
-import dotenv from 'dotenv';
-import xlsx from 'xlsx';
+import fs from 'node:fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import pg from 'pg';
-
-dotenv.config();
+import { isSourceQualityFlag, sourceReviewStatus } from '../src/services/herbs/sourceQuality.js';
+import { readXlsxRows } from '../src/utils/xlsxReader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -139,92 +137,16 @@ function simpleTrigramSimilarity(a, b) {
   return union.size === 0 ? 0 : intersection.size / union.size;
 }
 
-async function seedVocabularies() {
-  try {
-    console.log('Seeding closed vocabularies...');
-
-    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
-
-    // Helper to seed a vocabulary table
-    async function seedVocab(category, table) {
-      const terms = STANDARD_VOCABULARIES[category];
-      for (const term of terms) {
-        const slug = term.toLowerCase().replace(/\s+/g, '-');
-        await pool.query(
-          `INSERT INTO ${table} (canonical_en, slug) VALUES ($1, $2)
-           ON CONFLICT (canonical_en) DO NOTHING`,
-          [term, slug]
-        );
-      }
-      console.log(`  Seeded ${terms.length} ${category} terms`);
-    }
-
-    await seedVocab('rasa', 'rasa_terms');
-    await seedVocab('guna', 'guna_terms');
-    // dosha is an enum, not a table - skip seeding
-    await seedVocab('karma', 'karma_terms');
-    await seedVocab('srotas', 'srotas_terms');
-    await seedVocab('virya', 'virya_terms');
-    await seedVocab('vipaka', 'vipaka_terms');
-    await seedVocab('mala', 'mala_terms');
-    await seedVocab('dhatu', 'dhatu_terms');
-
-    console.log('Vocabulary seeding complete');
-    await pool.end();
-  } catch (err) {
-    console.warn('Database connection failed, skipping vocabulary seeding:', err.message);
-    console.warn('Will proceed with dry run parsing only');
-  }
-}
-
 async function dryRunImport() {
   console.log(`Reading Excel file: ${EXCEL_PATH}`);
-  const workbook = xlsx.readFile(EXCEL_PATH);
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const rawData = xlsx.utils.sheet_to_json(worksheet, { defval: null });
+  const rawData = readXlsxRows(fs.readFileSync(EXCEL_PATH));
 
-  console.log(`\n=== Sheet: ${sheetName} ===`);
+  console.log('\n=== Workbook source data (read-only; no database access) ===');
   console.log(`Total rows: ${rawData.length}`);
 
   if (rawData.length === 0) {
     console.error('No data found in Excel file');
     return;
-  }
-
-  // Seed vocabularies first (if DB is available)
-  await seedVocabularies();
-
-  // Load term IDs from database (if available)
-  let termIds = {};
-  let dbAvailable = false;
-
-  try {
-    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
-    await pool.query('SELECT 1'); // Test connection
-    dbAvailable = true;
-
-    for (const [category, table] of [
-      ['rasa', 'rasa_terms'],
-      ['guna', 'guna_terms'],
-      ['karma', 'karma_terms'],
-      ['indication', 'indication_terms'],
-      ['virya', 'virya_terms'],
-      ['vipaka', 'vipaka_terms'],
-      ['mala', 'mala_terms'],
-      ['dhatu', 'dhatu_terms'],
-      ['srotas', 'srotas_terms'],
-    ]) {
-      const { rows } = await pool.query(`SELECT id, canonical_en FROM ${table}`);
-      termIds[category] = {};
-      for (const row of rows) {
-        termIds[category][row.canonical_en.toLowerCase()] = row.id;
-      }
-    }
-    await pool.end();
-    console.log('Database connected, term IDs loaded');
-  } catch (err) {
-    console.warn('Database not available, proceeding with parsing only:', err.message);
   }
 
   // Analysis
@@ -269,9 +191,9 @@ async function dryRunImport() {
     const botanicalName = row['Botanical Name'];
 
     // Quality flags (file's own flags)
-    const missingIdentity = row['quality_missing_identity'] === true || row['quality_missing_identity'] === 'true';
-    const duplicateBotanical = row['quality_duplicate_botanical'] === true || row['quality_duplicate_botanical'] === 'true';
-    const conflictingDuplicate = row['quality_has_conflicting_duplicate'] === true || row['quality_has_conflicting_duplicate'] === 'true';
+    const missingIdentity = isSourceQualityFlag(row['quality_missing_identity']);
+    const duplicateBotanical = isSourceQualityFlag(row['quality_duplicate_botanical']);
+    const conflictingDuplicate = isSourceQualityFlag(row['quality_has_conflicting_duplicate']);
 
     // Track file's own flag counts
     if (missingIdentity) report.fileFlags.missingIdentity++;
@@ -279,10 +201,7 @@ async function dryRunImport() {
     if (conflictingDuplicate) report.fileFlags.conflictingDuplicate++;
 
     // Status determination
-    let status = 'draft';
-    if (!missingIdentity && !duplicateBotanical && !conflictingDuplicate) {
-      status = 'reviewed';
-    }
+    const status = sourceReviewStatus(row);
 
     // Missing identity check (skip only if both English and Sanskrit are missing)
     if (!englishName && !sanskritName) {
@@ -568,7 +487,7 @@ async function dryRunImport() {
   console.log('\n=== Note ===');
   console.log('This is a DRY RUN. No data was imported.');
   console.log('Review the report above before running the real import.');
-  console.log('The review CSV will be written to vocab_review.csv on real import.');
+  console.log('The real import writes a separate vocab_review.generated.csv and refuses to overwrite an existing review file.');
 }
 
 dryRunImport().catch((err) => {
