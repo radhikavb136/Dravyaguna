@@ -706,3 +706,7 @@ Translations are stored in `translation_cache`; editing a herb clears its cached
 
 `POST /api/auth/password-reset/request` accepts `{ email }` and returns the same `202` response for existing and unknown accounts. `POST /api/auth/password-reset/confirm` accepts `{ token, password }`; passwords must contain at least 10 characters. Tokens are stored as SHA-256 hashes, expire after 30 minutes, and are single-use. Both endpoints are rate-limited. Email sending is currently a no-output stub, so delivery is unavailable until an SMTP adapter and credentials are supplied.
 
+## Database export
+
+`GET /api/admin/export?format=csv` is admin-only and downloads the current database records in a stable herb-master CSV layout. `GET /api/admin/export?format=xlsx` returns HTTP 501 until XLSX support is added; it never returns a CSV under an XLSX name. Run `npm run export:herbs -- [output-path]` in `backend/` with `API_BASE_URL` and an admin `EXPORT_ADMIN_TOKEN`; the script does not print the token.
+

@@ -17,6 +17,7 @@
     "test:cleanup": "node scripts/testCleanup.js",
     "check:rls": "node scripts/checkRls.js",
     "admin:first": "node scripts/createFirstAdmin.js",
+    "export:herbs": "node scripts/exportHerbs.js",
     "weights:reset": "node scripts/resetScoringWeights.js",
     "dev-users:passwords": "node scripts/setDevUserPasswords.js",
     "loadtest:search": "node scripts/loadTestSearch.js",

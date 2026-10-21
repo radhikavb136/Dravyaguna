@@ -18,6 +18,7 @@ Updated 2026-10-21. This is the living status file. `PHASE_0_STATUS.md` and `PHA
 - Translation frontend `npm.cmd test -- --run` → `Test Files 6 passed (6); Tests 24 passed (24)`; ESLint → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded (618.32 kB JS chunk warning); `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
 - E backend `npm.cmd run migrate` applied additive migration `015_password_reset_single_use` to the isolated DB. `npm.cmd test` with local API port 45988 → `20 passed, 0 failed, 20 total`; upload checks reject invalid magic bytes, >2 MB bodies, clinician access, and external test-mode writes; reset checks cover generic responses, hashed tokens, 30-minute expiry, password change, single-use behavior, and rate limiting.
 - E frontend `npm.cmd test -- --run` → `Test Files 6 passed (6); Tests 24 passed (24)`; ESLint → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded (620.29 kB JS chunk warning); API bundle check passed.
+- B3 CSV backend `npm.cmd test` with local API port 45990 → `21 passed, 0 failed, 21 total`; CSV format, filename, stored rows, and admin-only authorization are asserted. XLSX returns 501 and remains blocked.
 - Frontend adapter tests: `npm.cmd test -- --run` → `Test Files 5 passed (5); Tests 21 passed (21)`; `npm.cmd run lint` → exit 0, 0 errors, 39 warnings; production build and API-build mock scan passed.
 - Backend `npm.cmd run migrate` applied `011_enable_rls_public_tables`; `npm.cmd run check:rls` → `All public tables have row-level security enabled.`
 - Migration 005 is already applied and historically recreated `herb_mala`; it must not be rerun. All new schema changes are additive/ALTER-only.
@@ -74,8 +75,9 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 | A | Favorites and saved searches | WIRED-UNVERIFIED | API tests pass; browser workflows need automated coverage. |
 | A | Compare | WIRED-UNVERIFIED | Selection stores herb IDs locally and reads herb data through APIs; workflow is not automated. |
 | B1 | Approved-only Simple Search mapping and UI | WIRED-UNVERIFIED | Backend integration tests cover draft exclusion, an approved `term_synonyms` mapping, unknown phrase zero-results plus async logging, request-only fuzzy matching, unsupported-language notes, and the 0.45 threshold/80% relative cutoff. Draft CSV is not loaded. UI feedback shows matched/unmatched terms; browser workflow remains unverified. |
-| B2 | Expert-approved vocabulary import/relink | BLOCKED | Requires the Ayurveda expert's approved mapping file. |
-| B3 | Database export | NOT STARTED | Admin CSV/XLSX export endpoint and script are absent. |
+| B2 | Expert-approved vocabulary import/relink | BLOCKED | `backend/scripts/vocab_review.csv` has 657 rows and zero nonempty `approved_canonical` values; an expert-approved mapping file is required. |
+| B3a | Admin CSV export endpoint and script | VERIFIED | Local backend `npm.cmd test`: `21 passed, 0 failed, 21 total`; covers admin-only access, CSV headers/filename, and stored data. `npm run export:herbs` uses `API_BASE_URL` plus `EXPORT_ADMIN_TOKEN`. |
+| B3b | XLSX export | BLOCKED | API reports HTTP 501 explicitly; no XLSX writer dependency is available in this environment. |
 | B4 | Query/performance work | NOT STARTED | Ranking/breakdown query optimization and before/after measurements remain. |
 | C | Herb descriptive translation, cache, verification, selector | WIRED-UNVERIFIED | Backend mock/cache/verification API tests pass; detail selector calls `GET /api/herbs/:id?lang=...` and labels machine output. Browser interaction is not verified. Live Sarvam/Google/Azure requests are blocked until keys are supplied; search-query translation and full UI localization remain unimplemented. |
 | D1/D2 | Grounded explain API, cache, and InfoIcon | WIRED-UNVERIFIED | Mock-backed service/API and InfoIcon unit tests pass; rate limiting, cache invalidation and structured failure response are tested. Browser interaction is not verified. Real OpenAI calls remain blocked pending `LLM_API_KEY` and `LLM_MODEL`. |
@@ -89,7 +91,7 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 
 1. Obtain expert approval for any starter synonym mappings and add browser coverage for Simple Search feedback; the draft CSV is intentionally not imported.
 2. Provide Supabase Storage configuration before enabling image uploads and implement/configure SMTP delivery before enabling password resets.
-3. Add export, search performance, and expert-approved mapping work for B2-B4; B2 remains blocked pending approved source data.
+3. Add XLSX export and B4 query/performance work; B2 remains blocked until the Ayurveda expert approves mappings.
 4. Add automated browser coverage where the environment supports it. `agent-browser` is not installed; do not label manual browser claims VERIFIED.
 5. Deploy to staging and verify only after a staging Supabase target, hosting accounts, and secrets are supplied. Do not run migrations against the unverified Supabase URL.
 
