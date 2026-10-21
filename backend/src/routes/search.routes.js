@@ -92,6 +92,7 @@ searchRouter.post('/simple', async (req, res, next) => {
     const body = simpleSchema.parse(req.body);
     const { results, meta } = await runSimpleSearch({
       query: body.query,
+      lang: body.lang,
       filters: body.filters,
       role: req.user.role,
       limit: body.limit ?? 50,
@@ -105,15 +106,18 @@ searchRouter.post('/simple', async (req, res, next) => {
       mode: 'simple',
       queryText: body.query,
       filtersJson: body.filters,
-      lang: body.lang,
+      lang: meta.language,
       resultCount: results.length,
       topMatchPct: topMatch,
       dbDurationMs: meta.dbDurationMs,
     }).catch(err => console.error('Search event logging failed:', err));
 
     res.json({
-      lang: body.lang ?? 'en-IN',
+      lang: meta.language,
       results,
+      matched_terms: meta.matched_terms,
+      unmatched_tokens: meta.unmatched_tokens,
+      ...(meta.note ? { note: meta.note } : {}),
       meta,
     });
   } catch (err) {

@@ -19,13 +19,16 @@ describe("herb search API adapters", () => {
             match_percentage: 87,
           },
         ],
+        matched_terms: [{ term: "fever", canonical: "Jwara", vocabulary: "indication", similarity: 1, matchType: "approved_synonym" }],
+        unmatched_tokens: ["unknown"],
+        lang: "en-IN",
       }),
     })
 
     const { searchHerbsSimple } = await import("./herbs.js")
-    const results = await searchHerbsSimple("fever", 25)
+    const response = await searchHerbsSimple("fever", 25)
 
-    expect(results).toEqual([
+    expect(response.results).toEqual([
       expect.objectContaining({
         id: "herb-1",
         englishName: "Guduchi",
@@ -33,6 +36,8 @@ describe("herb search API adapters", () => {
         matchPercentage: 87,
       }),
     ])
+    expect(response.matchedTerms[0].canonical).toBe("Jwara")
+    expect(response.unmatchedTokens).toEqual(["unknown"])
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "http://localhost:4000/api/search/simple",
       expect.objectContaining({
@@ -51,7 +56,7 @@ describe("herb search API adapters", () => {
     })
 
     const { searchHerbsSimple } = await import("./herbs.js")
-    const [result] = await searchHerbsSimple("fever")
+    const { results: [result] } = await searchHerbsSimple("fever")
 
     expect(result).toEqual(expect.objectContaining({
       englishName: "Haritaki",
@@ -67,7 +72,7 @@ describe("herb search API adapters", () => {
     })
 
     const { searchHerbsSimple } = await import("./herbs.js")
-    const results = await searchHerbsSimple("", 10, { rasa: ["tikta"] })
+    const { results } = await searchHerbsSimple("", 10, { rasa: ["tikta"] })
 
     expect(results[0].englishName).toBe("Guduchi")
     expect(globalThis.fetch).toHaveBeenCalledWith(

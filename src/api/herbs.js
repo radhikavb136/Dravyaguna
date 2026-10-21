@@ -281,13 +281,20 @@ export async function searchHerbsDetailed(filters, limit = 50) {
   return response.results.map(adaptHerb);
 }
 
-export async function searchHerbsSimple(query, limit = 50, filters = {}) {
+export async function searchHerbsSimple(query, limit = 50, filters = {}, options = {}) {
   const body = { ...(query?.trim() ? { query: query.trim() } : {}), limit };
+  if (options.lang) body.lang = options.lang;
   if (Object.values(filters).some((value) => Array.isArray(value) && value.length > 0)) {
     body.filters = filters;
   }
   const response = await apiClient.post('/api/search/simple', body);
-  return response.results.map(adaptHerb);
+  return {
+    results: response.results.map(adaptHerb),
+    matchedTerms: response.matched_terms || [],
+    unmatchedTokens: response.unmatched_tokens || [],
+    language: response.lang || response.meta?.language || 'en-IN',
+    note: response.note || '',
+  };
 }
 
 /**

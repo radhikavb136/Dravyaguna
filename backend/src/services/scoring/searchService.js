@@ -3,7 +3,11 @@ import { clinicianVisibleStatuses, canSeeDraftHerbs } from '../../utils/roles.js
 import { buildSearchQuery } from './buildSearchQuery.js';
 import { getScoringWeights } from './weightsCache.js';
 import { resolveSearchFilters } from './resolveFilters.js';
-import { mapQueryToFilterIds } from './simpleSearchMap.js';
+import {
+  detectSearchLanguage,
+  mapQueryToFilterIds,
+  normalizeSimpleQuery,
+} from './simpleSearchMap.js';
 
 function visibleStatusesForRole(role) {
   if (canSeeDraftHerbs(role)) {
@@ -37,8 +41,14 @@ export async function runDetailedSearch({ filters, role, limit, offset }) {
   };
 }
 
-export async function runSimpleSearch({ query, filters: requestedFilters = {}, role, limit, offset }) {
-  const mapped = await mapQueryToFilterIds(query);
+export async function runSimpleSearch({ query, lang, filters: requestedFilters = {}, role, limit, offset }) {
+  const normalizedQuery = normalizeSimpleQuery(query);
+  const detectedLanguage = detectSearchLanguage(normalizedQuery);
+  const language = lang || detectedLanguage;
+  const unsupportedLanguage = language !== 'en-IN';
+  const mapped = unsupportedLanguage
+    ? { karmaIds: [], indicationIds: [], matchedTerms: [], unmatchedTokens: normalizedQuery.split(/\s+/u).filter(Boolean) }
+    : await mapQueryToFilterIds(normalizedQuery);
   const filters = { ...requestedFilters };
 
   if (mapped.karmaIds.length) {
@@ -57,6 +67,27 @@ export async function runSimpleSearch({ query, filters: requestedFilters = {}, r
     filters.indication = [...new Set([...(filters.indication || []), ...rows.map((r) => r.canonical_en)])];
   }
 
+  const hasRequestedFilters = Object.values(filters).some(
+    (value) => Array.isArray(value) && value.length > 0
+  );
+  if (normalizedQuery && !mapped.karmaIds.length && !mapped.indicationIds.length && !hasRequestedFilters) {
+    return {
+      results: [],
+      meta: {
+        dbDurationMs: 0,
+        unresolved: {},
+        activeFilterGroups: 0,
+        query: normalizedQuery,
+        matched_terms: mapped.matchedTerms,
+        unmatched_tokens: mapped.unmatchedTokens,
+        language,
+        note: unsupportedLanguage
+          ? 'This search language is not supported yet. Search text is not interpreted until translation is available.'
+          : undefined,
+      },
+    };
+  }
+
   const searchResult = await runDetailedSearch({
     filters,
     role,
@@ -69,7 +100,12 @@ export async function runSimpleSearch({ query, filters: requestedFilters = {}, r
     meta: {
       ...searchResult.meta,
       query,
-      mappedTokens: mapped.mappedTokens,
+      matched_terms: mapped.matchedTerms,
+      unmatched_tokens: mapped.unmatchedTokens,
+      language,
+      note: unsupportedLanguage
+        ? 'This search language is not supported yet. Search text is not interpreted until translation is available.'
+        : undefined,
     },
   };
 }

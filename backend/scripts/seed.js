@@ -22,22 +22,6 @@ const DEFAULT_WEIGHTS = {
   indication: 15,
 };
 
-/** Seed synonym rows migrated from frontend simple-search mappings. */
-const SEARCH_SYNONYM_SEEDS = [
-  { token: 'fever', vocabulary: 'indication', slug: 'jwar' },
-  { token: 'feverish', vocabulary: 'indication', slug: 'jwar' },
-  { token: 'cough', vocabulary: 'karma', slug: 'kasahar' },
-  { token: 'digestion', vocabulary: 'karma', slug: 'deepana' },
-  { token: 'digestive', vocabulary: 'karma', slug: 'pachana' },
-  { token: 'weakness', vocabulary: 'karma', slug: 'balya' },
-  { token: 'skin', vocabulary: 'indication', slug: 'kushta' },
-  { token: 'itching', vocabulary: 'karma', slug: 'kandughna' },
-  { token: 'worms', vocabulary: 'indication', slug: 'krimirog' },
-  { token: 'inflammation', vocabulary: 'karma', slug: 'shothahara' },
-  { token: 'stress', vocabulary: 'karma', slug: 'medhya' },
-  { token: 'energy', vocabulary: 'karma', slug: 'balya' },
-];
-
 async function seedWeights(client) {
   for (const [parameterGroup, weight] of Object.entries(DEFAULT_WEIGHTS)) {
     await client.query(
@@ -45,17 +29,6 @@ async function seedWeights(client) {
        VALUES ($1, $2)
        ON CONFLICT (parameter_group) DO UPDATE SET weight = EXCLUDED.weight`,
       [parameterGroup, weight]
-    );
-  }
-}
-
-async function seedSynonyms(client) {
-  await client.query(`DELETE FROM search_synonym_seeds`);
-  for (const row of SEARCH_SYNONYM_SEEDS) {
-    await client.query(
-      `INSERT INTO search_synonym_seeds (query_token, maps_to_vocabulary, maps_to_term_slug)
-       VALUES ($1, $2, $3)`,
-      [row.token, row.vocabulary, row.slug]
     );
   }
 }
@@ -78,7 +51,6 @@ async function main() {
   try {
     await client.query('BEGIN');
     await seedWeights(client);
-    await seedSynonyms(client);
 
     const loadtestEmail = process.env.LOADTEST_EMAIL || 'loadtest@dravyaguna.local';
     const loadtestPassword = process.env.LOADTEST_PASSWORD || 'loadtest-password-change-me';

@@ -12,7 +12,7 @@ Updated 2026-10-21. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 ## Data and search issues
 
 - Indication vocabulary remains empty until the domain-approved `vocab_review.csv` mapping is applied. Condition search coverage is consequently limited.
-- Simple Search now applies the Phase B pg_trgm threshold (0.45). Search vocabulary coverage remains limited because the domain-approved `search_synonym_seeds` term set has not been provided/applied.
+- Simple Search uses canonical Karma/Indication terms and expert-entered `term_synonyms`; PostgreSQL fuzzy suggestions require similarity 0.45 plus an 80% relative cutoff and never persist links. Unknown phrases return zero and are logged asynchronously. `backend/data/search-synonyms-starter.csv` is draft-only and unloaded; expert-approved mappings are still needed for broader coverage.
 - Sanskrit names in the source can be incorrect; do not auto-correct them.
 - There is no approved Organ (Avayava) dataset; keep the filter disabled until one is supplied.
 - Search history is a browser-side convenience. Favorites and saved searches are account-backed.

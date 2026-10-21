@@ -306,6 +306,15 @@ Detailed search with scoring and filters.
 
 ## Vocabulary Endpoints
 
+### POST /api/search/simple
+Search text and optional clinical filters with the same weighted ranking as detailed search. English Latin-script matching is enabled. Hindi/Devanagari and other unsupported input is not translated yet and returns a `note`; supplied filters are still evaluated.
+
+**Request:** `{ "query": "fever", "lang": "en-IN", "filters": { "rasa": ["tikta"] }, "limit": 50, "offset": 0 }`. A query or at least one non-empty filter is required.
+
+**Response:** `{ "lang": "en-IN", "results": [], "matched_terms": [{ "term": "...", "canonical": "...", "vocabulary": "karma", "similarity": 1, "matchType": "approved_synonym" }], "unmatched_tokens": [], "meta": { "language": "en-IN", "matched_terms": [], "unmatched_tokens": [], "query": "..." } }`.
+
+Only existing canonical Karma/Indication vocabulary and `term_synonyms` rows with `approval_status: "approved"` are eligible. Existing synonym rows default to `draft` after migration 012. Exact approved synonyms are preferred; PostgreSQL trigram suggestions require similarity at least `0.45`, are filtered to at least 80% of the strongest candidate for that token, and remain request-only (no vocabulary/herb link is written). `backend/data/search-synonyms-starter.csv` is a draft for expert review and is not imported. Search analytics logging runs asynchronously.
+
 ### GET /api/vocabulary/filters
 Get all vocabulary terms for frontend filters.
 

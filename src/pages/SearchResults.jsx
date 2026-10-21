@@ -680,6 +680,7 @@ function SearchResults() {
     })
 
   const [apiResults, setApiResults] = useState(null)
+  const [simpleSearchMeta, setSimpleSearchMeta] = useState(null)
   const [apiLoading, setApiLoading] = useState(false)
   const [apiError, setApiError] = useState(null)
   const [preferenceError, setPreferenceError] = useState("")
@@ -706,6 +707,7 @@ function SearchResults() {
     if (USE_API && mode === "detailed" && parametersString) {
       setApiLoading(true)
       setApiError(null)
+      setSimpleSearchMeta(null)
 
       try {
         const selectedParameters = JSON.parse(decodeURIComponent(parametersString))
@@ -759,14 +761,16 @@ function SearchResults() {
       setApiLoading(true)
       setApiError(null)
       searchHerbsSimple(query, 200, simpleFilters)
-        .then(data => {
-          setApiResults(data || [])
+        .then(response => {
+          setApiResults(response.results || [])
+          setSimpleSearchMeta(response)
           setApiLoading(false)
         })
         .catch(error => {
           console.error('API search error:', error)
           setApiError(error.message)
           setApiResults([])
+          setSimpleSearchMeta(null)
           setApiLoading(false)
         })
       return
@@ -776,6 +780,7 @@ function SearchResults() {
       setApiResults(null)
     } else {
       setApiResults([])
+      setSimpleSearchMeta(null)
     }
   }, [mode, parametersString, query, simpleRasa, simpleVirya, simpleVipaka, simpleIndication])
 
@@ -1128,6 +1133,22 @@ useEffect(() => {
 
             {apiError && (
               <p role="alert">{apiError}</p>
+            )}
+
+            {USE_API && mode === "simple" && simpleSearchMeta && (
+              <section className="simple-search-feedback" role="status" aria-live="polite">
+                {simpleSearchMeta.note && <p>{simpleSearchMeta.note}</p>}
+                {simpleSearchMeta.matchedTerms.length > 0 && (
+                  <p>
+                    Matched terms: {simpleSearchMeta.matchedTerms.map((item) => item.canonical).join(", ")}
+                  </p>
+                )}
+                {simpleSearchMeta.unmatchedTokens.length > 0 && (
+                  <p>
+                    Unmatched words: {simpleSearchMeta.unmatchedTokens.join(", ")}
+                  </p>
+                )}
+              </section>
             )}
             {preferenceError && <p role="alert">{preferenceError}</p>}
             {savedSearchMessage && <p role={savedSearchMessage.startsWith("Unable") ? "alert" : "status"}>{savedSearchMessage}</p>}

@@ -31,6 +31,8 @@ async function cleanupTestRecords() {
       DELETE FROM indication_terms
       WHERE slug LIKE 'zz_test_%' OR canonical_en LIKE 'zz_test_%'
     `);
+    await client.query(`DELETE FROM term_synonyms WHERE text LIKE 'zz_test%' OR text LIKE 'zz test %'`);
+    await client.query(`DELETE FROM search_events WHERE query_text LIKE 'zz_test_%' OR query_text LIKE 'zzqqqxvzzunmapped%'`);
     await client.query(`
       DELETE FROM users
       WHERE email LIKE 'zz_test_%'
