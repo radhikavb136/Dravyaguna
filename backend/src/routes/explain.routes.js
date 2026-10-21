@@ -6,10 +6,13 @@ import { generateExplanation } from '../services/explain/explainService.js';
 import { filtersSchema } from './search.routes.js';
 
 const explainSchema = z.object({
-  herb_id: z.string().uuid(),
+  herb_id: z.string().uuid().optional(),
+  question: z.string().trim().min(1).max(500).optional(),
   filters: filtersSchema.optional().default({}),
   lang: z.enum(['en-IN', 'hi-IN', 'mr-IN', 'sa-IN']).optional().default('en-IN'),
-}).strict();
+}).strict().refine((body) => Boolean(body.herb_id || body.question), {
+  message: 'Provide a herb_id or a question',
+});
 
 const explanationLimiter = rateLimit({
   windowMs: 60_000,
@@ -27,6 +30,7 @@ explainRouter.post('/', explanationLimiter, requireRole('clinician', 'editor', '
     const body = explainSchema.parse(req.body);
     const result = await generateExplanation({
       herbId: body.herb_id,
+      question: body.question,
       filters: body.filters,
       lang: body.lang,
       role: req.user.role,

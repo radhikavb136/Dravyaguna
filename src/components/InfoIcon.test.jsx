@@ -42,13 +42,14 @@ describe('InfoIcon', () => {
     expect(await screen.findByText('Definition coming soon.')).toBeTruthy()
   })
 
-  it('labels mock explanations and closes the panel with Escape', async () => {
+  it('submits a question and labels development mock output without presenting it as AI', async () => {
     const { explainHerb } = await import('../api/explain')
     explainHerb.mockResolvedValue({
-      explanation: 'Retrieved data summary.',
-      ai_generated: true,
+      explanation: 'Development mock only.',
+      answer_status: 'mock',
+      ai_generated: false,
       provider: 'mock',
-      citations: [],
+      citations: [{ source: 'database:herb:TEST_REC_1', title: 'Stored test record' }],
       structured: { breakdown: [] },
     })
     const { default: InfoIcon } = await import('./InfoIcon')
@@ -56,9 +57,13 @@ describe('InfoIcon', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'More information about this herb' }))
     fireEvent.click(screen.getByRole('button', { name: 'View more' }))
+    fireEvent.change(screen.getByLabelText('Ask a question about this herb'), { target: { value: 'What rasa is recorded?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
 
-    expect(await screen.findByText('AI-generated (mock provider)')).toBeTruthy()
-    expect(screen.getByText('Retrieved data summary.')).toBeTruthy()
+    expect(await screen.findByText('Development mock — no AI answer was generated.')).toBeTruthy()
+    expect(explainHerb).toHaveBeenCalledWith({ herbId: 'herb-1', question: 'What rasa is recorded?', filters: {}, lang: 'en-IN' })
+    expect(screen.getByText('Development mock only.')).toBeTruthy()
+    expect(screen.getByText('database:herb:TEST_REC_1 · Stored test record')).toBeTruthy()
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
   })

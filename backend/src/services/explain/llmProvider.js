@@ -4,11 +4,9 @@ export const mockLlmProvider = {
   name: 'mock',
   model: 'mock',
   calls: 0,
-  async generate({ retrievedData }) {
+  async generate() {
     this.calls += 1;
-    const scored = retrievedData.scoring?.breakdown?.length || 0;
-    const percent = retrievedData.scoring?.matchPercentage;
-    return `Mock explanation based on the retrieved record: ${scored} scoring criteria were evaluated${percent == null ? '.' : ` with a ${percent}% match`}. This mock output adds no clinical claims.`;
+    return 'Development mock only. No AI answer was generated; review the retrieved source passages below.';
   },
   reset() {
     this.calls = 0;

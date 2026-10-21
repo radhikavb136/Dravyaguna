@@ -65,19 +65,28 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 
 ## Latest verification snapshot (2026-10-21)
 
-- Backend: `npm.cmd test` against isolated local DB/API → 22 passed, 0 failed, 22 total.
-- Frontend: `npm.cmd test -- --run` → 24 passed in 6 files; `npm.cmd run lint` → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded with 621.36 kB chunk warning.
+- Backend: `npm.cmd test` against isolated local DB/API at port 44587 → 23 passed, 0 failed, 23 total.
+- Frontend: `npm.cmd test -- --run` → 24 passed in 6 files; `npm.cmd run lint` → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded with 622.65 kB chunk warning.
 - API bundle scan: `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
 - Migrations: `npm.cmd run migrate` reported no pending migrations on isolated local PostgreSQL; `npm.cmd run check:rls` reported all public tables have RLS enabled.
 - Offline audits: frontend and backend `npm.cmd audit --offline` reported 0 vulnerabilities using cached audit data; this does not establish current online advisory status.
-- Browser click-through, staging Supabase, Docker builds, and live external providers were not verified in this snapshot.
+- Chromium local checks verified login/session restoration and role route boundaries for clinician, domain expert and admin, plus the RAG question/evidence panel using the explicitly labelled mock. Herb CRUD and broader workflows, staging Supabase, Docker builds, and live external providers remain unverified.
 
 ## Current status table
 
+### Latest continuation evidence (2026-10-21)
+
+- Backend `npm.cmd test` against the isolated local PostgreSQL database and a fresh API process at `http://127.0.0.1:44587`: `23 passed, 0 failed, 23 total`. The RAG test covers supported-file parsing, chunk bounds, duplicate-safe ingestion/re-indexing, keyword retrieval and metadata, clinician draft exclusion, citations, insufficient evidence, hostile passage handling, missing LLM credentials, and provider failure degradation.
+- Frontend `npm.cmd test -- --run`: `Test Files 6 passed (6); Tests 24 passed (24)`.
+- Chromium local click-through against API port 44586 and Vite port 5175: clinician login/session restore and admin denial; domain-expert login/session restore and user-management denial; admin user page; herb library/detail and question-based RAG evidence panel. Result: all checked workflows passed, 0 API HTTP errors and 0 uncaught browser errors. The default RAG provider was explicitly the development mock, not a live generated answer.
+- `npm.cmd run lint`: exit 0, 0 errors, 39 warnings. `npm.cmd run build` succeeded (622.65 kB JS chunk warning); `npm.cmd run verify:api-build`: `PASS API production bundle excludes 6 mock persistence keys.`
+- Local RAG ingestion: `npm.cmd run rag:ingest -- --herbs` indexed 182 stored non-archived herb records; repeat run reported 0 changed and 182 unchanged documents. No external reference documents were present or invented.
+- Browser testing initially hit a local CORS origin mismatch and the API's login rate limit after browser logins; the local server was restarted on isolated ports and the complete backend suite then passed. Production rate limits and database safety checks were not changed.
+
 | Phase | Feature | Status | Evidence / remaining work |
 |---|---|---|---|
-| A0 | Test foundation and local DB guard | VERIFIED | Latest backend `npm.cmd test` on isolated local DB/API: 22 passed, 0 failed, 22 total. Frontend `npm.cmd test -- --run`: 24 passed in 6 files. |
-| A | Authentication and role enforcement | VERIFIED | Backend auth/RBAC and frontend role-boundary automated suites passed in those commands. |
+| A0 | Test foundation and local DB guard | VERIFIED | Latest backend `npm.cmd test` on isolated local DB/API port 44587: 23 passed, 0 failed, 23 total. Frontend `npm.cmd test -- --run`: 24 passed in 6 files. |
+| A | Authentication and role enforcement | VERIFIED | Backend suite: `npm.cmd test` → 23 passed, 0 failed, 23 total; Chromium login/session restore and clinician/reviewer denied-route checks passed against the local API. |
 | A | Herb library, details, CRUD, verification, archive | WIRED-UNVERIFIED | API suite passes; end-to-end page and role workflows still need automated browser tests. |
 | A | Detailed search and scoring | WIRED-UNVERIFIED | API suite passes; detailed search UI workflow and search-after-weight-change UI remain unverified. |
 | A | Vocabulary management | WIRED-UNVERIFIED | API suite covers validation, merge/relink, and protected deletion; UI workflows need automated browser coverage. |
@@ -93,7 +102,9 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 | C1 | Herb descriptive translation, cache, verification, selector | WIRED-UNVERIFIED | Mock-backed API tests cover cache hits, provider-call counts, verification permissions/audit, and invalidation. Live providers require keys; browser interaction is unverified. |
 | C2 | Search-query translation and localized results | NOT STARTED | Not implemented. |
 | C3 | Frontend interface localization | NOT STARTED | Language preference/selector currently affects herb descriptive fields only; menus and other pages are not localized. |
-| D1/D2 | Grounded explain API, cache, and InfoIcon | WIRED-UNVERIFIED | Mock-backed service/API and InfoIcon unit tests pass; rate limiting, cache invalidation and structured failure response are tested. Browser interaction is not verified. Real OpenAI calls remain blocked pending `LLM_API_KEY` and `LLM_MODEL`. |
+| D1a | Knowledge ingestion and keyword retrieval | VERIFIED | Backend `npm.cmd test` → 23 passed, 0 failed, 23 total; tests cover parser/chunking, idempotent insert and re-index, retrieval metadata, role filtering, source citations, insufficient evidence, hostile passage separation, and credential-independent behavior. `npm.cmd run rag:ingest -- --herbs` indexed 182 stored records; repeat returned 182 unchanged. No external authoritative reference corpus or vector index was supplied. |
+| D1b | Live grounded LLM answer generation | BLOCKED | Mock is explicitly labelled `ai_generated: false`; the OpenAI adapter requires `LLM_API_KEY` and `LLM_MODEL`. Missing-credential and provider-failure behavior is tested; provide valid provider credentials/model to verify a real model response. |
+| D2 | RAG question and evidence UI | WIRED-UNVERIFIED | InfoIcon unit tests are included in the 24-test frontend suite. Chromium exercised question submission and source/evidence display with the labelled development mock; no real provider answer was exercised. |
 | E1 | Herb image upload | BLOCKED | Endpoint and Add/Edit UI validate JPEG/PNG/WebP by magic bytes and 2 MB cap; tests verify permissions and reject external writes in test mode. Live upload needs Supabase Storage credentials, bucket, and policy. |
 | E2 | Password reset | BLOCKED | API/UI and backend tests cover generic requests, hashed single-use tokens, 30-minute expiry, and password change. The email sender is a no-output stub; SMTP delivery is not implemented/configured, so users cannot receive reset links. |
 | F | RLS | VERIFIED | Local `npm run check:rls`: all public tables enabled; backend suite verifies no public policies. Supabase project review remains. |
@@ -105,13 +116,13 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 1. Obtain expert approval for any starter synonym mappings and add browser coverage for Simple Search feedback; the draft CSV is intentionally not imported.
 2. Provide Supabase Storage configuration before enabling image uploads and implement/configure SMTP delivery before enabling password resets.
 3. Implement C2 search-query translation and C3 interface localization; add XLSX export.
-4. Browser click-through remains for the owner; prior Chromium notes are manual evidence and do not make a feature VERIFIED.
+4. Owner staging click-through remains; local Chromium smoke is partial and does not verify herb mutations, scoring persistence, vocabulary merge, analytics, audit filters, saved-search persistence, or live external services.
 5. Deploy to staging only after a confirmed staging Supabase target, hosting accounts, and deployment secrets are supplied. Do not run migrations against the unverified Supabase URL.
 
 ## External launch dependencies
 
 Live translation and LLM generation, SMTP password reset/email verification, persistent image storage, billing, production hosting/secrets, and a deployment-time database/RLS policy review require external configuration and remain incomplete. Explain retrieval uses stored SQL records and scoring; no external vector service is currently required. Dockerfiles and context exclusions were updated, but the Docker image was not built because Docker is not installed in this environment.
 
-Additional launch inputs still required: Sarvam and LLM keys; optional Google/Azure translation credentials; SMTP credentials; Supabase Storage URL, service role key, bucket and read policy; confirmed staging and production Supabase projects; hosting accounts and domain; monitoring configuration. The Ayurveda expert must approve vocabulary mappings and definitions. The company must confirm dataset scope, Organ data, and reviewed-record policy. Explain retrieval uses stored SQL records and scoring; no external vector service is currently required. Dockerfiles and context exclusions are present, but Docker was unavailable. Browser click-through is pending with the owner.
+Additional launch inputs still required: Sarvam and LLM keys; optional Google/Azure translation credentials; SMTP credentials; Supabase Storage URL, service role key, bucket and read policy; confirmed staging and production Supabase projects; hosting accounts and domain; monitoring configuration. The Ayurveda expert must approve vocabulary mappings and definitions. The company must confirm dataset scope, Organ data, and reviewed-record policy. Explain retrieval uses stored SQL records and scoring; no external vector service is currently required. Dockerfiles and context exclusions are present, but Docker was unavailable. Full owner staging click-through is pending.
 
 Labels: `NOT STARTED`, `WIRED-UNVERIFIED`, `VERIFIED`, `BLOCKED`. VERIFIED refers only to the scope and environment stated above.

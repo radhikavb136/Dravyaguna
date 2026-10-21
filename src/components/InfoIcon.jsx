@@ -12,6 +12,7 @@ function InfoIcon({ termName, vocabulary, definition = '', definitionStatus = 'd
   const [error, setError] = useState('')
   const [termDefinitions, setTermDefinitions] = useState([])
   const [explanation, setExplanation] = useState(null)
+  const [question, setQuestion] = useState('')
   const [tooltipDefinition, setTooltipDefinition] = useState(definition)
   const [tooltipStatus, setTooltipStatus] = useState(definitionStatus)
   const [definitionLoaded, setDefinitionLoaded] = useState(Boolean(definition))
@@ -42,13 +43,26 @@ function InfoIcon({ termName, vocabulary, definition = '', definitionStatus = 'd
     if (!USE_API) return
     setLoading(true)
     try {
-      if (herbId) {
-        setExplanation(await explainHerb({ herbId, filters, lang }))
-      } else if (vocabulary && names.length) {
+      if (!herbId && vocabulary && names.length) {
         setTermDefinitions(await getTermDefinitions(vocabulary, names))
       }
     } catch (requestError) {
       setError(requestError.message || 'Unable to load information')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const submitQuestion = async (event) => {
+    event.preventDefault()
+    if (!herbId || !question.trim()) return
+    setError('')
+    setExplanation(null)
+    setLoading(true)
+    try {
+      setExplanation(await explainHerb({ herbId, question: question.trim(), filters, lang }))
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to retrieve supporting information')
     } finally {
       setLoading(false)
     }
@@ -92,6 +106,9 @@ function InfoIcon({ termName, vocabulary, definition = '', definitionStatus = 'd
 
             {herbId && explanation && (
               <>
+                {explanation.answer_status === 'mock' && (
+                  <p className="info-icon-generated-label">Development mock — no AI answer was generated.</p>
+                )}
                 {explanation.ai_generated ? (
                   <p className="info-icon-generated-label">
                     AI-generated{explanation.provider === 'mock' ? ' (mock provider)' : ''}
@@ -99,12 +116,24 @@ function InfoIcon({ termName, vocabulary, definition = '', definitionStatus = 'd
                 ) : null}
                 {explanation.explanation && <p>{explanation.explanation}</p>}
                 {explanation.explanation_unavailable && <p>{explanation.message}</p>}
+                <p>Educational information only; not a substitute for advice from a qualified medical professional.</p>
                 {explanation.citations?.length > 0 && (
                   <div>
-                    <strong>References</strong>
+                    <strong>Sources</strong>
                     <ul>{explanation.citations.map((citation, index) => (
                       <li key={`${citation.source}-${index}`}>
-                        {[citation.source, citation.chapter, citation.verse, citation.notes].filter(Boolean).join(' · ')}
+                        {[citation.source, citation.title, citation.page ? `p. ${citation.page}` : '', citation.section, citation.chapter, citation.verse, citation.notes].filter(Boolean).join(' · ')}
+                      </li>
+                    ))}</ul>
+                  </div>
+                )}
+                {explanation.evidence?.length > 0 && (
+                  <div>
+                    <strong>Retrieved passages</strong>
+                    <ul>{explanation.evidence.map((item, index) => (
+                      <li key={`${item.source.identifier}-${index}`}>
+                        <blockquote>{item.content}</blockquote>
+                        <small>{[item.source.identifier, item.source.page ? `p. ${item.source.page}` : '', item.source.section].filter(Boolean).join(' · ')}</small>
                       </li>
                     ))}</ul>
                   </div>
@@ -118,6 +147,21 @@ function InfoIcon({ termName, vocabulary, definition = '', definitionStatus = 'd
                   </div>
                 )}
               </>
+            )}
+
+            {herbId && (
+              <form onSubmit={submitQuestion}>
+                <label htmlFor={`${id}-question`}>Ask a question about this herb</label>
+                <input
+                  id={`${id}-question`}
+                  value={question}
+                  maxLength={500}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  placeholder="Ask about its recorded attributes"
+                  required
+                />
+                <button type="submit" disabled={loading || !question.trim()}>Ask</button>
+              </form>
             )}
 
             {!herbId && (termDefinitions.length > 0 ? termDefinitions.map((term) => (

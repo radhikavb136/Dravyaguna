@@ -27,13 +27,13 @@ export async function run() {
   const cleanupHashes = [filters, failedFilters, rateFilters, invalidationFilters].map(canonicalFiltersHash);
   let temporaryHerbId;
   const provider = {
-    name: 'test-mock',
+    name: 'mock',
     model: 'fixture',
     calls: 0,
     async generate({ system, retrievedData }) {
       this.calls += 1;
       assert(system.includes('Do not give dosages'), 'grounded prompt prohibits dosages');
-      assert(retrievedData.herb.id === fixture.id, 'provider receives only the retrieved herb');
+      assert(retrievedData.evidence.some((item) => item.herb_code), 'provider receives only retrieved evidence');
       assert(Array.isArray(retrievedData.scoring.breakdown), 'provider receives server-computed scoring');
       assert(!Object.hasOwn(retrievedData, 'prompt'), 'client prompt is not included in retrieved JSON');
       return 'Grounded test explanation.';
@@ -42,7 +42,8 @@ export async function run() {
 
   try {
     const first = await generateExplanation({ herbId: fixture.id, filters, lang: 'en-IN', role: 'clinician' }, { provider });
-    assertEqual(first.ai_generated, true, 'mock provider returns generated response');
+    assertEqual(first.ai_generated, false, 'mock provider is never represented as a real AI response');
+    assertEqual(first.answer_status, 'mock', 'mock provider output is labelled as a development mock');
     assertEqual(first.cache_hit, false, 'first explanation misses cache');
     assert(first.structured.breakdown.length > 0, 'structured breakdown remains available');
     const second = await generateExplanation({ herbId: fixture.id, filters, lang: 'en-IN', role: 'clinician' }, { provider });

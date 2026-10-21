@@ -22,7 +22,8 @@
     "weights:reset": "node scripts/resetScoringWeights.js",
     "dev-users:passwords": "node scripts/setDevUserPasswords.js",
     "loadtest:search": "node scripts/loadTestSearch.js",
-    "explain:search": "node scripts/explainSearch.js"
+    "explain:search": "node scripts/explainSearch.js",
+    "rag:ingest": "node scripts/ingestKnowledge.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
