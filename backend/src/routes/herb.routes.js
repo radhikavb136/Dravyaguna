@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
+import { translateHerbFields } from '../services/translations/translationService.js';
 import {
   listHerbs,
   getHerbById,
@@ -11,6 +13,7 @@ import {
 } from '../services/herbs/herbService.js';
 
 export const herbRouter = Router();
+const translationLimit = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => req.user.id });
 
 // Validation schemas
 const herbQuerySchema = z.object({
@@ -80,6 +83,7 @@ const herbCreateSchema = z.object({
 const herbUpdateSchema = herbCreateSchema.partial().extend({
   status: z.enum(['draft', 'reviewed', 'verified', 'archived']).optional(),
 });
+const applyTranslationLimit = (req, res, next) => req.query.lang ? translationLimit(req, res, next) : next();
 
 // GET /api/herbs - paginated list with status filter
 herbRouter.get('/', authenticate, async (req, res, next) => {
@@ -108,18 +112,33 @@ herbRouter.get('/', authenticate, async (req, res, next) => {
 });
 
 // GET /api/herbs/:id - full profile
-herbRouter.get('/:id', authenticate, async (req, res, next) => {
+herbRouter.get('/:id', authenticate, applyTranslationLimit, async (req, res, next) => {
   try {
     const { id } = req.params;
     const user = req.user;
+    const language = req.query.lang == null ? null : z.enum(['en-IN', 'hi-IN', 'mr-IN', 'sa-IN']).parse(req.query.lang);
     const herb = await getHerbById(id, user.role);
     if (!herb) {
       return res.status(404).json({ error: 'Herb not found' });
     }
-    res.json(herb);
+    if (language && language !== herb.original_language) {
+      const translations = await translateHerbFields(herb, language);
+      return res.json({ ...herb, translations, language });
+    }
+    res.json({ ...herb, translations: {}, language: language || herb.original_language });
   } catch (err) {
     next(err);
   }
+});
+
+herbRouter.get('/:id/translation', authenticate, translationLimit, async (req, res, next) => {
+  try {
+    const language = z.enum(['en-IN', 'hi-IN', 'mr-IN', 'sa-IN']).parse(req.query.lang);
+    const herb = await getHerbById(req.params.id, req.user.role);
+    if (!herb) return res.status(404).json({ error: 'Herb not found' });
+    const translations = await translateHerbFields(herb, language);
+    res.json({ language, translations });
+  } catch (error) { next(error); }
 });
 
 // POST /api/herbs - create herb (editor+)

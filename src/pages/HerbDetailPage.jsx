@@ -104,6 +104,7 @@ function HerbDetailPage() {
   const [apiLoading, setApiLoading] = useState(false)
   const [apiError, setApiError] = useState(null)
   const [favoriteBusy, setFavoriteBusy] = useState(false)
+  const [language, setLanguage] = useState(() => localStorage.getItem('dravyaguna-language') || 'en-IN')
 
 
   /* =========================================
@@ -115,7 +116,7 @@ function HerbDetailPage() {
       setApiLoading(true)
       setApiError(null)
       
-      getHerbById(id)
+      getHerbById(id, language)
         .then(herb => {
           setApiHerb(herb)
           setApiLoading(false)
@@ -126,7 +127,7 @@ function HerbDetailPage() {
           setApiLoading(false)
         })
     }
-  }, [id])
+  }, [id, language])
 
 
   /* =========================================
@@ -390,6 +391,18 @@ function HerbDetailPage() {
             <section className="herb-detail-header">
 
               <div className="herb-detail-heading">
+                <label>
+                  Language{' '}
+                  <select value={language} onChange={(event) => {
+                    localStorage.setItem('dravyaguna-language', event.target.value)
+                    setLanguage(event.target.value)
+                  }} aria-label="Herb content language">
+                    <option value="en-IN">English</option>
+                    <option value="hi-IN">Hindi</option>
+                    <option value="mr-IN">Marathi</option>
+                    <option value="sa-IN">Sanskrit</option>
+                  </select>
+                </label>
 
                 <div className="herb-detail-icon-wrapper">
                   <LeafIcon />
@@ -461,8 +474,9 @@ function HerbDetailPage() {
 
                 <DetailField
                   label="PART USED"
-                  value={herb.partUsed}
+                  value={herb.translations?.part_used?.text || herb.partUsed}
                 />
+                {herb.translations?.part_used?.status === 'machine_translated' && <small>Machine-translated</small>}
 
 
                 <DetailField
@@ -477,6 +491,13 @@ function HerbDetailPage() {
                 />
 
               </div>
+              {herb.description && (
+                <p>
+                  {herb.translations?.description?.text || herb.description}
+                  {herb.translations?.description?.status === 'machine_translated' && <small> Machine-translated</small>}
+                  {herb.translations?.description?.translation_unavailable && <small> Translation unavailable; showing original.</small>}
+                </p>
+              )}
 
               <button
                 className={`herb-favorite-button${isFavorite ? " favorite-active" : ""}`}
@@ -778,8 +799,9 @@ function HerbDetailPage() {
               <div className="major-disease-card">
 
                 <p>
-                  {herb.prabhava || "—"}
+                  {herb.translations?.prabhava?.text || herb.prabhava || "—"}
                 </p>
+                {herb.translations?.prabhava?.status === 'machine_translated' && <small>Machine-translated</small>}
 
               </div>
 

@@ -691,3 +691,9 @@ Remove a saved search.
 - Soft delete sets status to `archived` (herb remains in database)
 - Dosha effect values: `pacifies`, `increases` (frontend displays "pacifies/increases")
 - Mala effect values: `increases`, `decreases` (frontend displays "increases/decreases")
+
+## Translations
+
+`GET /api/herbs/:id?lang=hi-IN|mr-IN|sa-IN` returns the original herb record plus a `translations` map for `description`, `prabhava`, and `part_used`. Sanskrit and botanical names and classical vocabulary labels remain the stored originals. Each translated value includes `text`, `status`, and `provider`; a provider failure returns the original text with `translation_unavailable: true`. This endpoint is limited to 30 requests per authenticated user per minute when `lang` is provided.
+
+Translations are stored in `translation_cache`; editing a herb clears its cached translations. Sarvam is tried first, then configured Google and Azure providers. With no provider keys, the mock provider returns explicitly marked mock text. Mock output is for integration testing only, not clinical use. `POST /api/translations/verify` accepts `{ content_type, content_id, field_name, language }` and is restricted to admins and domain experts; verification is audited.

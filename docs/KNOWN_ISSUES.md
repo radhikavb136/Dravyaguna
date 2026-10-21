@@ -24,7 +24,7 @@ Updated 2026-10-21. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 - Herb profile photo selection is preview-only; persistent upload needs configured Supabase Storage and access controls.
 - Explain/RAG runs through the mock provider by default and has an OpenAI Responses adapter; live generation remains unverified and requires `LLM_API_KEY` plus `LLM_MODEL`.
 - Two-factor setup, session listing/revocation, account export, and audit rollback are unavailable; the unsupported controls are disabled or marked unavailable in the UI.
-- Translation needs a provider, approved translations, and verification workflow. The language setting currently records a preference; it does not translate the full interface.
+- Herb detail can request and cache descriptive field translations through Sarvam, Google, Azure, or the mock provider, and admins/domain experts can verify cached output. Live providers remain unverified without keys; mock text is not clinical content. Search-query translation, full interface localization, and vocabulary definition translations are not implemented. User language preference and the herb-detail selector are present but do not translate unrelated pages.
 - Explain retrieval currently uses stored herb records, recalculated scoring and stored herb references; there is no external vector index. Clinical explanations still depend on the quality and completeness of the source records, and live text generation needs the configured provider credentials.
 - Billing/payment is not connected to a payment provider.
 - Production hosting, secrets, monitoring, backup/restore, and database policy deployment have not been verified. Review RLS/policies and service-role access before production.

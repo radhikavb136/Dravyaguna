@@ -36,7 +36,7 @@ function AdminLanguagePage() {
     setError("")
     setSaveMessage("")
     try {
-      await updateAccountPreferences({ language: ({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN" })[selectedLanguage] })
+      await updateAccountPreferences({ language: ({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN", Sanskrit: "sa-IN" })[selectedLanguage] })
       setSaveMessage("Language preference saved successfully.")
     } catch (err) {
       setError(err.message || "Unable to save language preference")
@@ -62,6 +62,11 @@ function AdminLanguagePage() {
       name: "Marathi",
       nativeName: "मराठी",
       description: "Use Marathi across the admin workspace."
+    },
+    {
+      name: "Sanskrit",
+      nativeName: "Sanskrit",
+      description: "Use Sanskrit where translated content is available."
     }
   ]
 

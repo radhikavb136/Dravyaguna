@@ -36,4 +36,8 @@ export const env = {
   llmProvider: process.env.LLM_PROVIDER || 'mock',
   llmApiKey: process.env.LLM_API_KEY || '',
   llmModel: process.env.LLM_MODEL || '',
+  sarvamApiKey: process.env.SARVAM_API_KEY || '',
+  googleTranslateApiKey: process.env.GOOGLE_TRANSLATE_API_KEY || '',
+  azureTranslatorKey: process.env.AZURE_TRANSLATOR_KEY || '',
+  azureTranslatorRegion: process.env.AZURE_TRANSLATOR_REGION || '',
 };

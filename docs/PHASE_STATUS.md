@@ -14,6 +14,8 @@ Updated 2026-10-21. This is the living status file. `PHASE_0_STATUS.md` and `PHA
 - D backend `npm.cmd test` against the isolated local DB and fresh API → `17 passed, 0 failed, 17 total`; covers mock cache hit, provider failure degradation, reference/scoring payload, herb-edit cache invalidation, auth/validation, and the 10-per-user/minute limit.
 - D frontend `npm.cmd test -- --run` → `Test Files 6 passed (6); Tests 24 passed (24)`; ESLint → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded (616.90 kB JS chunk warning) and `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
 - Backend `npm.cmd run migrate` applied additive migration `013_vocabulary_definition_status`; all vocabulary definition statuses default to `draft` on the isolated DB.
+- Translation backend `npm.cmd run migrate` applied additive migration `014_translation_cache_provider` against the isolated DB. Backend `npm.cmd test` against the isolated DB and fresh API at port 45731 → `18 passed, 0 failed, 18 total`; includes three-field mock caching, zero provider calls on repeated reads, API translation output, clinician verification denial, domain-expert verification audit persistence, and edit invalidation.
+- Translation frontend `npm.cmd test -- --run` → `Test Files 6 passed (6); Tests 24 passed (24)`; ESLint → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded (618.32 kB JS chunk warning); `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
 - Frontend adapter tests: `npm.cmd test -- --run` → `Test Files 5 passed (5); Tests 21 passed (21)`; `npm.cmd run lint` → exit 0, 0 errors, 39 warnings; production build and API-build mock scan passed.
 - Backend `npm.cmd run migrate` applied `011_enable_rls_public_tables`; `npm.cmd run check:rls` → `All public tables have row-level security enabled.`
 - Migration 005 is already applied and historically recreated `herb_mala`; it must not be rerun. All new schema changes are additive/ALTER-only.
@@ -73,7 +75,7 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 | B2 | Expert-approved vocabulary import/relink | BLOCKED | Requires the Ayurveda expert's approved mapping file. |
 | B3 | Database export | NOT STARTED | Admin CSV/XLSX export endpoint and script are absent. |
 | B4 | Query/performance work | NOT STARTED | Ranking/breakdown query optimization and before/after measurements remain. |
-| C | Translation providers, cache, verification, UI | NOT STARTED | Mock provider workflow is not implemented; live providers require keys. |
+| C | Herb descriptive translation, cache, verification, selector | WIRED-UNVERIFIED | Backend mock/cache/verification API tests pass; detail selector calls `GET /api/herbs/:id?lang=...` and labels machine output. Browser interaction is not verified. Live Sarvam/Google/Azure requests are blocked until keys are supplied; search-query translation and full UI localization remain unimplemented. |
 | D1/D2 | Grounded explain API, cache, and InfoIcon | WIRED-UNVERIFIED | Mock-backed service/API and InfoIcon unit tests pass; rate limiting, cache invalidation and structured failure response are tested. Browser interaction is not verified. Real OpenAI calls remain blocked pending `LLM_API_KEY` and `LLM_MODEL`. |
 | E | Image upload and password reset | NOT STARTED | Upload and reset flows are not implemented. |
 | F | RLS | VERIFIED | Local `npm run check:rls`: all public tables enabled; backend suite verifies no public policies. Supabase project review remains. |
@@ -83,7 +85,7 @@ The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is a
 ## Remaining critical work
 
 1. Obtain expert approval for any starter synonym mappings and add browser coverage for Simple Search feedback; the draft CSV is intentionally not imported.
-2. Implement mock-backed C translation and E upload/reset workflows with the requested focused automated tests; live LLM calls need an owner-supplied key/model.
+2. Run the frontend suite/build after C integration, then implement E upload/reset workflows; live LLM and translation calls need owner-supplied keys.
 3. Add export, search performance, and expert-approved mapping work for B2-B4; B2 remains blocked pending approved source data.
 4. Add automated browser coverage where the environment supports it. `agent-browser` is not installed; do not label manual browser claims VERIFIED.
 5. Deploy to staging and verify only after a staging Supabase target, hosting accounts, and secrets are supplied. Do not run migrations against the unverified Supabase URL.

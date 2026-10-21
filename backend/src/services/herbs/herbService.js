@@ -270,6 +270,7 @@ export async function updateHerb(id, data, user) {
     }
 
     await client.query('DELETE FROM rag_explanation_cache WHERE herb_id = $1', [id]);
+    await client.query("DELETE FROM translation_cache WHERE content_type = 'herb' AND content_id = $1", [String(id)]);
 
     await client.query('COMMIT');
 

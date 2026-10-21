@@ -19,6 +19,8 @@ function adaptHerb(backendHerb) {
     family: backendHerb.family,
     partUsed: backendHerb.part_used ?? backendHerb.partUsed,
     description: backendHerb.description,
+    translations: backendHerb.translations || {},
+    language: backendHerb.language || 'en-IN',
     identificationNotes: backendHerb.identification_notes ?? backendHerb.identificationNotes,
     classicalReferences: backendHerb.references ?? backendHerb.classical_references ?? [],
     prabhava: backendHerb.prabhava,
@@ -300,7 +302,8 @@ export async function searchHerbsSimple(query, limit = 50, filters = {}, options
 /**
  * Get herb by ID (alias for getHerb with simpler signature)
  */
-export async function getHerbById(id) {
-  const response = await apiClient.get(`/api/herbs/${id}`);
+export async function getHerbById(id, language = localStorage.getItem('dravyaguna-language') || 'en-IN') {
+  const lang = language;
+  const response = await apiClient.get(`/api/herbs/${id}?lang=${encodeURIComponent(lang)}`);
   return adaptHerb(response);
 }
