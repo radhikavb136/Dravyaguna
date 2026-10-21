@@ -3,12 +3,14 @@ import { useSearchParams, useNavigate } from "react-router-dom"
 import { getAccount } from "../api/account"
 import { getFilterOptions } from "../api/vocabulary"
 import { USE_API } from "../api/client"
+import { useUiText } from "../i18n/useUiText"
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
 import DetailedSearch from "../components/DetailedSearch"
 import "../styles/SearchPage.css"
 
 function SearchPage() {
+  const t = useUiText()
 
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -173,12 +175,11 @@ function SearchPage() {
 
                 <>
                   <h1>
-                    Search by Ayurvedic parameters
+                    {t("searchByParameters")}
                   </h1>
 
                   <p className="search-page-description">
-                    Select classical Ayurvedic attributes to find herbs
-                    that match multiple clinical criteria.
+                    {t("detailedDescription")}
                   </p>
                 </>
 
@@ -186,12 +187,11 @@ function SearchPage() {
 
                 <>
                   <h1>
-                    Describe the patient's concern
+                    {t("patientConcern")}
                   </h1>
 
                   <p className="search-page-description">
-                    Use everyday language and add Ayurvedic clinical
-                    factors to refine the results.
+                    {t("simpleDescription")}
                   </p>
                 </>
 
@@ -214,7 +214,7 @@ function SearchPage() {
                 onClick={() => handleModeChange("simple")}
               >
                 <span>✦</span>
-                Simple search
+                {t("simpleSearch")}
               </button>
 
 
@@ -226,7 +226,7 @@ function SearchPage() {
                 onClick={() => handleModeChange("detailed")}
               >
                 <span>☷</span>
-                Detailed search
+                {t("detailedSearch")}
               </button>
 
             </div>
@@ -257,12 +257,11 @@ function SearchPage() {
                   <div>
 
                     <h2>
-                      Tell us what you're seeing
+                      {t("tellUs")}
                     </h2>
 
                     <p>
-                      Symptoms, patterns, timing, and triggers all help
-                      refine the match.
+                      {t("simpleDescription")}
                     </p>
 
                   </div>
@@ -303,7 +302,7 @@ function SearchPage() {
                     }
                     onClick={handleSimpleSearch}
                   >
-                    Search
+                    {t("searchButton")}
                     <span>⌕</span>
                   </button>
 
@@ -321,7 +320,7 @@ function SearchPage() {
                       </span>
 
                       <h3>
-                        Refine the search
+                        {t("refineSearch")}
                       </h3>
 
                     </div>

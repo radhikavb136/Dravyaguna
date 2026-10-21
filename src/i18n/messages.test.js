@@ -8,6 +8,8 @@ describe("interface language", () => {
     expect(uiMessages[language].home).toBeTruthy()
     expect(uiMessages[language].search).toBeTruthy()
     expect(uiMessages[language].logout).toBeTruthy()
+    expect(uiMessages[language].patientConcern).toBeTruthy()
+    expect(uiMessages[language].simpleSearch).toBeTruthy()
   })
 
   it("persists a supported language and notifies mounted navigation", () => {
