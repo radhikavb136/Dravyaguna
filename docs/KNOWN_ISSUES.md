@@ -1,6 +1,13 @@
 # Known issues and release dependencies
 
-Updated 2026-10-21. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scope and test results.
+Updated 2026-10-22. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scope and test results.
+
+## Local API unreachable / development ports
+
+- Reproduced in the current environment: no API was listening on port 4000 (localhost timed out; 127.0.0.1 was refused), and no process owned ports 4000, 5173, or 5180. Thus the specific claim that an unrelated project currently owned 5173 could not be confirmed or mapped to a PID. The observed root cause of the API alert was that this checkout's backend was not running.
+- The backend now uses an exact comma-separated `FRONTEND_ORIGIN` allow-list, development defaults include ports 5173/5180 on localhost and 127.0.0.1, and production rejects empty or wildcard lists. API startup binds dual-stack in development and reports `EADDRINUSE` with its port.
+- Start the backend with `npm.cmd start` from `backend/`; start this frontend at 5180 with `npm.cmd run dev:local` from the repository root. The latter uses Vite `--strictPort`. Check API/CORS/process state with `npm.cmd run check:local`. Details and troubleshooting commands are in [`MANUAL_CHECKLIST.md`](./MANUAL_CHECKLIST.md).
+- Running frontend `localhost:5180` uses `VITE_API_BASE_URL=http://localhost:4000` in the checked-in example and the build command tested here. Environment values of a previously claimed running frontend/backend could not be inspected because neither process existed at initial reproduction. No unrelated processes were stopped.
 
 ## Database test safety
 

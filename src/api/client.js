@@ -7,6 +7,33 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
 );
 const USE_API = import.meta.env.VITE_USE_API === 'true';
 
+export function formatApiNetworkError(baseURL, error, pageOrigin = globalThis.location?.origin || '') {
+  let safeBaseURL = String(baseURL || '');
+  try {
+    const parsed = new URL(safeBaseURL, pageOrigin || 'http://localhost');
+    safeBaseURL = `${parsed.protocol}//${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname.replace(/\/$/, '')}`;
+  } catch {
+    safeBaseURL = '(invalid API base URL)';
+  }
+
+  const apiOrigin = (() => {
+    try { return new URL(baseURL, pageOrigin || 'http://localhost').origin; } catch { return ''; }
+  })();
+  const crossOrigin = Boolean(pageOrigin && apiOrigin && apiOrigin !== pageOrigin);
+  const originalMessage = String(error?.message || '');
+  const detail = /failed to fetch/i.test(originalMessage)
+    ? 'Failed to fetch'
+    : /networkerror/i.test(originalMessage)
+      ? 'NetworkError'
+      : /load failed/i.test(originalMessage)
+        ? 'Load failed'
+        : 'network error';
+  const hint = crossOrigin
+    ? `This may be a network failure or a CORS block for ${pageOrigin}; confirm that origin is in FRONTEND_ORIGIN.`
+    : 'Check that the backend is running and reachable.';
+  return `API unreachable: No response from ${safeBaseURL} (${detail}). ${hint}`;
+}
+
 class ApiClient {
   constructor() {
     this.baseURL = API_BASE_URL;
@@ -53,8 +80,7 @@ class ApiClient {
         headers,
       });
     } catch (error) {
-      console.error('API client network error:', error);
-      throw new Error(`API unreachable: ${error.message}. Backend at ${this.baseURL} may not be running.`);
+      throw new Error(formatApiNetworkError(this.baseURL, error));
     }
 
     if (!response.ok) {

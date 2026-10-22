@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "vite --host localhost --port 5180 --strictPort",
+    "check:local": "node backend/scripts/checkLocal.js",
     "build": "vite build",
     "verify:api-build": "node scripts/verifyApiBuild.js",
     "lint": "eslint src",

@@ -4,30 +4,39 @@ No browser click-through is claimed as verified here. Each row describes the man
 
 ## Start the application
 
-Use a verified **local development/test PostgreSQL database only** for local review. Do not copy a Supabase production connection into these commands. The current isolated local database used by automated tests is at port `54334`; it must already be running and migrated. Port `54333` is a stale cluster and must not be used. Set values in the process environment rather than storing them in this document.
+Use the verified **local development/test PostgreSQL database only**. Do not copy a Supabase production connection into these commands. The current isolated local database is at port `54334`; it must already be running and migrated. Port `54333` is a stale cluster. These commands configure development CORS for the four local origins and use `localhost` consistently. Stale servers from other projects may occupy ports `4000` or `5173`; do not stop a process until its PID and owner are identified.
 
-**Backend terminal (PowerShell, from the repository root):**
+**Terminal 1 — backend (PowerShell):**
 
 ```powershell
 Set-Location 'C:\Users\Radhika V Bhosale\Downloads\Dravyaguna (2)\Dravyaguna\Dravyaguna\backend'
 $env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:54334/dravyaguna'
-$env:JWT_SECRET = 'local-only-development-secret-change-before-deploy'
-$env:FRONTEND_ORIGIN = 'http://localhost:5173'
+$env:JWT_SECRET = [guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')
+$env:FRONTEND_ORIGIN = 'http://localhost:5173,http://localhost:5180,http://127.0.0.1:5173,http://127.0.0.1:5180'
 $env:PORT = '4000'
 $env:NODE_ENV = 'development'
 npm.cmd start
 ```
 
-**Frontend terminal (PowerShell, from the repository root):**
+Confirm `http://localhost:4000/api/health` returns HTTP 200 with `{ "status": "ok", "database": "ok" }`.
+
+**Terminal 2 — frontend (PowerShell, from the repository root):**
 
 ```powershell
 Set-Location 'C:\Users\Radhika V Bhosale\Downloads\Dravyaguna (2)\Dravyaguna\Dravyaguna'
 $env:VITE_USE_API = 'true'
 $env:VITE_API_BASE_URL = 'http://localhost:4000'
-npm.cmd run dev -- --host 127.0.0.1
+npm.cmd run dev:local
 ```
 
-Open `http://localhost:5173`; verify backend readiness at `http://localhost:4000/api/health`. These commands assume the existing local PostgreSQL service at port `54334` is already running. Staging needs separately configured host environment variables and must not use these local values.
+Open `http://localhost:5180`. `dev:local` uses Vite `--strictPort`, so it exits with an error if 5180 is occupied rather than silently selecting another port. Backend `PORT` defaults to 4000 and reports an explicit port-in-use error.
+
+| Symptom | Check | Action |
+|---|---|---|
+| Port in use | Run `netstat -ano -p tcp` and find the `LISTENING` row for 4000, 5173, or 5180; map its PID with `Get-Process -Id <PID>`. | If it belongs to this project, stop/restart that server. If it belongs to another project, leave it running and ask its owner; do not kill it. |
+| CORS error | Check the browser origin exactly, including scheme, host, and port; compare it with the backend's `FRONTEND_ORIGIN`. | Restart the backend with the exact origin in the comma-separated allow-list. Do not use `*`. |
+| API unreachable | Request both `http://localhost:4000/api/health` and `http://127.0.0.1:4000/api/health`; run `npm.cmd run check:local`. | Start/restart the backend with the local database URL and verify `VITE_API_BASE_URL` is `http://localhost:4000`. |
+| Blank page | Inspect the Vite terminal and browser console for the first error; open `http://localhost:5180/` rather than a stale port. | Restart with `npm.cmd run dev:local`; fix a reported compile/runtime error before retrying. |
 
 ## Account and role setup
 

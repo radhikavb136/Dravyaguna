@@ -1,6 +1,18 @@
 # Dravyaguna release status
 
-Updated 2026-10-21. This is the living status file. `PHASE_0_STATUS.md` and `PHASE_1_STATUS.md` are historical.
+Updated 2026-10-22. This is the living status file. `PHASE_0_STATUS.md` and `PHASE_1_STATUS.md` are historical.
+
+## Local startup, CORS, and port diagnosis (2026-10-22)
+
+**Status: VERIFIED** for the API origin policy, IPv4/IPv6 loopback access, occupied-port startup message, strict Vite port, and local health checker. The owner still needs to perform their browser login/Herb Library check; no browser workflow is claimed here.
+
+- Reproduction before starting this checkout: `GET http://localhost:4000/api/health` timed out and `GET http://127.0.0.1:4000/api/health` was refused. `netstat -ano` showed no listeners on 4000, 5173, or 5180 and no Node server process was present. Therefore the reported running backend/frontend settings could not be inspected. A fresh local API started with `PORT=4000` and the four documented development origins; frontend build/start settings were explicitly `VITE_USE_API=true` and `VITE_API_BASE_URL=http://localhost:4000`.
+- Backend CORS accepts a trimmed comma-separated exact-origin allow-list, allows credentials plus Authorization/Content-Type and API methods, and uses the documented four-origin development default. Production refuses empty or wildcard origin configuration. Development binds dual-stack on `::` (`ipv6Only:false`).
+- Evidence: local API `GET` health on both `localhost` and `127.0.0.1` returned HTTP 200 and `{"status":"ok","database":"ok"}`. GET `/api/health` from `localhost:5180` and `localhost:5173` returned ACAO matching the request origin; the random origin returned no ACAO. OPTIONS POST preflights for both allowed origins returned 204 with Authorization, Content-Type, and GET/HEAD/POST/PUT/PATCH/DELETE/OPTIONS; the random origin received no CORS allow headers.
+- `backend`: `NODE_ENV=test; DATABASE_URL=<isolated local PostgreSQL 127.0.0.1:54334>; API_BASE_URL=http://localhost:4000; npm.cmd test` -> `29 passed, 0 failed, 29 total`. This includes comma-list parsing, all four default origins, disallowed origin, POST preflight, production empty/wildcard rejection, and occupied-port startup.
+- Frontend `npm.cmd test -- --run` -> `Test Files 10 passed (10); Tests 36 passed (36)`. `npm.cmd run lint` -> exit 0, 0 errors, 39 warnings. Production `npm.cmd run build` with API mode and `VITE_API_BASE_URL=http://localhost:4000` -> succeeded; `npm.cmd run verify:api-build` -> `PASS API production bundle excludes 6 mock persistence keys.`
+- `npm.cmd run check:local` -> `Backend health: localhost=OK, 127.0.0.1=OK`; all four CORS dev origins `PASS`; port owners `4000: PID 11124 (node); 5173: none; 5180: none` after stopping only the Vite server started for this check. While Vite was running IPv6-only on `[::1]:5180`, the updated checker identified `5180: PID 6700 (node)`. `npm.cmd run dev:local` served on 5180; a second invocation exited 1 with `Error: Port 5180 is already in use`.
+- The user-reported old unrelated listener on 5173 was not present in the initial snapshot, so its PID/process name cannot be identified from this run. No unrelated process was stopped. Backend port 4000 is now free after stopping the local API; local PostgreSQL remains on 54334.
 
 ## Re-verification evidence (2026-10-21)
 

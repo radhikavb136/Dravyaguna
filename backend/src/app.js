@@ -32,8 +32,12 @@ export function createApp() {
   app.use(helmet());
   app.use(
     cors({
-      origin: Array.isArray(env.frontendOrigin) ? env.frontendOrigin : [env.frontendOrigin],
+      origin: (origin, callback) => {
+        callback(null, !origin || env.frontendOrigin.includes(origin));
+      },
       credentials: true,
+      methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Authorization', 'Content-Type'],
     })
   );
   app.use(express.json({ limit: '1mb' }));

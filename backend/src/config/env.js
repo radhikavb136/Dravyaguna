@@ -10,26 +10,43 @@ for (const key of required) {
   }
 }
 
-function parseFrontendOrigin(value) {
-  if (!value) {
-    return ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:20322'];
-  }
-  if (Array.isArray(value)) {
-    return value;
-  }
+export const defaultFrontendOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5180',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5180',
+];
+
+export function parseFrontendOrigin(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  if (value === undefined || value === null) return [...defaultFrontendOrigins];
   return String(value)
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
+const nodeEnv = process.env.NODE_ENV || 'development';
+const rawFrontendOrigin = process.env.FRONTEND_ORIGIN;
+const frontendOrigin = rawFrontendOrigin?.trim()
+  ? parseFrontendOrigin(rawFrontendOrigin)
+  : nodeEnv === 'production' ? [] : [...defaultFrontendOrigins];
+if (nodeEnv === 'production') {
+  if (!process.env.FRONTEND_ORIGIN?.trim() || frontendOrigin.length === 0) {
+    throw new Error('FRONTEND_ORIGIN must contain at least one origin in production.');
+  }
+  if (frontendOrigin.some((origin) => origin.includes('*'))) {
+    throw new Error('FRONTEND_ORIGIN must not contain wildcard origins in production.');
+  }
+}
+
 export const env = {
   port: Number(process.env.PORT || 4000),
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
   databaseUrl: process.env.DATABASE_URL,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
-  frontendOrigin: parseFrontendOrigin(process.env.FRONTEND_ORIGIN),
+  frontendOrigin,
   importDefaultStatus: process.env.IMPORT_DEFAULT_STATUS || 'reviewed',
   pgPoolMax: Number(process.env.PG_POOL_MAX || 10),
   prodDbRef: process.env.PROD_DB_REF || '',
