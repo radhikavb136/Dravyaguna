@@ -8,6 +8,7 @@ Updated 2026-10-22. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 - The backend now uses an exact comma-separated `FRONTEND_ORIGIN` allow-list, development defaults include ports 5173/5180 on localhost and 127.0.0.1, and production rejects empty or wildcard lists. API startup binds dual-stack in development and reports `EADDRINUSE` with its port.
 - Start the backend with `npm.cmd start` from `backend/`; start this frontend at 5180 with `npm.cmd run dev:local` from the repository root. The latter uses Vite `--strictPort`. Check API/CORS/process state with `npm.cmd run check:local`. Details and troubleshooting commands are in [`MANUAL_CHECKLIST.md`](./MANUAL_CHECKLIST.md).
 - Running frontend `localhost:5180` uses `VITE_API_BASE_URL=http://localhost:4000` in the checked-in example and the build command tested here. Environment values of a previously claimed running frontend/backend could not be inspected because neither process existed at initial reproduction. No unrelated processes were stopped.
+- The 134-herb clinician count remains a separate data blocker: a read-only query of the isolated local database on 2026-10-22 returned 176 reviewed, 6 draft, and 1 archived herb. Do not import/overwrite the 176 source records or clean browser test rows until the owner explicitly approves the previously described dataset alignment.
 
 ## Database test safety
 
