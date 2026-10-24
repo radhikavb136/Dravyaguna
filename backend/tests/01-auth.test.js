@@ -37,6 +37,11 @@ export async function run() {
   assertEqual(register.status, 201, 'register');
   assertEqual(register.data.user.role, 'clinician', 'register ignores requested role');
 
+  const registeredEmail = `zz_test_register_${stamp}@example.com`;
+  const loginAfterRegister = await login(registeredEmail, 'TestPass1234');
+  assertEqual(loginAfterRegister.status, 200, 'login after register');
+  assert(loginAfterRegister.data?.token, 'login after register returns token');
+
   const short = await api('POST', '/api/auth/register', {
     body: {
       email: `zz_test_short_${stamp}@example.com`,

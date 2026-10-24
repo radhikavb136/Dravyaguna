@@ -15,6 +15,7 @@
     "db:embedded": "node scripts/startEmbeddedPostgres.js",
     "seed": "node scripts/seed.js",
     "test": "node tests/run.js",
+    "test:acceptance": "node tests/acceptance-search-visibility.js",
     "test:cleanup": "node scripts/testCleanup.js",
     "check:rls": "node scripts/checkRls.js",
     "admin:first": "node scripts/createFirstAdmin.js",

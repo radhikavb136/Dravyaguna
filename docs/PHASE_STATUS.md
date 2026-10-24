@@ -1,16 +1,19 @@
 # Dravyaguna release status
 
-Updated **2026-10-24** — master-prompt reconciliation on branch `phase-2-admin-pages`. Spec reference: user master prompt (Phases 0–8); `docs/BUILD_PROMPT.md` is **missing** from the repo (see `AGENTS.md`) — use this file + `docs/KNOWN_ISSUES.md` + `docs/API.md` + `docs/ENVIRONMENTS.md`.
+Updated **2026-10-24** — Phase 1 acceptance hardening on branch `phase-2-admin-pages`. Spec: user master prompt (Phases 0–8); `docs/BUILD_PROMPT.md` **missing** (see `AGENTS.md`).
 
-## Environment (this session)
+## Environment (read-only inspection)
 
 | Check | Result |
 |---|---|
-| Branch | `phase-2-admin-pages` |
-| `DATABASE_URL` (backend `.env`) | `127.0.0.1:54334` — **not** Supabase pooler |
-| `DEV_DB_REF` | **unset** → Supabase dev tests/seeds **BLOCKED** |
-| Supabase pooler in `.env` | **no** |
-| Dev users | 7 rows in `public.users` (custom JWT auth; not Supabase Auth dashboard) |
+| Branch | `phase-2-admin-pages` · prior commit `0f29cda` |
+| `DATABASE_URL` endpoint | `127.0.0.1:54334` (local embedded Postgres) |
+| `DEV_DB_REF` | **unset** · pooler URL in `.env`: **no** |
+| Supabase dev verification | **BLOCKED** — cannot confirm 134/42 herb split or remote registration without pooler + ref |
+| Users (`public.users`) | **7** |
+| Herbs by status | draft **1**, reviewed **175**, verified **2**, archived **6** |
+| RLS | all `public` tables enabled (`npm run check:local`) |
+| API health | `databaseEndpoint` **127.0.0.1:54334** when API running on **4000** |
 
 **Your action for Supabase dev today:** In `backend/.env`, set session-pooler `DATABASE_URL` and `DEV_DB_REF` to the **exact** dev project ref (`postgres.<ref>` in the username). Restart API. Run read-only SQL from `docs/ENVIRONMENTS.md` before any writes. Then `npm run seed:dev-users:supabase-dev -- --confirm` only if dev users are missing. Never point at production.
 
@@ -19,7 +22,7 @@ Updated **2026-10-24** — master-prompt reconciliation on branch `phase-2-admin
 | Phase | Status | Evidence / gap |
 |---|---|---|
 | **0** Ground truth, guards, audits | **VERIFIED** (local) | `361e0cf`: `docs/ENVIRONMENTS.md`, `check:local`, `seedDevUsers` guards, route-duplicate test `28-route-duplicates.test.js`. Supabase inspection **BLOCKED** (no `DEV_DB_REF`). Clutter/deletion audits documented; no deletions without approval. |
-| **1** E2E/smoke, dataset, acceptance numbers | **WIRED-UNVERIFIED** | Backend **30/30** (`npm test`, 2026-10-24, API + `127.0.0.1:54334`). Playwright **9/9** (Phase 2 spec, retained). `acceptance-search-visibility.js` runs but **73≠55** at 100% Tikta+Deepana on current local DB (176 `HERB_REC_*` all `reviewed`; master expects **134** reviewed / **42** draft on dev). `21-rag-knowledge.test.js` now self-creates draft fixture when missing. |
+| **1** E2E/smoke, dataset, acceptance numbers | **VERIFIED** (local logic) · **BLOCKED** (Supabase + fixed 55 baseline) | Backend **`npm test` → 31 passed** incl. `29-acceptance-search-visibility.test.js` (baseline-relative N→N+1→N). `01-auth.test.js` login-after-register. Playwright **9/9** retained. Optional `ACCEPTANCE_BASELINE_TIKTA_DEEPANA=55` on approved dev DB only. Local DB still **175 reviewed** (not 134/42). **No** Supabase registration persistence tested. |
 | **2** Admin/user pages, permissions, Playwright | **VERIFIED** (core) | E2E: scoring, manage/add herb, vocabulary, audit, analytics, users, favorites, compare, 401/403, verified→reviewed. Gaps: deep form validation, user-create UI, vocabulary CRUD UI, scoring save persistence (see Phase 2 notes below). |
 | **3** Search quality, vocabulary, export, performance | **WIRED-UNVERIFIED** | Deterministic weighted search in `buildSearchQuery.js`; tests `03-search`, `12-simple-search-*`, `20-search-query-shape`. Approved `vocab_review.csv` / indication mapping **not applied** (empty indication vocabulary per `KNOWN_ISSUES`). Export **VERIFIED** in `19-export.test.js`. Load/Supabase perf **BLOCKED**. |
 | **4** Grounded RAG + InfoIcon | **WIRED-UNVERIFIED** | `explainService.js`, `ragKnowledgeService.js` (Postgres **FTS**, not pgvector embeddings), `InfoIcon.jsx` + tests. `21-rag-knowledge.test.js`, `15-explain.test.js` **pass**. Live `LLM_API_KEY` **BLOCKED**; no classical reference corpus — do not fabricate citations. |
@@ -35,9 +38,9 @@ Status labels only: `NOT STARTED` | `WIRED-UNVERIFIED` | `VERIFIED` | `BLOCKED`.
 | Command | Result |
 |---|---|
 | `npm test` (repo root) | **37 passed**, 0 failed |
-| `npm test` (`backend/`, `API_BASE_URL=http://127.0.0.1:4000`, `DISABLE_RATE_LIMIT=true`) | **30 passed**, 0 failed |
-| `npm run test:e2e` (prior run, retained) | **9 passed**, 0 failed, 0 skipped |
-| `node backend/tests/acceptance-search-visibility.js` | Completes; **count assertions fail** (73/74 vs 55/56) on current DB |
+| `npm test` (`backend/`, API on 4000 via `start:e2e`) | **31 passed**, 0 failed (2026-10-24) |
+| `npm run test:acceptance` (`backend/`) | **PASS** baseline-relative |
+| `npm run test:e2e` (retained) | **9 passed**, 0 failed, 0 skipped |
 
 ### Playwright (retained — do not rerun unless regressing)
 

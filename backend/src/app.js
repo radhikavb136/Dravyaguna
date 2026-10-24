@@ -47,7 +47,12 @@ export function createApp() {
     const databaseEndpoint = databaseEndpointFromUrl(env.databaseUrl);
     try {
       await pool.query('SELECT 1');
-      res.json({ status: 'ok', database: 'ok', databaseEndpoint });
+      res.json({
+        status: 'ok',
+        database: 'ok',
+        databaseEndpoint,
+        loginRateLimitEnabled: process.env.DISABLE_RATE_LIMIT !== 'true',
+      });
     } catch {
       res.status(503).json({ status: 'error', database: 'unavailable', databaseEndpoint });
     }

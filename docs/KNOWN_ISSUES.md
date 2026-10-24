@@ -9,7 +9,7 @@ Updated 2026-10-24. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 - Clinicians hitting `/admin/*` are redirected to `/doctor` by `AdminLayout` (not `AdminPageGuard` “Access denied”); E2E asserts redirect for `/admin/users`.
 - Editors saving a **verified** herb must send `reviewed` status on “Save Changes”; without that demotion, the UI blocked save with the verify-only alert (fixed in `AddHerb.jsx` during verification).
 - `docs/BUILD_PROMPT.md` referenced in `AGENTS.md` is **missing** from the repository; phase acceptance is tracked in `docs/PHASE_STATUS.md` against the user master prompt.
-- `acceptance-search-visibility.js` (55→56→56→55) **fails count assertions** on the current isolated DB (73 herbs at 100% for Tikta+Deepana vs expected 55) because all `HERB_REC_*` rows are `reviewed`; master/dev expectation is **134 reviewed + 42 draft**. Do not re-import without owner approval.
+- Phase 1 acceptance is **`29-acceptance-search-visibility.test.js`** (and `npm run test:acceptance`): asserts **relative** 100% counts (N→N+1→N) so it passes on any DB size. Set **`ACCEPTANCE_BASELINE_TIKTA_DEEPANA=55`** only on the approved dev dataset. Local isolated DB still has **175 reviewed** (not 134/42); do not re-import without owner approval.
 - `DISABLE_RATE_LIMIT=true` now skips the login rate limiter (`auth.routes.js`); production must leave this unset.
 - RAG retrieval uses PostgreSQL full-text search (`ragKnowledgeService.js`), not vector embeddings; Phase 4 live LLM remains credential-dependent.
 - `GET /api/herbs` now supports `q` for manage-herb name search; advanced column filters on Manage Herbs still apply only to the current page when `VITE_USE_API=true`.
