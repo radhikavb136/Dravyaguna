@@ -48,6 +48,14 @@ export async function run() {
   });
   assert(editorList.data.pagination.total >= clinicianTotal, 'editors see at least as many herbs as clinicians');
 
+  const nameSearch = await api('GET', '/api/herbs?q=HERB_REC_0001&limit=20', { token: tokens.editor });
+  assert(nameSearch.ok, 'herb name search');
+  assert(
+    (nameSearch.data.data || []).some((row) => row.code === 'HERB_REC_0001'),
+    'q matches code and names'
+  );
+  assert(nameSearch.data.pagination.total >= 1, 'name search total');
+
   const { hit } = await findByCode(tokens.clinician, 'HERB_REC_0001');
   assert(hit, 'HERB_REC_0001 in clinician list');
 

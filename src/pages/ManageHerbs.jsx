@@ -1,11 +1,91 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { addAuditLog } from "../utils/auditLogger"
-import { listAllHerbs, verifyHerb, deleteHerb } from "../api/herbs"
+import { listHerbs, verifyHerb, deleteHerb } from "../api/herbs"
 import { getCurrentUser } from "../api/auth"
 import { getAccount } from "../api/account"
 import { canArchiveHerbs, canVerifyHerbs } from "../utils/roles"
 import "../styles/ManageHerbs.css"
+
+const toArray = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean)
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
+  return []
+}
+
+const getDisplayDate = (herb) => {
+  const dateValue =
+    herb.updatedAt ||
+    herb.savedAt ||
+    herb.createdAt ||
+    herb.lastUpdated
+
+  if (!dateValue) {
+    return "—"
+  }
+
+  const date = new Date(dateValue)
+
+  if (Number.isNaN(date.getTime())) {
+    return "—"
+  }
+
+  return date.toLocaleDateString()
+}
+
+const getUpdatedBy = (herb) => {
+  return (
+    herb.updatedBy ||
+    herb.lastUpdatedBy ||
+    herb.createdBy ||
+    "Admin"
+  )
+}
+
+/* =========================================================
+   DOSHA NORMALIZATION
+========================================================= */
+
+const getDoshaValues = (herb) => {
+  const values = []
+
+  if (herb.dosha && typeof herb.dosha === "object") {
+    if (herb.dosha.vata) {
+      values.push(`Vata ${herb.dosha.vata}`)
+    }
+
+    if (herb.dosha.pitta) {
+      values.push(`Pitta ${herb.dosha.pitta}`)
+    }
+
+    if (herb.dosha.kapha) {
+      values.push(`Kapha ${herb.dosha.kapha}`)
+    }
+  }
+
+  if (Array.isArray(herb.dosha)) {
+    values.push(...herb.dosha)
+  }
+
+  if (typeof herb.dosha === "string") {
+    values.push(...toArray(herb.dosha))
+  }
+
+  if (Array.isArray(herb.doshaAffinity)) {
+    values.push(...herb.doshaAffinity)
+  }
+
+  return [...new Set(values.filter(Boolean))]
+}
 
 function ManageHerbs() {
   const navigate = useNavigate()
@@ -22,6 +102,11 @@ function ManageHerbs() {
   const [error, setError] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
   const [confirmBeforeDelete, setConfirmBeforeDelete] = useState(true)
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(20)
+  const [pagination, setPagination] = useState({ total: 0, totalPages: 1 })
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const useApi = import.meta.env.VITE_USE_API === "true"
 
   useEffect(() => {
     getAccount()
@@ -33,26 +118,35 @@ function ManageHerbs() {
      LOAD HERBS
   ========================================================= */
 
-  useEffect(() => {
-    loadCurrentUser()
-    loadHerbs()
-  }, [selectedStatus])
-
   const loadCurrentUser = () => {
     const user = getCurrentUser()
     setCurrentUser(user)
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  useEffect(() => {
+    setPage(1)
+  }, [selectedStatus, debouncedSearch])
 
   const loadHerbs = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const useApi = import.meta.env.VITE_USE_API === 'true'
-      
       if (useApi) {
-        const statusFilter = selectedStatus === 'All' ? undefined : selectedStatus.toLowerCase()
-        setHerbs(await listAllHerbs({ limit: 200, status: statusFilter }))
+        const statusFilter = selectedStatus === "All" ? undefined : selectedStatus.toLowerCase()
+        const result = await listHerbs({
+          page,
+          limit: pageSize,
+          status: statusFilter,
+          q: debouncedSearch || undefined,
+        })
+        setHerbs(result.data)
+        setPagination(result.pagination || { total: 0, totalPages: 1 })
       } else {
         // Fallback to localStorage for mock data
         const savedHerbs = JSON.parse(
@@ -62,96 +156,26 @@ function ManageHerbs() {
       }
     } catch (err) {
       console.error('Failed to load herbs:', err)
-      setError('Failed to load herbs')
+      const forbidden = err?.status === 403
+      setError(forbidden ? (err.message || "You do not have permission to view these herbs.") : (err.message || "Failed to load herbs"))
       setHerbs([])
     } finally {
       setLoading(false)
     }
   }
 
+  useEffect(() => {
+    loadCurrentUser()
+  }, [])
+
+  useEffect(() => {
+    loadHerbs()
+  }, [selectedStatus, page, debouncedSearch])
+
   /* =========================================================
      HELPERS
   ========================================================= */
 
-  const toArray = (value) => {
-    if (Array.isArray(value)) {
-      return value.filter(Boolean)
-    }
-
-    if (typeof value === "string" && value.trim()) {
-      return value
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean)
-    }
-
-    return []
-  }
-
-  const getDisplayDate = (herb) => {
-    const dateValue =
-      herb.updatedAt ||
-      herb.savedAt ||
-      herb.createdAt ||
-      herb.lastUpdated
-
-    if (!dateValue) {
-      return "—"
-    }
-
-    const date = new Date(dateValue)
-
-    if (Number.isNaN(date.getTime())) {
-      return "—"
-    }
-
-    return date.toLocaleDateString()
-  }
-
-  const getUpdatedBy = (herb) => {
-    return (
-      herb.updatedBy ||
-      herb.lastUpdatedBy ||
-      herb.createdBy ||
-      "Admin"
-    )
-  }
-
-  /* =========================================================
-     DOSHA NORMALIZATION
-  ========================================================= */
-
-  const getDoshaValues = (herb) => {
-    const values = []
-
-    if (herb.dosha && typeof herb.dosha === "object") {
-      if (herb.dosha.vata) {
-        values.push(`Vata ${herb.dosha.vata}`)
-      }
-
-      if (herb.dosha.pitta) {
-        values.push(`Pitta ${herb.dosha.pitta}`)
-      }
-
-      if (herb.dosha.kapha) {
-        values.push(`Kapha ${herb.dosha.kapha}`)
-      }
-    }
-
-    if (Array.isArray(herb.dosha)) {
-      values.push(...herb.dosha)
-    }
-
-    if (typeof herb.dosha === "string") {
-      values.push(...toArray(herb.dosha))
-    }
-
-    if (Array.isArray(herb.doshaAffinity)) {
-      values.push(...herb.doshaAffinity)
-    }
-
-    return [...new Set(values.filter(Boolean))]
-  }
 
   /* =========================================================
      NORMALIZE HERB DATA
@@ -324,10 +348,7 @@ function ManageHerbs() {
   ========================================================= */
 
   const filteredHerbs = useMemo(() => {
-    const query =
-      searchTerm
-        .trim()
-        .toLowerCase()
+    const query = useApi ? "" : searchTerm.trim().toLowerCase()
 
     return normalizedHerbs.filter((herb) => {
       /* SEARCH */
@@ -399,6 +420,7 @@ function ManageHerbs() {
       /* STATUS */
 
       const matchesStatus =
+        useApi ||
         selectedStatus === "All" ||
         herb.status === selectedStatus
 
@@ -414,6 +436,7 @@ function ManageHerbs() {
   }, [
     normalizedHerbs,
     searchTerm,
+    useApi,
     selectedDosha,
     selectedRasa,
     selectedGuna,
@@ -598,14 +621,21 @@ function ManageHerbs() {
   ========================================================= */
 
   const getStatusCount = (status) => {
+    if (useApi) {
+      if (status === "All" && selectedStatus === "All" && !debouncedSearch) {
+        return pagination.total ?? 0
+      }
+      if (selectedStatus === status) {
+        return pagination.total ?? 0
+      }
+      return "—"
+    }
+
     if (status === "All") {
       return normalizedHerbs.length
     }
 
-    return normalizedHerbs.filter(
-      (herb) =>
-        herb.status === status
-    ).length
+    return normalizedHerbs.filter((herb) => herb.status === status).length
   }
 
   /* =========================================================
@@ -1269,6 +1299,28 @@ function ManageHerbs() {
           </table>
 
         </div>
+
+        {useApi && pagination.totalPages > 1 && (
+          <div className="manage-herbs-pagination" role="navigation" aria-label="Herb list pagination">
+            <button
+              type="button"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Previous
+            </button>
+            <span>
+              Page {page} of {pagination.totalPages} ({pagination.total} herbs)
+            </span>
+            <button
+              type="button"
+              disabled={page >= pagination.totalPages || loading}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+            </button>
+          </div>
+        )}
 
       </section>
 

@@ -1,6 +1,13 @@
 # Known issues and release dependencies
 
-Updated 2026-10-22. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scope and test results.
+Updated 2026-10-24. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scope and test results.
+
+## Phase 2 (2026-10-24)
+
+- Manual testing against **Supabase dev** is still **BLOCKED** in this workspace: `DEV_DB_REF` is unset and `backend/.env` points at isolated local Postgres (`127.0.0.1:54334`). No Supabase writes were performed.
+- Playwright specs exist under `e2e/specs/phase2-admin.spec.js` but were **not** executed (`npm run test:e2e` → 2 skipped). Set `E2E_RUN=true` with API (4000), frontend (5180), and `DEV_USER_PASSWORD` to verify zero console/network errors.
+- `GET /api/herbs` now supports `q` for manage-herb name search; advanced column filters on Manage Herbs still apply only to the current page when `VITE_USE_API=true`.
+- Backend integration tests require the API process to run with `DISABLE_RATE_LIMIT=true` during full-suite runs; otherwise login rate limiting can fail the suite after repeated logins.
 
 ## Local API unreachable / development ports
 
@@ -69,3 +76,11 @@ Updated 2026-10-22. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 - The trigram threshold is set to 0.45 and has a backend regression assertion. The approved synonym/indication data is still unavailable, so search coverage still needs domain review.
 - Custom vocabulary terms using underscore-containing names now resolve by canonical name as well as slug during herb create/update. Backend integration coverage verifies an in-use term cannot be deleted, an admin merge relinks the herb, and the target term remains protected while used.
 - Every authenticated API request now checks the current user role and active status in PostgreSQL, so existing tokens cannot retain privileges after demotion or deactivation. This adds a database read per authenticated request; monitor this cost and consider a cache only if it preserves prompt revocation semantics.
+## 2026-10-23 updates (verified local run)
+
+- **Local environment**: Reused isolated embedded Postgres cluster `.embedded-pg-agent-fresh` on 127.0.0.1:54334. API running on port 4000 with local CORS origins. Health OK with DB OK (`GET /api/health` → `{"status":"ok","database":"ok"}`). No remote/Supabase connections used.
+- **Migrations/RLS**: Up to date (`npm run migrate` → No migrations to run!); all public tables have RLS enabled (`npm run check:rls`).
+- **Backend tests**: 29/29 passed against isolated DB + local API (auth, roles, scoring/search, herbs/vocabulary, admin/favorites/account, translations/explain/RAG/upload/password-reset/export, CORS/port, import safety, rate limiting).
+- **Frontend**: Lint 0 errors / 24 warnings (15 warnings resolved across 9 files without behavioral changes); tests 10 files / 36 tests passed; production build succeeded (`verify:api-build` PASS).
+- **Provider blockers (unchanged)**: Live Sarvam/Google/Azure translation, LLM generation for RAG, SMTP password reset delivery, Supabase Storage uploads require credentials/config not present; tested with mocks/stubs. No import of `Dataset/herbs.xlsx` attempted.
+- **Data safety**: No records/accounts/audit logs deleted; Browser Herb/VERIFY_UI test rows untouched. Database safety guards not bypassed.

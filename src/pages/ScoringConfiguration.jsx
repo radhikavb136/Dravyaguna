@@ -1,32 +1,33 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { getWeights, updateWeights } from "../api/weights"
+import { searchHerbs } from "../api/herbs"
 import "../styles/ScoringConfiguration.css"
 
+const defaultWeights = {
+  rasa: 20,
+  guna: 18,
+  virya: 12,
+  vipaka: 10,
+  prabhava: 8,
+  dosha: 15,
+  dhatu: 6,
+  mala: 3,
+  srotas: 8,
+  karma: 10,
+  indication: 15,
+}
+
 function ScoringConfiguration() {
-
-  // =====================================================
-  // DEFAULT WEIGHTS
-  // =====================================================
-
-  const defaultWeights = {
-    rasa: 20,
-    guna: 18,
-    virya: 12,
-    vipaka: 10,
-    prabhava: 8,
-    dosha: 15,
-    dhatu: 6,
-    mala: 3,
-    srotas: 8,
-    karma: 10,
-    indication: 15,
-  }
 
   const [weights, setWeights] = useState(defaultWeights)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [saveMessage, setSaveMessage] = useState("")
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState(null)
+  const [previewText, setPreviewText] = useState("")
+  const useApi = import.meta.env.VITE_USE_API === "true"
 
   // =====================================================
   // LOAD WEIGHTS FROM API
@@ -120,7 +121,49 @@ function ScoringConfiguration() {
       name: "Clinical Indication",
       description: "Indicated conditions",
     },
+    {
+      key: "avayava",
+      name: "Avayava (Organ)",
+      description: "No organ data in the dataset yet",
+      disabled: true,
+    },
   ]
+
+  const refreshPreview = useCallback(async () => {
+    if (!useApi) {
+      setPreviewText("Connect the API to preview live search scoring.")
+      return
+    }
+    setPreviewLoading(true)
+    setPreviewError(null)
+    try {
+      const { results } = await searchHerbs(
+        { rasa: ["tikta"], karma: ["deepana"] },
+        { limit: 100 }
+      )
+      const sample =
+        results.find((herb) => herb.code === "HERB_REC_0010") ||
+        results.find((herb) => herb.code === "HERB_REC_0023") ||
+        results[0]
+      if (!sample) {
+        setPreviewText("No herbs matched the example filters (Tikta + Deepana).")
+        return
+      }
+      const pct = sample.matchPercentage ?? sample.match ?? 0
+      setPreviewText(`${sample.code} (${sample.englishName || sample.english_name}): ${pct}% match for Tikta + Deepana with saved server weights.`)
+    } catch (err) {
+      setPreviewError(err?.status === 403 ? err.message : (err.message || "Unable to load preview search"))
+      setPreviewText("")
+    } finally {
+      setPreviewLoading(false)
+    }
+  }, [useApi])
+
+  useEffect(() => {
+    if (!loading) {
+      refreshPreview()
+    }
+  }, [loading, refreshPreview])
 
   // =====================================================
   // TOTAL WEIGHT
@@ -181,7 +224,8 @@ function ScoringConfiguration() {
       if (useApi) {
         const response = await updateWeights(weights)
         setWeights(response.weights)
-        setSaveMessage('Scoring configuration saved successfully.')
+        setSaveMessage('Scoring configuration saved successfully. The next search uses these weights.')
+        await refreshPreview()
       } else {
         // Fallback to localStorage for mock data
         localStorage.setItem(
@@ -290,7 +334,7 @@ function ScoringConfiguration() {
 
             <tbody>
               {parameters.map((param) => {
-                const weight = weights[param.key] || 0
+                const weight = param.disabled ? (weights[param.key] ?? 0) : (weights[param.key] || 0)
                 const percentage = totalPoints > 0 
                   ? ((weight / totalPoints) * 100).toFixed(1) 
                   : 0
@@ -307,6 +351,8 @@ function ScoringConfiguration() {
                         min="0"
                         max="100"
                         value={weight}
+                        disabled={param.disabled}
+                        title={param.disabled ? "Organ (Avayava) data is not available yet." : undefined}
                         onChange={(e) =>
                           handleWeightChange(
                             param.key,
@@ -326,6 +372,11 @@ function ScoringConfiguration() {
 
           <div className="scoring-total">
             <strong>Total:</strong> {totalPoints} points
+          </div>
+
+          <div className="scoring-preview" role="status">
+            <strong>Live example (saved weights):</strong>
+            {previewLoading ? " Running preview search…" : (previewError ? previewError : previewText)}
           </div>
 
         </div>

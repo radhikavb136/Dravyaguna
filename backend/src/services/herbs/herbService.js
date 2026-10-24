@@ -8,20 +8,44 @@ function badRequest(message) {
   return err;
 }
 
-export async function listHerbs({ page, limit, statuses }) {
+export async function listHerbs({ page, limit, statuses, q }) {
   const offset = (page - 1) * limit;
+  const search = q?.trim() || null;
+  const searchSql = search
+    ? ` AND (
+      english_name ILIKE '%' || $4 || '%'
+      OR COALESCE(sanskrit_name, '') ILIKE '%' || $4 || '%'
+      OR COALESCE(botanical_name, '') ILIKE '%' || $4 || '%'
+      OR code ILIKE '%' || $4 || '%'
+      OR EXISTS (
+        SELECT 1 FROM herb_regional_names hrn
+        WHERE hrn.herb_id = herbs.id AND hrn.name ILIKE '%' || $4 || '%'
+      )
+    )`
+    : '';
+  const listParams = search ? [statuses, limit, offset, search] : [statuses, limit, offset];
   const { rows } = await pool.query(
     `SELECT id, code, english_name, sanskrit_name, botanical_name, status, created_at, updated_at
      FROM herbs
-     WHERE status = ANY($1)
+     WHERE status = ANY($1)${searchSql}
      ORDER BY english_name
      LIMIT $2 OFFSET $3`,
-    [statuses, limit, offset]
+    listParams
   );
 
+  const countParams = search ? [statuses, search] : [statuses];
   const { rows: [{ count }] } = await pool.query(
-    `SELECT COUNT(*)::int FROM herbs WHERE status = ANY($1)`,
-    [statuses]
+    `SELECT COUNT(*)::int FROM herbs WHERE status = ANY($1)${search ? ` AND (
+      english_name ILIKE '%' || $2 || '%'
+      OR COALESCE(sanskrit_name, '') ILIKE '%' || $2 || '%'
+      OR COALESCE(botanical_name, '') ILIKE '%' || $2 || '%'
+      OR code ILIKE '%' || $2 || '%'
+      OR EXISTS (
+        SELECT 1 FROM herb_regional_names hrn
+        WHERE hrn.herb_id = herbs.id AND hrn.name ILIKE '%' || $2 || '%'
+      )
+    )` : ''}`,
+    countParams
   );
 
   return {

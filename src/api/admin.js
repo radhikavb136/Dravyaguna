@@ -33,3 +33,12 @@ export async function updateUserStatus(userId, status) {
 export async function updateUserDetails(userId, details) {
   return apiClient.patch(`/api/users/${userId}`, details);
 }
+
+export async function createUser({ email, password, fullName, role }) {
+  return apiClient.post('/api/users', {
+    email,
+    password,
+    fullName,
+    role,
+  });
+}

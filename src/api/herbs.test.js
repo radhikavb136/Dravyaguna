@@ -112,6 +112,25 @@ describe("herb search API adapters", () => {
     )
   })
 
+  it("forwards herb list q, page, and status query params", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [{ id: "herb-9", code: "HERB_REC_0009", english_name: "Sample", status: "reviewed" }],
+        pagination: { page: 2, limit: 20, total: 40, totalPages: 2 },
+      }),
+    })
+
+    const { listHerbs } = await import("./herbs.js")
+    const result = await listHerbs({ page: 2, limit: 20, status: "reviewed", q: "sample" })
+
+    expect(result.data).toHaveLength(1)
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "http://localhost:4000/api/herbs?page=2&limit=20&status=reviewed&q=sample",
+      expect.objectContaining({ method: "GET" })
+    )
+  })
+
   it("keeps detailed-search results as an adapted array", async () => {
     globalThis.fetch.mockResolvedValue({
       ok: true,

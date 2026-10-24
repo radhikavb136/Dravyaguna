@@ -11,6 +11,7 @@
                     "verify:api-build":  "node scripts/verifyApiBuild.js",
                     "lint":  "eslint src",
                     "test":  "vitest run",
+                    "test:e2e":  "playwright test -c e2e/playwright.config.js",
                     "preview":  "vite preview"
                 },
     "dependencies":  {
@@ -31,6 +32,7 @@
                             "globals":  "^17.11.0",
                             "jsdom":  "^29.1.1",
                             "vite":  "^8.2.2",
+                            "@playwright/test":  "^1.55.0",
                             "vitest":  "^5.0.5"
                         }
 }

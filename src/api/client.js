@@ -80,7 +80,7 @@ class ApiClient {
         headers,
       });
     } catch (error) {
-      throw new Error(formatApiNetworkError(this.baseURL, error));
+      throw new Error(formatApiNetworkError(this.baseURL, error), { cause: error });
     }
 
     if (!response.ok) {
@@ -100,7 +100,13 @@ class ApiClient {
       }
 
       console.error('API client error response:', errorData);
-      throw new Error(errorData.error || errorData.message || `Request failed with status ${response.status}`);
+      const message = errorData.error || errorData.message || `Request failed with status ${response.status}`;
+      const apiError = new Error(message);
+      apiError.status = response.status;
+      if (errorData.details) {
+        apiError.details = errorData.details;
+      }
+      throw apiError;
     }
 
     return response.json();

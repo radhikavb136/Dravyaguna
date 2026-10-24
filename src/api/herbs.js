@@ -166,11 +166,12 @@ function convertDoshaPayload(herbData) {
  * List herbs with pagination and status filter
  */
 export async function listHerbs(params = {}) {
-  const { page = 1, limit = 20, status } = params;
+  const { page = 1, limit = 20, status, q } = params;
   const queryParams = new URLSearchParams();
   if (page) queryParams.set('page', page);
   if (limit) queryParams.set('limit', limit);
   if (status) queryParams.set('status', status);
+  if (q?.trim()) queryParams.set('q', q.trim());
   
   const response = await apiClient.get(`/api/herbs?${queryParams}`);
   

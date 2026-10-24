@@ -104,6 +104,7 @@ List herbs with pagination and status filter.
 - `page` (optional, default: 1)
 - `limit` (optional, default: 20)
 - `status` (optional): `draft`, `reviewed`, `verified`, `archived`
+- `q` (optional): case-insensitive search across `code`, `english_name`, `sanskrit_name`, `botanical_name`, and regional names
 
 **Role Visibility:**
 - Clinicians: only `reviewed`, `verified`

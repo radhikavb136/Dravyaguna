@@ -758,8 +758,15 @@ function AddHerb() {
         }
 
         if ((isEditMode || herbId) && herbId) {
-          // Update existing herb
-          await updateHerb(herbId, herbData)
+          const wasVerified = String(formData.verificationStatus || "").toLowerCase() === "verified"
+          const saved = await updateHerb(herbId, herbData)
+          if (wasVerified && saved.status === "reviewed") {
+            alert("This herb was verified. Your changes moved it back to reviewed for re-verification.")
+          }
+          setFormData((previous) => ({
+            ...previous,
+            verificationStatus: saved.status || previous.verificationStatus,
+          }))
           if (imageFile) { await uploadHerbImage(herbId, imageFile); setImageFile(null) }
         } else {
           // Create new herb (always as draft initially)

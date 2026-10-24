@@ -9,6 +9,89 @@ import {
 } from "../api/vocabulary"
 import "../styles/VocabularyManagement.css"
 
+function generateTermId() {
+  return Date.now().toString()
+}
+
+const toArray = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .filter(Boolean)
+      .map((item) => String(item).trim())
+      .filter(Boolean)
+  }
+
+  if (
+    typeof value === "string" &&
+    value.trim()
+  ) {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
+  return []
+}
+
+/* =========================================================
+   GET REAL HERB VOCABULARY VALUES
+========================================================= */
+
+const getHerbCategoryValues = (
+  herb,
+  category
+) => {
+  switch (category) {
+    case "Rasa":
+      return toArray(herb.rasa)
+
+    case "Guna":
+      return toArray(herb.guna)
+
+    case "Dhatu":
+      return toArray(
+        herb.dhatu ||
+        herb.dhatuAffinity
+      )
+
+    case "Mala":
+      return toArray(
+        herb.mala ||
+        herb.malaAffinity
+      )
+
+    case "Srotas":
+      return toArray(herb.srotas)
+
+    case "Karma":
+      return toArray(
+        herb.karma ||
+        herb.therapeuticActions
+      )
+
+    case "Indications":
+      return toArray(
+        herb.indications ||
+        herb.therapeuticIndications ||
+        herb.mainIndications
+      )
+
+    case "Virya":
+      return herb.virya
+        ? [String(herb.virya).trim()]
+        : []
+
+    case "Vipaka":
+      return herb.vipaka
+        ? [String(herb.vipaka).trim()]
+        : []
+
+    default:
+      return []
+  }
+}
+
 function VocabularyManagement() {
   const [activeCategory, setActiveCategory] = useState("Rasa")
   const [isAddTermOpen, setIsAddTermOpen] = useState(false)
@@ -54,10 +137,6 @@ function VocabularyManagement() {
 
   const [vocabularyData, setVocabularyData] = useState([])
 
-  useEffect(() => {
-    loadVocabulary()
-  }, [])
-
   const loadVocabulary = async () => {
     setLoading(true)
     setError(null)
@@ -99,6 +178,10 @@ function VocabularyManagement() {
     }
   }
 
+  useEffect(() => {
+    loadVocabulary()
+  }, [])
+
   /* =========================================================
      LOAD HERBS
   ========================================================= */
@@ -121,84 +204,6 @@ function VocabularyManagement() {
      HELPERS
   ========================================================= */
 
-  const toArray = (value) => {
-    if (Array.isArray(value)) {
-      return value
-        .filter(Boolean)
-        .map((item) => String(item).trim())
-        .filter(Boolean)
-    }
-
-    if (
-      typeof value === "string" &&
-      value.trim()
-    ) {
-      return value
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean)
-    }
-
-    return []
-  }
-
-  /* =========================================================
-     GET REAL HERB VOCABULARY VALUES
-  ========================================================= */
-
-  const getHerbCategoryValues = (
-    herb,
-    category
-  ) => {
-    switch (category) {
-      case "Rasa":
-        return toArray(herb.rasa)
-
-      case "Guna":
-        return toArray(herb.guna)
-
-      case "Dhatu":
-        return toArray(
-          herb.dhatu ||
-          herb.dhatuAffinity
-        )
-
-      case "Mala":
-        return toArray(
-          herb.mala ||
-          herb.malaAffinity
-        )
-
-      case "Srotas":
-        return toArray(herb.srotas)
-
-      case "Karma":
-        return toArray(
-          herb.karma ||
-          herb.therapeuticActions
-        )
-
-      case "Indications":
-        return toArray(
-          herb.indications ||
-          herb.therapeuticIndications ||
-          herb.mainIndications
-        )
-
-      case "Virya":
-        return herb.virya
-          ? [String(herb.virya).trim()]
-          : []
-
-      case "Vipaka":
-        return herb.vipaka
-          ? [String(herb.vipaka).trim()]
-          : []
-
-      default:
-        return []
-    }
-  }
 
   /* =========================================================
      REAL USAGE COUNT
@@ -499,7 +504,7 @@ function VocabularyManagement() {
 
         const newTerm = {
           id:
-            Date.now().toString(),
+            generateTermId(),
 
           term:
             cleanedTerm,
@@ -1104,6 +1109,11 @@ function VocabularyManagement() {
 
                       <td className="vocabulary-term">
                         {item.term}
+                        {item.is_custom && (
+                          <span className="vocabulary-category-badge" title="Custom term">
+                            custom
+                          </span>
+                        )}
                       </td>
 
                       <td className="vocabulary-sanskrit">

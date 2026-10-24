@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { getUsers, updateUserRole, updateUserStatus, updateUserDetails } from "../api/admin"
+import { createUser, getUsers, updateUserRole, updateUserStatus, updateUserDetails } from "../api/admin"
 import { ROLE_PERMISSION_MATRIX } from "../utils/roles"
 import "../styles/UserRoleManagement.css"
 
@@ -61,10 +61,6 @@ function UserRoleManagement() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
   const loadUsers = async () => {
     setLoading(true)
     setError(null)
@@ -88,6 +84,10 @@ function UserRoleManagement() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadUsers()
+  }, [])
 
 
   /* =========================================
@@ -114,6 +114,43 @@ function UserRoleManagement() {
 
   const [searchTerm, setSearchTerm] =
     useState("")
+
+  const [showCreateUser, setShowCreateUser] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    role: "clinician",
+  })
+  const [createError, setCreateError] = useState("")
+  const [createFieldErrors, setCreateFieldErrors] = useState({})
+
+  const handleCreateUser = async (event) => {
+    event.preventDefault()
+    setCreateError("")
+    setCreateFieldErrors({})
+    try {
+      await createUser({
+        email: createForm.email.trim(),
+        password: createForm.password,
+        fullName: createForm.fullName.trim(),
+        role: createForm.role,
+      })
+      setShowCreateUser(false)
+      setCreateForm({ fullName: "", email: "", password: "", role: "clinician" })
+      await loadUsers()
+    } catch (err) {
+      if (err?.status === 400 && Array.isArray(err.details)) {
+        const fieldErrors = {}
+        err.details.forEach((item) => {
+          const key = item.path?.join(".") || "form"
+          fieldErrors[key] = item.message
+        })
+        setCreateFieldErrors(fieldErrors)
+      }
+      setCreateError(err.message || "Failed to create user")
+    }
+  }
 
 
   /* =========================================
@@ -422,9 +459,70 @@ function UserRoleManagement() {
             and system permissions.
           </p>
 
+          <button
+            type="button"
+            className="user-role-primary-button"
+            onClick={() => setShowCreateUser(true)}
+          >
+            Create user
+          </button>
+
         </div>
 
       </div>
+
+      {showCreateUser && (
+        <div className="user-view-modal" role="dialog" aria-modal="true" aria-label="Create user">
+          <form onSubmit={handleCreateUser}>
+            <h2>Create user</h2>
+            {createError && <p role="alert">{createError}</p>}
+            <label>
+              Full name
+              <input
+                value={createForm.fullName}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                required
+              />
+              {createFieldErrors.fullName && <span role="alert">{createFieldErrors.fullName}</span>}
+            </label>
+            <label>
+              Email
+              <input
+                type="email"
+                value={createForm.email}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, email: event.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              Password (min 10 characters)
+              <input
+                type="password"
+                value={createForm.password}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, password: event.target.value }))}
+                minLength={10}
+                required
+              />
+            </label>
+            <label>
+              Role
+              <select
+                value={createForm.role}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, role: event.target.value }))}
+              >
+                <option value="clinician">Doctor (clinician)</option>
+                <option value="editor">Editor</option>
+                <option value="domain_expert">Ayurvedic Reviewer</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <div>
+              <button type="submit">Create</button>
+              <button type="button" onClick={() => setShowCreateUser(false)}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
 
 
       {/* =========================================

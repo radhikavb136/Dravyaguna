@@ -20,6 +20,7 @@ const herbQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(100),
   status: z.enum(['draft', 'reviewed', 'verified', 'archived']).optional(),
+  q: z.string().trim().min(1).max(120).optional(),
 });
 
 const slugOrCustom = z.union([
@@ -104,6 +105,7 @@ herbRouter.get('/', authenticate, async (req, res, next) => {
       page: query.page,
       limit: query.limit,
       statuses: allowedStatuses,
+      q: query.q,
     });
     res.json(result);
   } catch (err) {
