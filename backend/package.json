@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "start:e2e": "node scripts/startE2eApi.js",
     "dev": "node --watch src/index.js",
     "migrate": "node-pg-migrate up",
     "migrate:down": "node-pg-migrate down",

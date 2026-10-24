@@ -697,6 +697,13 @@ function AddHerb() {
       nextStatus = "verified"
     }
 
+    if (
+      action === "save" &&
+      String(formData.verificationStatus || "").toLowerCase() === "verified"
+    ) {
+      nextStatus = "reviewed"
+    }
+
     // Prevent editors from setting verified status
     if (nextStatus === "verified" && getBackendRole(currentUser) === "editor") {
       alert("Editors cannot verify herbs. Only domain experts and admins can verify.")

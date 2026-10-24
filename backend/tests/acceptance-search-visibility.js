@@ -19,6 +19,10 @@ const BASE_URL = 'http://localhost:4000';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+function devPassword() {
+  return process.env.DEV_USER_PASSWORD || 'Dev1234567';
+}
+
 async function login(email, password) {
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
     method: 'POST',
@@ -26,8 +30,14 @@ async function login(email, password) {
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
-    const err = await res.json();
-    console.log(`  Login failed:`, err);
+    const text = await res.text();
+    let err = text;
+    try {
+      err = JSON.parse(text);
+    } catch {
+      // plain-text rate limit or proxy body
+    }
+    console.log(`  Login failed (${res.status}):`, err);
     return null;
   }
   return res.json();
@@ -96,7 +106,7 @@ async function main() {
   // Use dev users
   console.log('1. Using dev users...\n');
 
-  const clinicianRes = await login('dev-clinician@test.com', 'Dev123456');
+  const clinicianRes = await login('dev-clinician@test.com', devPassword());
   if (!clinicianRes) {
     console.log('Failed to login clinician');
     await pool.end();
@@ -115,7 +125,7 @@ async function main() {
 
   // Test 2: Create herb with Tikta + Deepana
   console.log('3. Test: Create herb with Tikta + Deepana');
-  const editorRes = await login('dev-editor@test.com', 'Dev123456');
+  const editorRes = await login('dev-editor@test.com', devPassword());
   const editorToken = editorRes?.token;
   
   if (!editorToken) {
@@ -155,7 +165,7 @@ async function main() {
 
   // Test 5: Verify → still 56
   console.log('6. Test: Verify herb (should still be 56 at 100%)');
-  const expertRes = await login('dev-expert@test.com', 'Dev123456');
+  const expertRes = await login('dev-expert@test.com', devPassword());
   const expertToken = expertRes?.token;
   
   if (!expertToken) {
@@ -173,7 +183,7 @@ async function main() {
 
   // Test 6: Soft delete → back to 55
   console.log('7. Test: Soft delete herb (should return to 55 at 100%)');
-  const adminRes = await login('dev-admin@test.com', 'Dev123456');
+  const adminRes = await login('dev-admin@test.com', devPassword());
   const adminToken = adminRes?.token;
   
   if (!adminToken) {

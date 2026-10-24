@@ -4,7 +4,13 @@ import { z } from 'zod';
 import { loginUser, registerUser } from '../services/auth/authService.js';
 import { requestPasswordReset, confirmPasswordReset } from '../services/auth/passwordResetService.js';
 
-const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.DISABLE_RATE_LIMIT === 'true',
+});
 const resetRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
 const resetConfirmLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
 

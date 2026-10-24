@@ -63,10 +63,23 @@ export async function run() {
     const { rows: [reviewed] } = await pool.query(
       `SELECT id, code, english_name FROM herbs WHERE status IN ('reviewed', 'verified') ORDER BY code LIMIT 1`
     );
-    const { rows: [draft] } = await pool.query(
+    assert(reviewed, 'RAG authorization tests require at least one reviewed or verified herb');
+
+    let draft;
+    const { rows: draftRows } = await pool.query(
       `SELECT id, code, english_name FROM herbs WHERE status = 'draft' ORDER BY code LIMIT 1`
     );
-    assert(reviewed && draft, 'RAG authorization tests require reviewed and draft herbs');
+    draft = draftRows[0];
+    const draftCode = `zz_test_rag_draft_${stamp}`;
+    if (!draft) {
+      const { rows: [inserted] } = await pool.query(
+        `INSERT INTO herbs (code, english_name, botanical_name, status)
+         VALUES ($1, $2, $3, 'draft')
+         RETURNING id, code, english_name`,
+        [draftCode, `ZZ Test RAG Draft ${stamp}`, 'RAG fixture botanical']
+      );
+      draft = inserted;
+    }
     const questionForGeneration = `${reviewed.english_name} zztest${stamp}`;
     testFiltersHash = createHash('sha256')
       .update(JSON.stringify({ filters: {}, question: questionForGeneration.toLowerCase() }))
@@ -130,6 +143,7 @@ export async function run() {
   } finally {
     await pool.query(`DELETE FROM rag_documents WHERE source_key = $1`, [sourceKey]);
     if (testFiltersHash) await pool.query('DELETE FROM rag_explanation_cache WHERE filters_hash = $1', [testFiltersHash]);
+    await pool.query(`DELETE FROM herbs WHERE code LIKE 'zz_test_rag_draft_%'`);
     await pool.end();
   }
 }

@@ -5,7 +5,13 @@ Updated 2026-10-24. See [`PHASE_STATUS.md`](./PHASE_STATUS.md) for verified scop
 ## Phase 2 (2026-10-24)
 
 - Manual testing against **Supabase dev** is still **BLOCKED** in this workspace: `DEV_DB_REF` is unset and `backend/.env` points at isolated local Postgres (`127.0.0.1:54334`). No Supabase writes were performed.
-- Playwright specs exist under `e2e/specs/phase2-admin.spec.js` but were **not** executed (`npm run test:e2e` → 2 skipped). Set `E2E_RUN=true` with API (4000), frontend (5180), and `DEV_USER_PASSWORD` to verify zero console/network errors.
+- **Playwright (local, 2026-10-24):** `e2e/specs/phase2-pages.spec.js` — **9 passed, 0 failed, 0 skipped** with `DEV_USER_PASSWORD` set, Playwright `webServer` starting API (`backend/scripts/startE2eApi.js`, rate limit disabled) and frontend on 5180, plus `e2e/global-setup.js` seeding dev users against local DB only. On this machine, `npx playwright install chromium` did not finish; runs used **`E2E_BROWSER_CHANNEL=chrome`** (system Chrome). The old `E2E_RUN` gate and `phase2-admin.spec.js` are removed/replaced.
+- Clinicians hitting `/admin/*` are redirected to `/doctor` by `AdminLayout` (not `AdminPageGuard` “Access denied”); E2E asserts redirect for `/admin/users`.
+- Editors saving a **verified** herb must send `reviewed` status on “Save Changes”; without that demotion, the UI blocked save with the verify-only alert (fixed in `AddHerb.jsx` during verification).
+- `docs/BUILD_PROMPT.md` referenced in `AGENTS.md` is **missing** from the repository; phase acceptance is tracked in `docs/PHASE_STATUS.md` against the user master prompt.
+- `acceptance-search-visibility.js` (55→56→56→55) **fails count assertions** on the current isolated DB (73 herbs at 100% for Tikta+Deepana vs expected 55) because all `HERB_REC_*` rows are `reviewed`; master/dev expectation is **134 reviewed + 42 draft**. Do not re-import without owner approval.
+- `DISABLE_RATE_LIMIT=true` now skips the login rate limiter (`auth.routes.js`); production must leave this unset.
+- RAG retrieval uses PostgreSQL full-text search (`ragKnowledgeService.js`), not vector embeddings; Phase 4 live LLM remains credential-dependent.
 - `GET /api/herbs` now supports `q` for manage-herb name search; advanced column filters on Manage Herbs still apply only to the current page when `VITE_USE_API=true`.
 - Backend integration tests require the API process to run with `DISABLE_RATE_LIMIT=true` during full-suite runs; otherwise login rate limiting can fail the suite after repeated logins.
 
