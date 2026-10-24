@@ -1,155 +1,163 @@
 # Dravyaguna release status
 
-Updated 2026-10-22. This is the living status file. `PHASE_0_STATUS.md` and `PHASE_1_STATUS.md` are historical.
+Updated **2026-10-24** (Phase 0 on branch `phase-0-ground-truth`). Stopped after Phase 0 dry-run audits (no deletions/consolidations applied yet).
 
-## Local startup, CORS, and port diagnosis (2026-10-22)
+## Phase 0 evidence (this session)
 
-**Status: VERIFIED** for the API origin policy, IPv4/IPv6 loopback access, occupied-port startup message, strict Vite port, and local health checker. The owner still needs to perform their browser login/Herb Library check; no browser workflow is claimed here.
+| Step | Status | Evidence |
+|---|---|---|
+| 0.1 `docs/ENVIRONMENTS.md` | VERIFIED | File added; Supabase `public.users` vs Auth dashboard documented |
+| 0.1 `npm run check:local` | VERIFIED | See command output below |
+| 0.2 Supabase dev read-only | BLOCKED | `DEV_DB_REF` unset in workspace; use SQL block in `docs/ENVIRONMENTS.md` |
+| 0.3 `seed:dev-users:supabase-dev` | WIRED-UNVERIFIED | Script + guards added; not run (no dev pooler + ref in env) |
+| 0.3 `staging:remove-dev-users` | WIRED-UNVERIFIED | Script added; not run |
+| 0.4 clutter audit | WIRED-UNVERIFIED | Dry-run table below; **awaiting your approval** before `git rm` |
+| 0.5 duplicate audit | WIRED-UNVERIFIED | Dry-run table below; route-duplicate test added |
+| 0.6 scripts/README | WIRED-UNVERIFIED | Inventory below; no script removals yet |
 
-- Reproduction before starting this checkout: `GET http://localhost:4000/api/health` timed out and `GET http://127.0.0.1:4000/api/health` was refused. `netstat -ano` showed no listeners on 4000, 5173, or 5180 and no Node server process was present. Therefore the reported running backend/frontend settings could not be inspected. A fresh local API started with `PORT=4000` and the four documented development origins; frontend build/start settings were explicitly `VITE_USE_API=true` and `VITE_API_BASE_URL=http://localhost:4000`.
-- Backend CORS accepts a trimmed comma-separated exact-origin allow-list, allows credentials plus Authorization/Content-Type and API methods, and uses the documented four-origin development default. Production refuses empty or wildcard origin configuration. Development binds dual-stack on `::` (`ipv6Only:false`).
-- Evidence: local API `GET` health on both `localhost` and `127.0.0.1` returned HTTP 200 and `{"status":"ok","database":"ok"}`. GET `/api/health` from `localhost:5180` and `localhost:5173` returned ACAO matching the request origin; the random origin returned no ACAO. OPTIONS POST preflights for both allowed origins returned 204 with Authorization, Content-Type, and GET/HEAD/POST/PUT/PATCH/DELETE/OPTIONS; the random origin received no CORS allow headers.
-- `backend`: `NODE_ENV=test; DATABASE_URL=<isolated local PostgreSQL 127.0.0.1:54334>; API_BASE_URL=http://localhost:4000; npm.cmd test` -> `29 passed, 0 failed, 29 total`. This includes comma-list parsing, all four default origins, disallowed origin, POST preflight, production empty/wildcard rejection, and occupied-port startup.
-- Frontend `npm.cmd test -- --run` -> `Test Files 10 passed (10); Tests 36 passed (36)`. `npm.cmd run lint` -> exit 0, 0 errors, 39 warnings. Production `npm.cmd run build` with API mode and `VITE_API_BASE_URL=http://localhost:4000` -> succeeded; `npm.cmd run verify:api-build` -> `PASS API production bundle excludes 6 mock persistence keys.`
-- `npm.cmd run check:local` -> `Backend health: localhost=OK, 127.0.0.1=OK`; all four CORS dev origins `PASS`; port owners `4000: PID 11124 (node); 5173: none; 5180: none` after stopping only the Vite server started for this check. While Vite was running IPv6-only on `[::1]:5180`, the updated checker identified `5180: PID 6700 (node)`. `npm.cmd run dev:local` served on 5180; a second invocation exited 1 with `Error: Port 5180 is already in use`.
-- The Herb Library's requested clinician count is not established by this connectivity verification. Read-only query on the isolated local database, `SELECT status, count(*) FROM herbs GROUP BY status`, returned `draft=6, reviewed=176, archived=1`; matching the expected 134 clinician-visible rows still requires the separately documented, owner-approved dataset alignment. No database records were changed for this task.
-- The user-reported old unrelated listener on 5173 was not present in the initial snapshot, so its PID/process name cannot be identified from this run. No unrelated process was stopped. Backend port 4000 is now free after stopping the local API; local PostgreSQL remains on 54334.
+### Git (start of session)
 
-## Re-verification evidence (2026-10-21)
+- Branch: `phase-0-ground-truth` (was `phase-a0-test-foundation`)
+- Unrelated frontend edits were left unstaged (not part of Phase 0 commit)
 
-- After the embedded local PostgreSQL service was found stopped, `backend/scripts/startEmbeddedPostgres.js` restarted the existing `.embedded-pg-agent-fresh` cluster after confirming `PG_VERSION` and `base/` exist; it did not initialize a new cluster. With `DATABASE_URL` explicitly set to local port 54334, `npm.cmd run migrate` returned `No migrations to run!` and `npm.cmd run check:rls` returned `All public tables have row-level security enabled.`
-- After restart, backend `npm.cmd test` against the same local port 54334 and a fresh API at port 44614 returned `27 passed, 0 failed, 27 total`. A local production-mode API health request returned `{status:"ok",database:"ok"}`.
-- Latest localized Simple Search and shared navigation work: frontend `npm.cmd test -- --run` â†’ 34 tests passed across 9 files; `npm.cmd run lint` â†’ 0 errors, 39 warnings; `npm.cmd run build` succeeded (627.22 kB JS chunk warning); `npm.cmd run verify:api-build` â†’ `PASS API production bundle excludes 6 mock persistence keys.` Backend on isolated local DB port 54334 with fresh API process: `npm.cmd test` â†’ 27 passed, 0 failed. Local Chromium simple search returned HTTP 200 with 98 results, named cards, and 0 page errors. Shared navigation translations have automated hook/dictionary tests and a mock-mode Chromium smoke of Hindi navigation/search labels with 0 page errors; full localization remains unverified.
-- `backend`: `$env:DATABASE_URL=<isolated local PostgreSQL>; $env:API_BASE_URL=http://127.0.0.1:4015; $env:NODE_ENV=test; npm.cmd test` → `12 passed, 0 failed, 12 total`.
-- Frontend `npm.cmd test -- --run` → `Test Files 5 passed (5); Tests 21 passed (21)`.
-- Frontend `npm.cmd run lint` → exit 0, 0 errors, 39 warnings.
-- Frontend `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
-- Backend `npm.cmd test` → `15 passed, 0 failed, 15 total` against the isolated local database.
-- B1 backend `npm.cmd test` against the same isolated DB and fresh local API (`API_BASE_URL=http://127.0.0.1:4017`) → `16 passed, 0 failed, 16 total`.
-- Backend `npm.cmd run migrate` applied additive migration `012_term_synonyms_approval_status` on the isolated DB; `npm.cmd run check:rls` → `All public tables have row-level security enabled.`
-- D backend `npm.cmd test` against the isolated local DB and fresh API → `17 passed, 0 failed, 17 total`; covers mock cache hit, provider failure degradation, reference/scoring payload, herb-edit cache invalidation, auth/validation, and the 10-per-user/minute limit.
-- D frontend `npm.cmd test -- --run` → `Test Files 6 passed (6); Tests 24 passed (24)`; ESLint → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded (616.90 kB JS chunk warning) and `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
-- Backend `npm.cmd run migrate` applied additive migration `013_vocabulary_definition_status`; all vocabulary definition statuses default to `draft` on the isolated DB.
-- Translation backend `npm.cmd run migrate` applied additive migration `014_translation_cache_provider` against the isolated DB. Backend `npm.cmd test` against the isolated DB and fresh API at port 45731 → `18 passed, 0 failed, 18 total`; includes three-field mock caching, zero provider calls on repeated reads, API translation output, clinician verification denial, domain-expert verification audit persistence, and edit invalidation.
-- Translation frontend `npm.cmd test -- --run` → `Test Files 6 passed (6); Tests 24 passed (24)`; ESLint → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded (618.32 kB JS chunk warning); `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
-- Translation reviewer-control follow-up frontend `npm.cmd test -- --run` → `Test Files 6 passed (6); Tests 24 passed (24)`; ESLint → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded (621.36 kB JS chunk warning); API bundle check passed. Admin/domain-expert detail controls now call the tested verification API; browser interaction remains unverified.
-- E backend `npm.cmd run migrate` applied additive migration `015_password_reset_single_use` to the isolated DB. `npm.cmd test` with local API port 45988 → `20 passed, 0 failed, 20 total`; upload checks reject invalid magic bytes, >2 MB bodies, clinician access, and external test-mode writes; reset checks cover generic responses, hashed tokens, 30-minute expiry, password change, single-use behavior, and rate limiting.
-- E frontend `npm.cmd test -- --run` → `Test Files 6 passed (6); Tests 24 passed (24)`; ESLint → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded (620.29 kB JS chunk warning); API bundle check passed.
-- B3 CSV backend `npm.cmd test` with local API port 45990 → `21 passed, 0 failed, 21 total`; CSV format, filename, stored rows, and admin-only authorization are asserted. XLSX returns 501 and remains blocked.
-- B4 backend `npm.cmd test` with isolated local DB/API port 45992 → `22 passed, 0 failed, 22 total`, including the rank-before-breakdown SQL contract and unchanged search/weight result tests. Local `node scripts/explainSearch.js` baseline: 18.630 ms; optimized query: 13.813 ms (single warm local run, 176 herbs). `npm run measure:search-concurrency` under API pool max 5: 5 clients 201.40 req/s, avg 24.29 ms, p97.5 35 ms; 10 clients 205.60 req/s, avg 48.11 ms, p97.5 63 ms. Pool max 10: 5 clients 193.40 req/s, avg 25.34 ms, p97.5 37 ms; 10 clients 243.20 req/s, avg 40.54 ms, p97.5 57 ms. All runs reported 0 errors and 0 non-2xx.
-- Frontend adapter tests: `npm.cmd test -- --run` → `Test Files 5 passed (5); Tests 21 passed (21)`; `npm.cmd run lint` → exit 0, 0 errors, 39 warnings; production build and API-build mock scan passed.
-- Backend `npm.cmd run migrate` applied `011_enable_rls_public_tables`; `npm.cmd run check:rls` → `All public tables have row-level security enabled.`
-- Migration 005 is already applied and historically recreated `herb_mala`; it must not be rerun. All new schema changes are additive/ALTER-only.
-- Local production smoke: Vite preview root and `/herb-library` both returned HTTP 200; production-mode API `/api/health` returned HTTP 200 with API/database `ok`.
-- Historical check: no migrations were pending at port 54333 when that cluster was active. It is now the stale, partially migrated cluster; current tests use the isolated database at port 54334.
-- Backend `npm.cmd test`: 12/12 passed against the isolated database. Herb regression cases prove editors and reviewers cannot archive through the general update endpoint while Admin can. Admin audit tests confirm user creation, role changes, status changes, and name/email edits are recorded. Other cases cover verification, domain expert scoring/analytics, immediate token permission revocation, vocabulary relinking/protected deletion, and the Phase B simple-search threshold of 0.45.
-- Chromium with the local API: clinician login, profile, language, and search settings persisted after reload; restored seed values afterward.
-- Chromium with the local API: admin dashboard, herb management, vocabulary, scoring, users, audit log, and analytics pages loaded without API errors or browser exceptions.
-- Chromium with the local API: admin user name/email edit and scoring weight changes persisted after reload; restored seed user values and scoring weights afterward.
-- Chromium with the local API: clinician herb library/detail, favorite add/reload/remove, simple fever search (9 results), and saved-search create/list/run/delete passed. The saved search and favorite rows were cleaned up afterward.
-- Chromium with the local API: admin herb draft create, edit hydration, and description/identification-note persistence passed; the temporary test herb was removed.
-- Chromium with the local API: admin Karma term create/edit persisted across reloads; temporary vocabulary term was removed. Unsupported API vocabulary fields and local-only activation/deactivation controls are now hidden in server mode; failed create/update/delete/merge requests surface errors.
-- Chromium with the local API: admin role change for the seeded clinician persisted after reload; the original role and active status were restored.
-- Fixed a stale `SearchResults` memo that kept API search results empty, and preserved backend `matchPercentage` values through the frontend adapter.
-- Backend request logging now redacts `Authorization` and `Cookie` headers.
-- Frontend role normalization now consistently maps Admin, Ayurvedic Reviewer, Doctor/User, Editor, legacy case variants, and backend role IDs. Admin routes redirect unauthenticated or regular clinician accounts, and admin-only pages render an access-denied state for unauthorized elevated roles. Herb Verify/Archive controls use the normalized role; backend checks remain authoritative.
-- Backend authentication now loads the current role and account status from PostgreSQL on every authenticated request. Integration tests prove an existing admin token loses admin access immediately after demotion and an inactive account's existing token is rejected; login is still required to restore a session after reactivation.
-- The User & Role Management permissions matrix and sidebar now reflect API capabilities: reviewers can verify herbs, change scoring weights, and view analytics but cannot access user management/audit; editors can add herbs and vocabulary terms but cannot verify herbs, edit/merge/delete vocabulary, or change scoring; clinicians are limited to clinical/search workflows.
-- API-backed clinical/search/account routes now redirect users without an API token to sign in. The same boundary honors the explicit `isAuthenticated` session in local demo mode, and logout clears that marker.
-- The embedded DB script previously initialized a clean isolated cluster at port 54333; it is now stale and was left untouched. Current migrated test cluster is at port 54334. An older local cluster at port 54331 failed with a shared-memory-in-use error and remains untouched. The startup script checks for `PG_VERSION` before init so it does not reinitialize existing data.
-- Live API `GET /api/health`: returned `{ status: "ok", database: "ok" }` on 2026-10-21.
-- `git diff --check`: passed on 2026-10-21; Git emitted only LF-to-CRLF conversion notices.
+### Tests (this machine)
 
-The repository `.env` still defaults to an unverified Supabase pooler URL. A migration command using that default was denied by the environment before connecting; no remote migration ran. Older migration/API test commands used local `127.0.0.1:54333`; use `127.0.0.1:54334` for current local work. Always override the database URL; do not test against the unconfirmed Supabase project.
+**Frontend** (`npm test`):
 
-The old Supabase URL in `backend/.env` is a pooler target, and `DEV_DB_REF` is absent. The backend safety guard therefore refuses tests against it. No project reference was guessed, no safety check was weakened, and no remote database was used. Integration results above are from the local embedded database only.
+```text
+Test Files  10 passed (10)
+Tests       36 passed (36)
+```
 
-## Recent implementation
+**Backend** — first attempt with embedded Postgres stopped:
 
-- Added repo-root `AGENTS.md` with the standing safety, testing, status, and documentation rules; read `docs/PHASE_STATUS.md`, `KNOWN_ISSUES.md`, `API.md`, and `MANUAL_CHECKLIST.md` after confirming the supplied build prompt override.
-- Herb archive authorization is enforced in the service layer for status changes through PUT/PATCH and the dedicated DELETE route. Editors and domain experts cannot set `status: archived` through the general update route; API regression tests cover those denials and the Admin path.
-- Admin user creation, role changes, and status changes now write audit records in the same transaction as the mutation; the API suite verifies all user mutation audit events.
-- Admin metrics and search analytics read backend aggregates; audit log and user management use protected backend routes.
-- Admin profile, preferred language, notification and workspace preferences, and password changes use authenticated account APIs. Admin profile photo upload and active-session reporting remain unavailable and are identified as such in the UI.
-- Admin user name/email editing now has a validated admin-only API with transaction and audit record.
-- Clinician profile, preferred language, password, and displayed settings are wired to account APIs. Search mode and result page size consume the stored preferences. Email change requires the unavailable verification-mail service.
-- Favorites and saved searches have API-backed create/list/delete flows; saved searches can be named and rerun from the saved library.
-- Herb library, admin dashboard, and herb management now follow pagination metadata rather than silently stopping at the first 200 herbs.
-- Scoring configuration saves as one server transaction with audit logging; invalid parameter groups roll back the request.
-- The isolated importer/migration fixes, match rounding correction, and custom vocabulary slug/canonical lookup fix are retained.
-- Simple search trigram similarity now uses the Phase B threshold (0.45); synonym quality/coverage still depends on the pending domain-approved seed list.
+```text
+Error: connect ECONNREFUSED 127.0.0.1:54334
+```
 
-## Latest verification snapshot (2026-10-21)
+After starting embedded Postgres (`.embedded-pg-phase0` on `127.0.0.1:54334`), migrate/seed/import, `npm run rag:ingest -- --herbs`, API on port 4000 with `DISABLE_RATE_LIMIT=true`, and one `draft` herb for RAG authorization (`HERB_REC_0176`):
 
-- Backend: `npm.cmd test` against isolated local DB/API at port 44587 → 23 passed, 0 failed, 23 total.
-- Frontend: `npm.cmd test -- --run` → 24 passed in 6 files; `npm.cmd run lint` → exit 0, 0 errors, 39 warnings; `npm.cmd run build` succeeded with 622.65 kB chunk warning.
-- API bundle scan: `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
-- Migrations: `npm.cmd run migrate` reported no pending migrations on isolated local PostgreSQL; `npm.cmd run check:rls` reported all public tables have RLS enabled.
-- Offline audits: frontend and backend `npm.cmd audit --offline` reported 0 vulnerabilities using cached audit data; this does not establish current online advisory status.
-- Chromium local checks verified login/session restoration and role route boundaries for clinician, domain expert and admin, plus the RAG question/evidence panel using the explicitly labelled mock. Herb CRUD and broader workflows, staging Supabase, Docker builds, and live external providers remain unverified.
+```text
+30 passed, 0 failed, 30 total
+```
 
-## Current status table
+**Note:** CI/fresh import has **no** `draft` herbs; `21-rag-knowledge.test.js` expects both reviewed and draft rows. Fix belongs in Phase 1 (test should create its own draft fixture).
 
-### Latest continuation evidence (2026-10-21)
+### `npm run check:local` (2026-10-24)
 
-- Search translation continuation: backend `npm.cmd test` against the fully migrated isolated local PostgreSQL cluster on port 54334 and fresh API port 44606 → `27 passed, 0 failed, 27 total`; covers configured-provider translation via test double, protected term masking/restoration, mock refusal, provider-failure behavior, Devanagari detection, API response, and 30-per-user-per-minute rate limit. Frontend `npm.cmd test -- --run` → `25 passed` across 6 files; lint → `0 errors, 39 warnings`; `npm.cmd run build` passed (622.81 kB JS chunk warning); `npm.cmd run verify:api-build` → `PASS API production bundle excludes 6 mock persistence keys.`
-- Local Chromium on Vite 5177/API 44607 verified saved Hindi preference → Simple Search → empty response with explicit translation-not-configured feedback against the fully migrated local DB. One API search request completed; 0 browser errors. The account language was restored after testing. Real translation provider behavior remains unverified because no provider key is available.
-- Local Chromium also verified a domain expert can find and verify a temporary draft herb from `/admin/manage-herbs`; the API/database returned status `verified`. A clinician was redirected to `/doctor` from the same page. Both browser runs had 0 page errors; the temporary herb and only its test audit entries were removed. Backend regression coverage asserts clinician/editor verification returns 403 and domain expert/admin verification succeeds.
-- Database clarification: the existing `.embedded-pg-agent-test` cluster at port 54333 contains only migrations 001–009 and is stale for current code. It was not migrated. The current full-suite run used the already fully migrated `.embedded-pg-agent-fresh` cluster at port 54334 (migrations 001–016; 183 herbs, 7 users). No project or production database was contacted.
+```text
+Backend health: localhost=OK, 127.0.0.1=OK
+Backend .env DATABASE_URL endpoint: 127.0.0.1:54334
+Running API reports databaseEndpoint: 127.0.0.1:54334
+Users (public.users): 7
+Herbs by status: reviewed=176
+RLS: all public tables enabled
+CORS dev origins: ... PASS (all four)
+Port owners: 4000: node; 5180: none
+```
 
-- Backend `npm.cmd test` against the isolated local PostgreSQL database and a fresh API process at `http://127.0.0.1:44587`: `23 passed, 0 failed, 23 total`. The RAG test covers supported-file parsing, chunk bounds, duplicate-safe ingestion/re-indexing, keyword retrieval and metadata, clinician draft exclusion, citations, insufficient evidence, hostile passage handling, missing LLM credentials, and provider failure degradation.
-- Latest backend suite after adding source-flag, import-safety, and optional local source-workbook acceptance regressions: `npm.cmd test` against isolated local DB/API port 44594 → `26 passed, 0 failed, 26 total`.
-- Read-only `node scripts/importRealDatasetDryRun.js` using the local ignored `Dataset/herbs.xlsx` → 176 source rows, 134 clean/reviewed, 42 flagged/draft, 0 skipped; 238 open Karma and 426 Indication spellings need review. It no longer connects to or seeds a database.
-- The isolated DB was not changed by the dry run. It currently has 176 `HERB_REC_*` rows all marked reviewed, plus six leftover browser-test draft herbs and one archived browser-test herb. This does not match the source's 134/42 visibility split. Importing the source would overwrite attributes for existing `HERB_REC_*` records, so no real-data import or test-row cleanup was performed.
-- Frontend `npm.cmd test -- --run`: `Test Files 6 passed (6); Tests 24 passed (24)`.
-- Chromium local click-through against API port 44586 and Vite port 5175: clinician login/session restore and admin denial; domain-expert login/session restore and user-management denial; admin user page; herb library/detail and question-based RAG evidence panel. Result: all checked workflows passed, 0 API HTTP errors and 0 uncaught browser errors. The default RAG provider was explicitly the development mock, not a live generated answer.
-- Chromium Simple Search: canonical `Deepana` reached `/api/search/simple`, showed the backend matched-term feedback, and returned with 0 API errors. Draft-only `fever` correctly remained unmatched in API mode; its starter mapping is not approved/imported and the UI did not falsely claim a match.
-- `npm.cmd run lint`: exit 0, 0 errors, 39 warnings. `npm.cmd run build` succeeded (622.65 kB JS chunk warning); `npm.cmd run verify:api-build`: `PASS API production bundle excludes 6 mock persistence keys.`
-- Local RAG ingestion: `npm.cmd run rag:ingest -- --herbs` indexed 182 stored non-archived herb records; repeat run reported 0 changed and 182 unchanged documents. No external reference documents were present or invented.
-- Browser testing initially hit a local CORS origin mismatch and the API's login rate limit after browser logins; the local server was restarted on isolated ports and the complete backend suite then passed. Production rate limits and database safety checks were not changed.
+### Root cause: “users don’t appear in Supabase”
 
-| Phase | Feature | Status | Evidence / remaining work |
-|---|---|---|---|
-| A0 | Test foundation and local DB guard | VERIFIED | Latest backend `npm.cmd test` on isolated `.embedded-pg-agent-fresh` DB port 54334/API port 44606: 27 passed, 0 failed, 27 total. Frontend `npm.cmd test -- --run`: 25 passed in 6 files. |
-| A | Authentication and role enforcement | VERIFIED | Backend suite: `npm.cmd test` → 27 passed, 0 failed, 27 total; Chromium login/session restore and clinician/reviewer denied-route checks passed against the local API. |
-| A | Herb library, details, CRUD, verification, archive | WIRED-UNVERIFIED | API suite passes; end-to-end page and role workflows still need automated browser tests. |
-| A | Company dataset visibility and import | BLOCKED | Read-only `node scripts/importRealDatasetDryRun.js` and optional local-workbook test show 176 source rows, 134 reviewed, 42 draft. The isolated DB has 176 `HERB_REC_*` rows all reviewed; current Tikta+Deepana yields 144/73 full versus approved clinician 108/55, Tikta+Ushna yields 144/84 versus 108/63, Ushna yields 109 versus 80, and Vata-pacifies yields 126 versus 93. Importing updates source herb records and cleanup affects listed test rows; owner approval is needed before changing this existing local DB. |
-| A | Detailed search and scoring | WIRED-UNVERIFIED | API suite passes; detailed search UI workflow and search-after-weight-change UI remain unverified. |
-| A | Vocabulary management | WIRED-UNVERIFIED | API suite covers validation, merge/relink, and protected deletion; UI workflows need automated browser coverage. |
-| A | User/role management, analytics, audit | WIRED-UNVERIFIED | API suite covers permissions, persistence, and audit events; browser workflows need automated coverage. |
-| A | Profile, language, settings | WIRED-UNVERIFIED | Account API tests pass; browser persistence claims are not automated tests. |
-| A | Favorites and saved searches | WIRED-UNVERIFIED | API tests pass; browser workflows need automated coverage. |
-| A | Compare | WIRED-UNVERIFIED | Selection stores herb IDs locally and reads herb data through APIs; workflow is not automated. |
-| B1 | Approved-only Simple Search mapping and UI | WIRED-UNVERIFIED | Backend integration tests cover draft exclusion, an approved `term_synonyms` mapping, unknown phrase zero-results plus async logging, request-only fuzzy matching, unsupported-language notes, and the 0.45 threshold/80% relative cutoff. Local Chromium verified canonical `Deepana` feedback; draft-only `fever` correctly remains unmatched. The frontend browser run is a local smoke, not a committed browser regression suite. |
-| B2 | Expert-approved vocabulary import/relink | BLOCKED | `backend/scripts/vocab_review.csv` has 657 rows and zero nonempty `approved_canonical` values; an expert-approved mapping file is required. |
-| B3a | Admin CSV export endpoint and script | VERIFIED | Local backend `npm.cmd test`: `21 passed, 0 failed, 21 total`; covers admin-only access, CSV headers/filename, and stored data. `npm run export:herbs` uses `API_BASE_URL` plus `EXPORT_ADMIN_TOKEN`. |
-| B3b | XLSX export | VERIFIED | Backend `npm.cmd test` against isolated local DB/API at port 44594 → `26 passed, 0 failed, 26 total`; checks admin-only access, XLSX MIME type/download name, valid ZIP workbook parts, herb-master headers, and stored records. Spreadsheet-app rendering was not manually verified. |
-| B4 | Query/performance work | WIRED-UNVERIFIED | SQL materializes and limits ranked candidates before computing breakdown JSON; backend contract and score tests pass. Local warm EXPLAIN decreased 18.630→13.813 ms. Controlled pool-size measurements are recorded above, but cloud/Supabase throughput and larger production data remain unverified. Existing historical flat-throughput results had no archived metrics; current measurements suggest concurrency queuing (latency roughly doubles at pool 5 / 10 clients) and demonstrate a pool-10 throughput increase at 10 clients, but cannot explain the earlier run conclusively. |
-| C1 | Herb descriptive translation, cache, verification, selector | WIRED-UNVERIFIED | Mock-backed API tests cover cache hits, provider-call counts, verification permissions/audit, and invalidation. Live providers require keys; browser interaction is unverified. |
-| C2 | Hindi/Marathi search-query translation | WIRED-UNVERIFIED | Hindi/Marathi requests use configured Sarvam→Google→Azure adapters, protect stored herb/classical terms, reject mock output and fail visibly. Backend tests cover configured-provider behavior with a test double, provider failure, Devanagari detection, and rate limit; frontend test and Chromium verify language propagation and unavailable-provider feedback. Live provider translation needs credentials. Sanskrit query translation is unsupported. |
-| C2 | Localized Simple Search result fields | WIRED-UNVERIFIED | Search responses separate detected query language from preferred display language. Result cards request cached herb detail translations for the part-used field, label mock/machine/verified/unavailable states, and keep names and classical terms unchanged. Unit tests cover API card mapping and translation fallback; local Chromium found and verified the API-result-to-card mapping fix (98 `Deepana` results, named cards, 0 page errors). Live translation keys and provider response remain unverified. |
-| C3 | Frontend interface localization | WIRED-UNVERIFIED | Translation files and a shared language hook localize workspace navigation, account menu labels, and the search landing headings/actions in English, Hindi, Marathi, and Sanskrit. The user/admin language preference updates the shared UI language. Tests cover all four dictionaries, search labels, persisted language notifications, and mounted-label updates. A local mock-mode Chromium smoke selected Hindi, then verified translated navigation and search heading with 0 page errors. Most page content and forms remain English; full-page localization/browser click-through has not been completed. |
-| D1a | Knowledge ingestion and keyword retrieval | VERIFIED | Backend `npm.cmd test` → 26 passed, 0 failed, 26 total; tests cover parser/chunking, idempotent insert and re-index, retrieval metadata, role filtering, source citations, insufficient evidence, hostile passage separation, and credential-independent behavior. `npm.cmd run rag:ingest -- --herbs` indexes 182 stored records. No external authoritative reference corpus or vector index was supplied. |
-| D1b | Live grounded LLM answer generation | BLOCKED | Mock is explicitly labelled `ai_generated: false`; the OpenAI adapter requires `LLM_API_KEY` and `LLM_MODEL`. Missing-credential and provider-failure behavior is tested; provide valid provider credentials/model to verify a real model response. |
-| D2 | RAG question and evidence UI | WIRED-UNVERIFIED | InfoIcon unit tests are included in the 24-test frontend suite. Chromium exercised question submission and source/evidence display with the labelled development mock; no real provider answer was exercised. |
-| E1 | Herb image upload | BLOCKED | Endpoint and Add/Edit UI validate JPEG/PNG/WebP by magic bytes and 2 MB cap; tests verify permissions and reject external writes in test mode. Live upload needs Supabase Storage credentials, bucket, and policy. |
-| E2 | Password reset | BLOCKED | API/UI and backend tests cover generic requests, hashed single-use tokens, 30-minute expiry, and password change. The email sender is a no-output stub; SMTP delivery is not implemented/configured, so users cannot receive reset links. |
-| F | RLS | VERIFIED | Local `npm run check:rls`: all public tables enabled; backend suite verifies no public policies. Supabase project review remains. |
-| F | Production configuration and first-admin safety | WIRED-UNVERIFIED | Render/Vercel configs, names-only env examples, and seed guards are present; local API/SPA smoke checks pass, but first-admin creation against staging is not run. |
-| G | Staging deployment | BLOCKED | Needs staging Supabase URL, hosting accounts, frontend origin, and deployment secrets. |
+**One sentence:** App users are stored in **`public.users`** (custom JWT auth), not in Supabase **Authentication → Users**; registrations also won’t show in Supabase if the running API points at **local** `127.0.0.1:54334` instead of the dev pooler.
 
-## Remaining critical work
+---
 
-1. Obtain expert approval for any starter synonym mappings and add browser coverage for Simple Search feedback; the draft CSV is intentionally not imported.
-2. Provide Supabase Storage configuration before enabling image uploads and implement/configure SMTP delivery before enabling password resets.
-3. Provide a Sarvam or fallback key and verify live Hindi/Marathi query translation; extend C3 translations across page content/forms and add browser verification; validate generated XLSX in a spreadsheet application.
-4. Owner staging click-through remains; local Chromium smoke is partial and does not verify herb mutations, scoring persistence, vocabulary merge, analytics, audit filters, saved-search persistence, or live external services.
-5. Deploy to staging only after a confirmed staging Supabase target, hosting accounts, and deployment secrets are supplied. Do not run migrations against the unverified Supabase URL.
+## Phase 0.4 clutter audit (dry run — do not delete until approved)
 
-## External launch dependencies
+| Path | Size (bytes) | Last commit | Keep? | Notes |
+|---|---:|---|---|---|
+| `README.md` | 6453 | 2026-10-22 | Yes | Allowed |
+| `AGENTS.md` | 1763 | 2026-10-21 | Yes | Allowed |
+| `docs/API.md` | 20728 | 2026-10-21 | Yes | Allowed |
+| `docs/ENVIRONMENTS.md` | (new) | 2026-10-24 | Yes | Allowed |
+| `docs/MANUAL_CHECKLIST.md` | 17633 | 2026-10-22 | Yes | Allowed |
+| `docs/PHASE_STATUS.md` | — | — | Yes | This file |
+| `docs/KNOWN_ISSUES.md` | 16684 | 2026-10-22 | Yes | Allowed |
+| `docs/DEPLOY.md` | — | — | **Missing** | Create in Phase 7 from README staging section |
+| `docs/PHASE_0_COMPLETE.md` | 1189 | 2026-10-11 | **Delete** | Superseded by `PHASE_STATUS.md` |
+| `docs/PHASE_0_STATUS.md` | 2260 | 2026-10-21 | **Delete** | Superseded |
+| `docs/PHASE_1_STATUS.md` | 5838 | 2026-10-14 | **Delete** | Superseded |
+| `backend/README.md` | 1187 | 2026-10-10 | **Merge** | Overlap with root `README.md`; then delete |
+| `backend/IMPLEMENTATION_PLAN.md` | 12993 | 2026-10-10 | **Delete** | AI plan; not in allowed list |
+| `IMPLEMENTATION_PLAN_DETAILED.md` | (untracked) | — | **Delete** | Not tracked; not in allowed list |
 
-Live translation and LLM generation, SMTP password reset/email verification, persistent image storage, billing, production hosting/secrets, and a deployment-time database/RLS policy review require external configuration and remain incomplete. Explain retrieval uses stored SQL records and scoring; no external vector service is currently required. Dockerfiles and context exclusions were updated, but the Docker image was not built because Docker is not installed in this environment.
+`.gitignore` already covers `.env*`, `node_modules/`, `Dataset/`, `*.xlsx`, `vocab_review.csv`, `dist/`, `backend/.embedded-pg*/`.
 
-Additional launch inputs still required: Sarvam and LLM keys; optional Google/Azure translation credentials; SMTP credentials; Supabase Storage URL, service role key, bucket and read policy; confirmed staging and production Supabase projects; hosting accounts and domain; monitoring configuration. The Ayurveda expert must approve vocabulary mappings and definitions. The company must confirm dataset scope, Organ data, and reviewed-record policy. Explain retrieval uses stored SQL records and scoring; no external vector service is currently required. Dockerfiles and context exclusions are present, but Docker was unavailable. Full owner staging click-through is pending.
+**depcheck (backend):** reports unused `pino` (false positive — used via `pino-http`); missing `xlsx` for `scripts/checkHerb0001.js` only.
 
-Labels: `NOT STARTED`, `WIRED-UNVERIFIED`, `VERIFIED`, `BLOCKED`. VERIFIED refers only to the scope and environment stated above.
+---
+
+## Phase 0.5 duplicate audit (dry run)
+
+### Same basename (case-insensitive) in repo
+
+| Basename | Count | Recommendation |
+|---|---:|---|
+| `README.md` | 2 | Merge backend into root README; delete `backend/README.md` |
+| `.env.example` | 2 | Keep both (frontend + backend) |
+| `.gitignore` | 2 | Keep both |
+| `package.json` / lock | 2 | Keep (monorepo layout) |
+| `auth.js` | 2 | Keep (`middleware/auth.js` vs `src/auth.js` if both exist — verify paths) |
+| `roles.js` | 2 | Keep if different layers |
+| `Dockerfile` | 2 | Keep if frontend/backend images |
+
+No `herb.routes.js` vs `herbs.routes.js` duplicate (only `herb.routes.js`).
+
+### Duplicate logic
+
+| Area | Finding | Recommendation |
+|---|---|---|
+| Search | Single `searchService.js` | None |
+| Auth routes | Single `auth.routes.js` | None |
+| Weights | Single `weightsCache.js` + routes | None |
+| API client | Single `src/api/client.js` | None |
+| Mock dataset | `src/data/` mock path when `VITE_USE_API=false` | Keep; production build scan excludes mock keys |
+
+### Express routes (46 registrations, no duplicate method+path)
+
+See `backend/src/utils/listExpressRoutes.js` + test `28-route-duplicates.test.js`. Admin and favorites both mount at `/api` but paths differ (`/admin/export` vs `/favorites`); no shadowing found.
+
+### Database
+
+| Check | Finding |
+|---|---|
+| `herb_indication` vs `herb_indications` | Only `herb_indications` exists |
+| Migrations | `001`–`016` sequential `.cjs`; no duplicate numbers |
+| Unused tables | `herb_avayava` exists but no Organ data (product decision: filter disabled) |
+
+**jscpd:** not run this session (cost/time); optional before consolidation.
+
+### Superseded `backend/scripts/test*.js` (propose delete after Phase 1 Playwright)
+
+Covered by `backend/tests/*.test.js`: auth, library, search, weights, herb CRUD, vocabulary, admin, favorites, account, simple search, explain, translations, password reset, upload, export, CORS, RLS. One-off scripts (`testLogin.js`, `testAdminPagesUI.js`, etc.) overlap manual Chromium notes in older `PHASE_STATUS` — **delete after Playwright lands**.
+
+---
+
+## Phase 0.6 script inventory (no removals yet)
+
+**Root `package.json`:** `dev`, `dev:local`, `check:local`, `build`, `verify:api-build`, `lint`, `test`, `preview`.
+
+**Backend `package.json`:** `start`, `dev`, `migrate*`, `import:frontend`, `scale:herbs`, `db:embedded`, `seed`, `test`, `test:cleanup`, `check:rls`, `admin:first`, `export:herbs`, `measure:search-concurrency`, `weights:reset`, `dev-users:passwords`, **`seed:dev-users:supabase-dev`**, **`staging:remove-dev-users`**, `loadtest:search`, `explain:search`, `rag:ingest`.
+
+---
+
+## Master prompt phase summary (0–7)
+
+| Phase | Status | Notes |
+|---|---|---|
+| **0** Ground truth & cleanup | **WIRED-UNVERIFIED** | 0.1–0.3 code done; 0.4–0.5 dry runs recorded; deletions/consolidation **blocked on your approval**; Supabase dev inspection **BLOCKED** (`DEV_DB_REF`) |
+| **1** E2E tests | **NOT STARTED** | Playwright + smoke + section 5 acceptance on local DB |
+| **2** Admin/user pages | **WIRED-UNVERIFIED** | API wired; Playwright per role not done |
+| **3** Search quality & vocabulary | **WIRED-UNVERIFIED** | Simple search tests exist; expert CSV still empty |
+| **4** RAG & InfoIcon | **WIRED-UNVERIFIED** | Template/mock path tested; live LLM **BLOCKED** (no key) |
+| **5** Multi-language | **WIRED-UNVERIFIED** | Mock translation tests; Sarvam **BLOCKED** |
+| **6** Images, reset, first admin | **BLOCKED** | Storage/SMTP/first-admin on prod |
+| **7** Security & deployment | **NOT STARTED** | No `docs/DEPLOY.md` yet; CI exists |
+
+Labels: `NOT STARTED` | `WIRED-UNVERIFIED` | `VERIFIED` | `BLOCKED`.
+
+---
+
+## Historical notes (pre–Phase 0)
+
+Older verification paragraphs below this line are retained for audit trail but may reference ports, test counts, or environments that differ from the 2026-10-24 run. Prefer the **Phase 0 evidence** section above for current truth.

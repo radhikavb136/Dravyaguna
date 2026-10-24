@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import { env } from './config/env.js';
 import { pool } from './db/pool.js';
+import { databaseEndpointFromUrl } from './utils/databaseEndpoint.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.routes.js';
 import { searchRouter } from './routes/search.routes.js';
@@ -43,11 +44,12 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
 
   const health = async (_req, res) => {
+    const databaseEndpoint = databaseEndpointFromUrl(env.databaseUrl);
     try {
       await pool.query('SELECT 1');
-      res.json({ status: 'ok', database: 'ok' });
+      res.json({ status: 'ok', database: 'ok', databaseEndpoint });
     } catch {
-      res.status(503).json({ status: 'error', database: 'unavailable' });
+      res.status(503).json({ status: 'error', database: 'unavailable', databaseEndpoint });
     }
   };
   app.get('/api/health', health);

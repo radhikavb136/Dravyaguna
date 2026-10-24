@@ -21,6 +21,14 @@ dotenv.config();
 
 const { Pool } = pg;
 
+const supabaseDevMode = process.argv.includes('--supabase-dev');
+const confirmed = process.argv.includes('--confirm');
+
+if (supabaseDevMode && !confirmed) {
+  console.error('ERROR: Supabase dev seed requires --confirm');
+  process.exit(1);
+}
+
 // Safety check: prevent running in production
 if (process.env.NODE_ENV === 'production') {
   console.error('ERROR: Cannot run seed script in production (NODE_ENV=production)');
@@ -52,7 +60,16 @@ if (prodRef && (dbUrl.includes(prodRef) || databaseProjectRef === prodRef)) {
   process.exit(1);
 }
 
-if (!isDevDatabase && !isExplicitDevDatabase) {
+if (supabaseDevMode) {
+  if (!devRef || !dbUrl.includes(devRef)) {
+    console.error('ERROR: Supabase dev seed requires DEV_DB_REF to be set and present in DATABASE_URL');
+    process.exit(1);
+  }
+  if (!isExplicitDevDatabase) {
+    console.error('ERROR: DATABASE_URL project ref must match DEV_DB_REF for Supabase dev seed');
+    process.exit(1);
+  }
+} else if (!isDevDatabase && !isExplicitDevDatabase) {
   console.error('ERROR: DATABASE_URL does not appear to be a development database');
   console.error('Use a local dev URL or set DEV_DB_REF to the exact Supabase project ref.');
   process.exit(1);
@@ -74,31 +91,45 @@ const users = [
 ];
 
 async function main() {
-  console.log('Seeding dev users...\n');
+  if (!supabaseDevMode) {
+    console.log('Seeding dev users...\n');
+  }
 
   const client = await pool.connect();
   try {
     for (const user of users) {
       const passwordHash = await bcrypt.hash(user.password, 10);
-      
-      const { rows } = await client.query(
+
+      await client.query(
         `INSERT INTO users (email, password_hash, full_name, role)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (email) DO UPDATE SET
            password_hash = $2,
            full_name = $3,
-           role = $4
-         RETURNING email, role`,
+           role = $4`,
         [user.email, passwordHash, user.full_name, user.role]
       );
 
-      console.log(`✓ ${rows[0].email} (${rows[0].role})`);
+      if (!supabaseDevMode) {
+        console.log(`✓ ${user.email} (${user.role})`);
+      }
     }
 
-    console.log('\nDev users seeded successfully (password not printed).');
-    users.forEach((u) => {
-      console.log(`  ${u.email} (${u.role})`);
-    });
+    const { rows: roleCounts } = await client.query(
+      `SELECT role, COUNT(*)::int AS count FROM users GROUP BY role ORDER BY role`
+    );
+    const { rows: totalRows } = await client.query('SELECT COUNT(*)::int AS count FROM users');
+
+    if (supabaseDevMode) {
+      console.log(`Dev users upserted: ${users.length}`);
+      console.log(`users total: ${totalRows[0].count}`);
+      console.log(`users by role: ${roleCounts.map((r) => `${r.role}=${r.count}`).join(', ')}`);
+    } else {
+      console.log('\nDev users seeded successfully (password not printed).');
+      users.forEach((u) => {
+        console.log(`  ${u.email} (${u.role})`);
+      });
+    }
   } finally {
     client.release();
     await pool.end();

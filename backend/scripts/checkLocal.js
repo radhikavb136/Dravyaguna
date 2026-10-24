@@ -1,4 +1,13 @@
 import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import pg from 'pg';
+import dotenv from 'dotenv';
+import { databaseEndpointFromUrl } from '../src/utils/databaseEndpoint.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const backendRoot = path.join(__dirname, '..');
+dotenv.config({ path: path.join(backendRoot, '.env') });
 
 const port = Number(process.env.PORT || 4000);
 const origins = [
@@ -12,9 +21,12 @@ async function health(host) {
   try {
     const response = await fetch(`http://${host}:${port}/api/health`, { signal: AbortSignal.timeout(1800) });
     const body = await response.json();
-    return response.ok && body?.status === 'ok' && body?.database === 'ok';
+    return {
+      ok: response.ok && body?.status === 'ok' && body?.database === 'ok',
+      body,
+    };
   } catch {
-    return false;
+    return { ok: false, body: null };
   }
 }
 
@@ -68,7 +80,7 @@ function portOwners(ports) {
             '-NoProfile', '-NonInteractive', '-Command',
             `(Get-Process -Id ${pid} -ErrorAction Stop).ProcessName`,
           ], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }).trim() || name;
-        } catch { /* Keep PID and report an unknown name. */ }
+        } catch { /* keep unknown */ }
       }
       return `PID ${pid} (${name})`;
     });
@@ -76,8 +88,56 @@ function portOwners(ports) {
   }).join('; ');
 }
 
+async function printDatabaseDiagnostics(runningEndpoint) {
+  const envEndpoint = databaseEndpointFromUrl(process.env.DATABASE_URL);
+  console.log(`Backend .env DATABASE_URL endpoint: ${envEndpoint || 'invalid or unset'}`);
+  if (runningEndpoint) {
+    console.log(`Running API reports databaseEndpoint: ${runningEndpoint}`);
+    if (envEndpoint && runningEndpoint !== envEndpoint) {
+      console.log('WARNING: backend/.env endpoint does not match the running API (process may have been started with different env).');
+    }
+  }
+
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.log('Database counts: skipped (DATABASE_URL unset in backend/.env)');
+    return;
+  }
+
+  const pool = new pg.Pool({ connectionString: url, max: 1 });
+  try {
+    const { rows: userRows } = await pool.query('SELECT COUNT(*)::int AS count FROM users');
+    console.log(`Users (public.users): ${userRows[0].count}`);
+
+    const { rows: herbRows } = await pool.query(
+      'SELECT status, COUNT(*)::int AS count FROM herbs GROUP BY status ORDER BY status'
+    );
+    const herbSummary = herbRows.map((row) => `${row.status}=${row.count}`).join(', ') || 'none';
+    console.log(`Herbs by status: ${herbSummary}`);
+
+    const { rows: missingRls } = await pool.query(`
+      SELECT tablename
+      FROM pg_tables
+      WHERE schemaname = 'public' AND rowsecurity = false
+      ORDER BY tablename
+    `);
+    if (missingRls.length) {
+      console.log(`RLS: FAIL (${missingRls.length} public tables without RLS: ${missingRls.map((r) => r.tablename).join(', ')})`);
+    } else {
+      console.log('RLS: all public tables enabled');
+    }
+  } catch (error) {
+    console.log(`Database counts: FAIL (${error.code === 'ECONNREFUSED' ? 'connection refused' : 'query failed'})`);
+  } finally {
+    await pool.end();
+  }
+}
+
 const [localhostHealth, ipv4Health] = await Promise.all([health('localhost'), health('127.0.0.1')]);
-console.log(`Backend health: localhost=${localhostHealth ? 'OK' : 'FAIL'}, 127.0.0.1=${ipv4Health ? 'OK' : 'FAIL'}`);
+console.log(`Backend health: localhost=${localhostHealth.ok ? 'OK' : 'FAIL'}, 127.0.0.1=${ipv4Health.ok ? 'OK' : 'FAIL'}`);
+
+const runningBody = localhostHealth.ok ? localhostHealth.body : (ipv4Health.ok ? ipv4Health.body : null);
+await printDatabaseDiagnostics(runningBody?.databaseEndpoint || null);
 
 const corsResults = await Promise.all(origins.map(async (origin) => `${origin}=${await preflight(origin) ? 'PASS' : 'FAIL'}`));
 console.log(`CORS dev origins: ${corsResults.join(', ')}`);

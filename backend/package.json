@@ -21,6 +21,8 @@
     "measure:search-concurrency": "node scripts/measureSearchConcurrency.js",
     "weights:reset": "node scripts/resetScoringWeights.js",
     "dev-users:passwords": "node scripts/setDevUserPasswords.js",
+    "seed:dev-users:supabase-dev": "node scripts/seedDevUsers.js --supabase-dev",
+    "staging:remove-dev-users": "node scripts/removeDevUsers.js",
     "loadtest:search": "node scripts/loadTestSearch.js",
     "explain:search": "node scripts/explainSearch.js",
     "rag:ingest": "node scripts/ingestKnowledge.js"
