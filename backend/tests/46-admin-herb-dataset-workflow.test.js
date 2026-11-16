@@ -1,6 +1,6 @@
 import { inflateRawSync } from 'node:zlib';
 import { assert, assertEqual } from './lib/assert.js';
-import { api } from './lib/http.js';
+import { api, BASE_URL } from './lib/http.js';
 import { getTokens } from './lib/session.js';
 
 const stamp = Date.now();
@@ -52,7 +52,7 @@ export async function run() {
     'detailed search includes herb when karma filter matches'
   );
 
-  const exportCsv = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:4010'}/api/herbs/export?format=csv`, {
+  const exportCsv = await fetch(`${BASE_URL}/api/herbs/export?format=csv`, {
     headers: { Authorization: `Bearer ${tokens.admin}` },
   });
   assertEqual(exportCsv.status, 200, 'admin csv export');

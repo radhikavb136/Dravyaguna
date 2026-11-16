@@ -177,7 +177,7 @@ export function mapHerbToWorkbookRow(herb, data = {}, rowNumber = 1) {
 export async function syncHerbToWorkbook(herb, data = {}, customPath) {
   const workbookPath = resolveWorkbookPath(customPath);
   if (!fs.existsSync(workbookPath)) {
-    throw new Error(`Master Excel workbook not found at ${workbookPath}`);
+    throw new Error(`Master Excel workbook not found at ${workbookPath}. Configure EXCEL_DATASET_PATH environment variable or ensure Dataset/herbs.xlsx exists.`);
   }
 
   ensureWorkbookBackup(workbookPath);

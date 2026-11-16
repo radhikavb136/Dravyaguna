@@ -9,6 +9,7 @@ import {
   syncHerbToWorkbook,
 } from '../src/services/herbs/herbWorkbookSyncService.js';
 import { readXlsxRows } from '../src/utils/xlsxReader.js';
+import { createXlsxWorkbook } from '../src/utils/xlsxWorkbook.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,14 +51,35 @@ export async function run() {
     assert.ok(col in row, `Missing column ${col} in mapped row`);
   }
 
-  // 2. Append and idempotent update test
+  // 2. Append and idempotent update test against a temporary test fixture
   const tempWorkbookPath = path.join(__dirname, 'temp_test_herbs.xlsx');
-  assert.ok(fs.existsSync(DEFAULT_WORKBOOK_PATH), 'Master dataset must exist');
-  fs.copyFileSync(DEFAULT_WORKBOOK_PATH, tempWorkbookPath);
+
+  // If the proprietary dataset exists locally, use it as template; otherwise generate a synthetic fixture for CI
+  if (fs.existsSync(DEFAULT_WORKBOOK_PATH)) {
+    fs.copyFileSync(DEFAULT_WORKBOOK_PATH, tempWorkbookPath);
+  } else {
+    const headerPairs = WORKBOOK_COLUMNS.map((col) => [col, col]);
+    const baselineRow = mapHerbToWorkbookRow({
+      code: 'HERB_BASELINE_001',
+      english_name: 'Baseline Holy Basil',
+      sanskrit_name: 'Tulasi',
+      botanical_name: 'Ocimum sanctum',
+      local_name: 'Tulsi',
+      family: 'Lamiaceae',
+      part_used: 'leaves',
+      virya: 'Ushna',
+      vipaka: 'Katu',
+      rasa: ['Katu', 'Tikta'],
+      guna: ['Laghu', 'Ruksha'],
+    }, {}, 2);
+    const fixtureBuffer = createXlsxWorkbook(headerPairs, [baselineRow], 'herbs');
+    fs.writeFileSync(tempWorkbookPath, fixtureBuffer);
+  }
 
   try {
     const initialRows = readXlsxRows(fs.readFileSync(tempWorkbookPath));
     const initialCount = initialRows.length;
+    assert.ok(initialCount > 0, 'Workbook fixture contains initial records');
 
     const newHerb = {
       code: 'HERB_TEST_SYNC_999',
@@ -100,4 +122,13 @@ export async function run() {
     if (fs.existsSync(tempWorkbookPath)) fs.unlinkSync(tempWorkbookPath);
     if (fs.existsSync(`${tempWorkbookPath}.bak`)) fs.unlinkSync(`${tempWorkbookPath}.bak`);
   }
+
+  // 3. Clear actionable error when master workbook does not exist
+  const missingWorkbookPath = path.join(__dirname, 'missing_dataset.xlsx');
+  await assert.rejects(
+    async () => {
+      await syncHerbToWorkbook({ code: 'FAIL' }, {}, missingWorkbookPath);
+    },
+    /Master Excel workbook not found/
+  );
 }
