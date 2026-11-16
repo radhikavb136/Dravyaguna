@@ -6,5 +6,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.{js,jsx}"],
+    env: {
+      VITE_USE_API: "true",
+    },
   },
 })

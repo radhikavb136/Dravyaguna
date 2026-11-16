@@ -14,6 +14,9 @@ import { buildHelpFaqs, buildHelpTopics } from "../i18n/helpTopics"
 import { useUiText } from "../i18n/useUiText"
 
 function HelpSupportPage() {
+  const useApi = typeof import.meta.env.VITE_USE_API !== "undefined"
+    ? import.meta.env.VITE_USE_API === "true"
+    : Boolean(USE_API)
   const t = useUiText()
   const navigate = useNavigate()
 
@@ -88,7 +91,7 @@ function HelpSupportPage() {
     event.preventDefault()
     setSupportError("")
 
-    if (!USE_API) {
+    if (!useApi) {
       setSupportError(t("helpContactApiRequired"))
       return
     }

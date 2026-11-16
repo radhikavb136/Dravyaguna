@@ -108,6 +108,9 @@ function formatArray(value) {
    ========================================= */
 
 function HerbDetailPage() {
+  const useApi = typeof import.meta.env.VITE_USE_API !== "undefined"
+    ? import.meta.env.VITE_USE_API === "true"
+    : Boolean(USE_API)
   const t = useUiText()
   const navigate = useNavigate()
   const location = useLocation()
@@ -115,13 +118,13 @@ function HerbDetailPage() {
 
   const [isFavorite, setIsFavorite] = useState(false)
   const [apiHerb, setApiHerb] = useState(null)
-  const [apiLoading, setApiLoading] = useState(USE_API && Boolean(id))
+  const [apiLoading, setApiLoading] = useState(useApi && Boolean(id))
   const [apiError, setApiError] = useState(null)
   const [favoriteBusy, setFavoriteBusy] = useState(false)
   const [language, setLanguage] = useState(() => localStorage.getItem('dravyaguna-language') || 'en-IN')
 
   useEffect(() => {
-    if (!USE_API) return
+    if (!useApi) return
     getAccount()
       .then(({ preferred_language: preferred }) => {
         if (preferred) {
@@ -162,7 +165,7 @@ function HerbDetailPage() {
      ========================================= */
 
   useEffect(() => {
-    if (USE_API && id) {
+    if (useApi && id) {
       setApiLoading(true)
       setApiError(null)
       
@@ -198,7 +201,7 @@ function HerbDetailPage() {
      ========================================= */
 
   useEffect(() => {
-    if (!herb?.id || !USE_API) return
+    if (!herb?.id || !useApi) return
     const query = location.state?.searchQuery || herb.sanskritName || herb.englishName
     if (query) {
       recordFeedback({
@@ -337,10 +340,10 @@ function HerbDetailPage() {
 
 
   /* =========================================
-     HERB NOT FOUND
+     LOADING / ERROR / NOT FOUND STATES
      ========================================= */
 
-  if (USE_API && apiLoading) {
+  if (useApi && apiLoading) {
     return (
       <div className="herb-detail-layout">
         <DashboardNavbar />
@@ -348,7 +351,30 @@ function HerbDetailPage() {
           <Sidebar />
           <main className="herb-detail-content">
             <div className="herb-detail-inner">
-              <p role="status">{t("herbDetailLoading")}</p>
+              <p role="status">{t("herbDetailLoading") || "Loading herb profile..."}</p>
+            </div>
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (useApi && apiError && !herb) {
+    return (
+      <div className="herb-detail-layout">
+        <DashboardNavbar />
+        <div className="herb-detail-body">
+          <Sidebar />
+          <main className="herb-detail-content">
+            <div className="herb-detail-inner">
+              <p role="alert">{apiError}</p>
+              <h1>Unable to load herb profile</h1>
+              <button
+                type="button"
+                onClick={() => navigate("/herb-library")}
+              >
+                Back to Herb Library
+              </button>
             </div>
           </main>
         </div>
@@ -359,44 +385,26 @@ function HerbDetailPage() {
   if (!herb) {
     return (
       <div className="herb-detail-layout">
-
         <DashboardNavbar />
-
         <div className="herb-detail-body">
-
           <Sidebar />
-
           <main className="herb-detail-content">
-
             <div className="herb-detail-inner">
-
-              {USE_API && apiError && (
-                <p role="alert">{apiError}</p>
-              )}
-
               <h1>Herb not found</h1>
-
               <button
                 type="button"
-                onClick={() =>
-                  navigate("/herb-library")
-                }
+                onClick={() => navigate("/herb-library")}
               >
                 Back to Herb Library
               </button>
-
             </div>
-
           </main>
-
         </div>
-
       </div>
     )
   }
 
-
-  /* =========================================
+/* =========================================
      REAL DATA PREPARATION
      ========================================= */
 
@@ -451,7 +459,7 @@ function HerbDetailPage() {
 
           <div className="herb-detail-inner">
 
-            {USE_API && apiLoading && (
+            {useApi && apiLoading && (
               <p role="status">{t("herbDetailLoading")}</p>
             )}
 

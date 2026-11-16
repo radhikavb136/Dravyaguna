@@ -2,13 +2,21 @@ import { describe, expect, it, vi, beforeEach } from "vitest"
 import { render, screen, waitFor, fireEvent } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { setInterfaceLanguage } from "../i18n/useUiText"
-import HelpSupportPage from "./HelpSupportPage"
 
+vi.mock("../api/client", async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    USE_API: true,
+  }
+})
 vi.mock("../components/DashboardNavbar", () => ({ default: () => null }))
 vi.mock("../components/Sidebar", () => ({ default: () => null }))
 vi.mock("../api/support", () => ({
   submitSupportRequest: vi.fn().mockResolvedValue({ id: "req-1" }),
 }))
+
+import HelpSupportPage from "./HelpSupportPage"
 
 describe("HelpSupportPage", () => {
   beforeEach(() => {
