@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
+import PageBack from "../components/PageBack"
 import HerbResultCard from "../components/HerbResultCard"
 import herbDataset from "../data/herbDataset"
 
@@ -12,7 +13,10 @@ import { getAccount } from "../api/account"
 import { saveSearch } from "../api/favorites"
 import { USE_API } from "../api/client"
 import { prepareApiResultsForCards, prepareHerbForCard } from "../utils/searchResults"
+import SearchPitchPanel from "../components/SearchPitchPanel"
+import InfoTooltip from "../components/InfoTooltip"
 
+import { useUiText } from "../i18n/useUiText"
 import "../styles/SearchResults.css"
 
 
@@ -584,6 +588,7 @@ function herbMatchesFilter(
    ========================================= */
 
 function SearchResults() {
+  const t = useUiText()
   const [searchParams, setSearchParams] =
     useSearchParams()
 
@@ -603,13 +608,13 @@ function SearchResults() {
   const simpleVirya = searchParams.get("virya") || ""
   const simpleVipaka = searchParams.get("vipaka") || ""
   const simpleIndication = searchParams.get("majorDisease") || ""
-  const simpleFilters = {
+  const simpleFilters = useMemo(() => ({
     ...(simpleRasa ? { rasa: [simpleRasa] } : {}),
     ...(simpleVirya ? { virya: [simpleVirya] } : {}),
     ...(simpleVipaka ? { vipaka: [simpleVipaka] } : {}),
     ...(simpleIndication ? { indication: [simpleIndication] } : {}),
-  }
-  const hasSimpleFilters = Object.keys(simpleFilters).length > 0
+  }), [simpleRasa, simpleVirya, simpleVipaka, simpleIndication])
+  const hasSimpleFilters = useMemo(() => Object.keys(simpleFilters).length > 0, [simpleFilters])
 
   const [showFilters, setShowFilters] =
     useState(false)
@@ -741,7 +746,7 @@ function SearchResults() {
       setApiResults([])
       setSimpleSearchMeta(null)
     }
-  }, [mode, parametersString, query, simpleRasa, simpleVirya, simpleVipaka, simpleIndication, preferredLanguage, accountPreferencesLoaded])
+  }, [mode, parametersString, query, simpleFilters, hasSimpleFilters, preferredLanguage, accountPreferencesLoaded])
 
 
   /* =========================================
@@ -795,7 +800,7 @@ function SearchResults() {
       }
 
       // Fallback to client-side search
-      let results = []
+      let results
 
       if (mode === "detailed") {
         const hasParameters =
@@ -995,7 +1000,8 @@ useEffect(() => {
 }, [
   mode,
   query,
-  selectedParameters
+  selectedParameters,
+  herbResults
 ])
 
 
@@ -1085,8 +1091,10 @@ useEffect(() => {
 
           <div className="search-results-content">
 
+            <PageBack fallback="/search" />
+
             {apiLoading && (
-              <p role="status">Loading search results...</p>
+              <p role="status">{t("searchResLoadingStatus")}</p>
             )}
 
             {apiError && (
@@ -1108,6 +1116,14 @@ useEffect(() => {
                 )}
               </section>
             )}
+            {USE_API && (apiResults?.length > 0) && (
+              <SearchPitchPanel
+                query={query}
+                results={apiResults}
+                meta={simpleSearchMeta}
+                activeFilters={simpleFilters}
+              />
+            )}
             {preferenceError && <p role="alert">{preferenceError}</p>}
             {savedSearchMessage && <p role={savedSearchMessage.startsWith("Unable") ? "alert" : "status"}>{savedSearchMessage}</p>}
 
@@ -1121,11 +1137,12 @@ useEffect(() => {
               <div className="results-header-left">
 
                 <p className="results-label">
-                  SEARCH RESULTS
+                  {t("searchResBreadcrumb")}
                 </p>
 
                 <h1>
                   Ayurvedic herb profiles
+                  <InfoTooltip contentKey="searchResults" />
                 </h1>
 
                 <p className="results-count">
@@ -1141,7 +1158,7 @@ useEffect(() => {
 
               <div className="results-header-actions">
 
-                {USE_API && <button className="results-filter-button" type="button" onClick={handleSaveSearch}>Save search</button>}
+                {USE_API && <button className="results-filter-button" type="button" onClick={handleSaveSearch}>{t("searchResSaveSearch")}</button>}
 
                 {/* FILTER BUTTON */}
 
@@ -1180,6 +1197,7 @@ useEffect(() => {
 
                         <strong>
                           Filter results
+                          <InfoTooltip contentKey="searchFilters" />
                         </strong>
 
                         <button
@@ -1196,6 +1214,7 @@ useEffect(() => {
 
                       <label>
                         Verification status
+                        <InfoTooltip contentKey="statusFilter" />
 
                         <select
                           value={
@@ -1228,6 +1247,7 @@ useEffect(() => {
 
                       <label>
                         Virya
+                        <InfoTooltip contentKey="virya" />
 
                         <select
                           value={
@@ -1260,6 +1280,7 @@ useEffect(() => {
 
                       <label>
                         Rasa
+                        <InfoTooltip contentKey="rasaFilter" />
 
                         <select
                           value={
@@ -1292,6 +1313,7 @@ useEffect(() => {
 
                       <label>
                         Guna
+                        <InfoTooltip contentKey="guna" />
 
                         <select
                           value={
@@ -1324,6 +1346,7 @@ useEffect(() => {
 
                       <label>
                         Dosha
+                        <InfoTooltip contentKey="doshaFilter" />
 
                         <select
                           value={

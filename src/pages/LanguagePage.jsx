@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { getAccount, updateAccountPreferences } from "../api/account"
-import { setInterfaceLanguage } from "../i18n/useUiText"
+import { CODE_TO_SELECT_LABEL, SELECT_LABEL_TO_CODE } from "../i18n/languageCodes"
+import { setInterfaceLanguage, useUiText } from "../i18n/useUiText"
 
 import DashboardNavbar from "../components/DashboardNavbar"
+import PageBack from "../components/PageBack"
 import Sidebar from "../components/Sidebar"
 
 import "../styles/SettingsPage.css"
 import "../styles/LanguagePage.css"
 
 function LanguagePage() {
+  const t = useUiText()
   const navigate = useNavigate()
   const useApi = import.meta.env.VITE_USE_API === "true"
 
@@ -23,9 +26,9 @@ function LanguagePage() {
   useEffect(() => {
     if (!useApi) return
     getAccount().then(({ preferred_language: language }) => {
-      setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi", "sa-IN": "Sanskrit" })[language] || "English")
+      setSelectedLanguage(CODE_TO_SELECT_LABEL[language] || "English")
       setInterfaceLanguage(language)
-    }).catch((err) => setError(err.message || "Unable to load language preference")).finally(() => setLoading(false))
+    }).catch((err) => setError(err.message || t("languagePageLoadError"))).finally(() => setLoading(false))
   }, [useApi])
 
   const handleLanguageChange = async (language) => {
@@ -34,19 +37,19 @@ function LanguagePage() {
     setSelectedLanguage(language)
     if (!useApi) {
       localStorage.setItem("language", language)
-      setInterfaceLanguage(({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN", Sanskrit: "sa-IN" })[language])
+      setInterfaceLanguage(SELECT_LABEL_TO_CODE[language])
       return
     }
     try {
-      const code = ({ English: "en-IN", Hindi: "hi-IN", Marathi: "mr-IN", Sanskrit: "sa-IN" })[language]
+      const code = SELECT_LABEL_TO_CODE[language]
       await updateAccountPreferences({ language: code })
       setInterfaceLanguage(code)
-      setMessage("Language preference saved.")
+      setMessage(t("languagePageSaved"))
     } catch (err) {
-      setError(err.message || "Unable to save language preference")
+      setError(err.message || t("languagePageSaveError"))
       try {
         const { preferred_language: previous } = await getAccount()
-        setSelectedLanguage(({ "en-IN": "English", "hi-IN": "Hindi", "mr-IN": "Marathi", "sa-IN": "Sanskrit" })[previous] || "English")
+        setSelectedLanguage(CODE_TO_SELECT_LABEL[previous] || "English")
         setInterfaceLanguage(previous)
       } catch { /* preserve the selected value while the load error is visible */ }
     }
@@ -56,7 +59,7 @@ function LanguagePage() {
     navigate("/doctor")
   }
 
-  if (loading) return <p role="status">Loading language preference...</p>
+  if (loading) return <p role="status">{t("languagePageLoading")}</p>
 
   return (
     <div className="settings-page-layout">
@@ -77,13 +80,14 @@ function LanguagePage() {
 
             {/* Language Modal */}
             <div className="language-modal">
+              <PageBack fallback="/doctor" />
 
               {/* Close button */}
               <button
                 type="button"
                 className="settings-close-button"
                 onClick={closeLanguage}
-                aria-label="Close language"
+                aria-label={t("languageCloseAria")}
               >
                 ×
               </button>
@@ -99,15 +103,15 @@ function LanguagePage() {
                 <div className="language-header">
 
                   <p className="language-label">
-                    PREFERENCES
+                    {t("settingsTitle")}
                   </p>
 
                   <h1>
-                    Language
+                    {t("languagePageTitle")}
                   </h1>
 
                   <p className="language-description">
-                    Choose the language you prefer for the application.
+                    {t("languagePageSubtitle")}
                   </p>
 
                 </div>

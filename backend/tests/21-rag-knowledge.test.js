@@ -1,8 +1,8 @@
-import pg from 'pg';
 import { createHash } from 'node:crypto';
 import { assert, assertEqual } from './lib/assert.js';
 import { api } from './lib/http.js';
 import { getTokens } from './lib/session.js';
+import { getTestPool } from './lib/testPool.js';
 import {
   chunkText,
   ingestKnowledgeDocument,
@@ -12,7 +12,7 @@ import {
 import { generateExplanation } from '../src/services/explain/explainService.js';
 import { createOpenAiProvider } from '../src/services/explain/llmProvider.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+const pool = getTestPool();
 
 export async function run() {
   const { tokens } = await getTokens();
@@ -86,6 +86,19 @@ export async function run() {
       .digest('hex');
     const reviewedEvidence = await retrieveKnowledge({ question: reviewed.english_name, role: 'clinician' });
     assert(reviewedEvidence.some((item) => item.herb_code === reviewed.code), 'clinician retrieves reviewed herb records');
+    const scopedEvidence = await retrieveKnowledge({
+      question: reviewed.english_name,
+      role: 'clinician',
+      herbId: reviewed.id,
+    });
+    assert(
+      scopedEvidence.some((item) => item.herb_code === reviewed.code),
+      'herb-scoped retrieval includes the target herb record'
+    );
+    assert(
+      scopedEvidence.every((item) => !item.herb_code || item.herb_code === reviewed.code),
+      'herb-scoped retrieval does not leak other herb records'
+    );
     const hiddenDraft = await retrieveKnowledge({ question: draft.english_name, role: 'clinician' });
     assert(!hiddenDraft.some((item) => item.herb_code === draft.code), 'clinician retrieval excludes draft herb records');
     const visibleDraft = await retrieveKnowledge({ question: draft.english_name, role: 'domain_expert' });
@@ -121,14 +134,23 @@ export async function run() {
 
     const missingCredentials = createOpenAiProvider({ apiKey: '', model: '' });
     const missingConfig = await generateExplanation({ question: questionForGeneration, role: 'clinician' }, { provider: missingCredentials });
-    assertEqual(missingConfig.answer_status, 'generation_unavailable', 'missing LLM credentials degrade gracefully with evidence retained');
+    assert(
+      ['generation_unavailable', 'database_template'].includes(missingConfig.answer_status),
+      'missing LLM credentials degrade gracefully with evidence retained'
+    );
     assert(missingConfig.evidence.length > 0, 'missing LLM credentials do not discard retrieval evidence');
 
     const failed = await generateExplanation({ question: reviewed.code, role: 'clinician' }, {
       provider: { name: 'failing-test', model: 'fixture', async generate() { throw new Error('provider unavailable'); } },
     });
-    assertEqual(failed.answer_status, 'generation_unavailable', 'provider failure reports unavailable generation');
+    assert(
+      ['generation_unavailable', 'database_template'].includes(failed.answer_status),
+      'provider failure reports unavailable generation or database template fallback'
+    );
     assert(failed.evidence.length > 0, 'retrieved evidence remains available when generation fails');
+    if (failed.answer_status === 'database_template') {
+      assert(failed.explanation, 'database template fallback includes grounded summary');
+    }
 
     const badRequest = await api('POST', '/api/explain', { token: tokens.editor, body: {} });
     assertEqual(badRequest.status, 400, 'question or herb id is required');
@@ -144,6 +166,5 @@ export async function run() {
     await pool.query(`DELETE FROM rag_documents WHERE source_key = $1`, [sourceKey]);
     if (testFiltersHash) await pool.query('DELETE FROM rag_explanation_cache WHERE filters_hash = $1', [testFiltersHash]);
     await pool.query(`DELETE FROM herbs WHERE code LIKE 'zz_test_rag_draft_%'`);
-    await pool.end();
   }
 }

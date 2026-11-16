@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { listAllHerbs } from "../api/herbs"
+import { localizeApiError } from "../i18n/localizeApiError"
+import { formatRelativeTime } from "../i18n/relativeTime"
+import { useUiText } from "../i18n/useUiText"
+import InfoTooltip from "../components/InfoTooltip"
 import "../styles/AdminDashboard.css"
 
 function AdminDashboard() {
+  const t = useUiText()
   const navigate = useNavigate()
 
   const [herbs, setHerbs] = useState([])
@@ -22,7 +27,7 @@ function AdminDashboard() {
       setHerbs(allHerbs)
     } catch (error) {
       console.error("Failed to load herbs:", error)
-      setError(error.message || "Failed to load dashboard data")
+      setError(localizeApiError(t, error.message || t("adminDashLoadError")))
     } finally {
       setLoading(false)
     }
@@ -137,68 +142,9 @@ function AdminDashboard() {
       .slice(0, 4)
   }, [herbs])
 
-  if (loading) return <p role="status">Loading dashboard...</p>
+  if (loading) return <p role="status">{t("adminDashLoading")}</p>
   if (error) return <p role="alert">{error}</p>
 
-  // =====================================================
-  // TIME FORMATTER
-  // =====================================================
-
-  const formatRelativeTime = (date) => {
-    if (!date) {
-      return "No date"
-    }
-
-    const timestamp =
-      new Date(date).getTime()
-
-    if (Number.isNaN(timestamp)) {
-      return "No date"
-    }
-
-    const difference =
-      Date.now() - timestamp
-
-    const minutes = Math.floor(
-      difference / (1000 * 60)
-    )
-
-    if (minutes < 1) {
-      return "Just now"
-    }
-
-    if (minutes < 60) {
-      return `${minutes} min ago`
-    }
-
-    const hours = Math.floor(
-      minutes / 60
-    )
-
-    if (hours < 24) {
-      return `${hours} hr ago`
-    }
-
-    const days = Math.floor(
-      hours / 24
-    )
-
-    if (days === 1) {
-      return "Yesterday"
-    }
-
-    if (days < 7) {
-      return `${days} days ago`
-    }
-
-    return new Date(
-      timestamp
-    ).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    })
-  }
 
   // =====================================================
   // ACTIVITY DESCRIPTION
@@ -265,23 +211,20 @@ function AdminDashboard() {
 
   const qualityAlerts = [
     {
-      title: "Herbs pending verification",
-      description:
-        "Herb profiles are waiting for verification.",
+      title: t("adminDashPendingVerification"),
+      description: t("adminDashAlertVerifyDesc"),
       count: pendingVerification,
       type: "warning",
     },
     {
-      title: "Missing Ayurvedic parameters",
-      description:
-        "Some profiles have incomplete Ayurvedic attributes.",
+      title: t("adminDashMissingParams"),
+      description: t("adminDashAlertParamsDesc"),
       count: missingAyurvedicParameters,
       type: "warning",
     },
     {
-      title: "Vocabulary conflicts",
-      description:
-        "Terms require standardization.",
+      title: t("adminDashAlertVocabTitle"),
+      description: t("adminDashAlertVocabDesc"),
       count: vocabularyConflicts,
       type: "warning",
     },
@@ -305,12 +248,11 @@ function AdminDashboard() {
       <div className="admin-page-heading">
 
         <h1>
-          Admin Dashboard
+          {t("adminDashTitle")}
         </h1>
 
         <p>
-          Monitor the Ayurvedic knowledge base,
-          verification activity, and search performance.
+          {t("adminDashSubtitle")}
         </p>
 
       </div>
@@ -331,7 +273,8 @@ function AdminDashboard() {
           </div>
 
           <div className="admin-stat-title">
-            Total Herbs
+            {t("adminDashTotalHerbs")}
+            <InfoTooltip contentKey="totalHerbs" />
           </div>
 
           <div className="admin-stat-description">
@@ -350,7 +293,8 @@ function AdminDashboard() {
           </div>
 
           <div className="admin-stat-title">
-            Verified Herbs
+            {t("adminDashVerified")}
+            <InfoTooltip title="Verified Herbs" text="Herbs that have completed expert review and are verified for clinical consultation." />
           </div>
 
           <div className="admin-stat-description">
@@ -369,7 +313,8 @@ function AdminDashboard() {
           </div>
 
           <div className="admin-stat-title">
-            Reviewed Herbs
+            {t("adminDashReviewed")}
+            <InfoTooltip contentKey="reviewedHerbs" />
           </div>
 
           <div className="admin-stat-description">
@@ -388,7 +333,8 @@ function AdminDashboard() {
           </div>
 
           <div className="admin-stat-title">
-            Draft Herbs
+            {t("adminDashDraft")}
+            <InfoTooltip contentKey="draftHerbs" />
           </div>
 
           <div className="admin-stat-description">
@@ -420,6 +366,7 @@ function AdminDashboard() {
 
               <h2>
                 Verification Overview
+                <InfoTooltip title="Verification Status" text="Progress breakdown of botanical entries verified, awaiting review, or currently drafted." />
               </h2>
 
             </div>
@@ -553,6 +500,7 @@ function AdminDashboard() {
 
               <h2>
                 Data Quality Alerts
+                <InfoTooltip title="Data Quality Alerts" text="Monitors missing Ayurvedic parameters (Rasa, Guna, Virya, Vipaka) or unverified botanical records." />
               </h2>
 
             </div>
@@ -637,6 +585,7 @@ function AdminDashboard() {
 
               <h2>
                 Recent Herb Activity
+                <InfoTooltip contentKey="recentActivity" />
               </h2>
 
             </div>
@@ -700,6 +649,7 @@ function AdminDashboard() {
 
                   <span className="admin-activity-time">
                     {formatRelativeTime(
+                      t,
                       herb.updatedAt ||
                         herb.savedAt
                     )}
@@ -782,7 +732,7 @@ function AdminDashboard() {
             <div>
 
               <h2>
-                Quick Actions
+                {t("adminDashQuickActions")}
               </h2>
 
             </div>
@@ -802,7 +752,7 @@ function AdminDashboard() {
               <span>＋</span>
 
               <strong>
-                Add New Herb
+                {t("adminDashAddHerbLink")}
               </strong>
             </button>
 
@@ -849,7 +799,7 @@ function AdminDashboard() {
               <span>⌁</span>
 
               <strong>
-                View Search Analytics
+                {t("adminDashViewAnalytics")}
               </strong>
             </button>
 

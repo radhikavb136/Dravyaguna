@@ -2,13 +2,42 @@
    SEARCH ANALYTICS PAGE
    ========================================= */
 
-   .analytics-page {
-    width: 100%;
-    min-height: 100%;
-    box-sizing: border-box;
-    color: #17251d;
-    background: #f7f8f4;
-  }
+.analytics-page {
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  color: #17251d;
+  background: #f7f8f4;
+}
+
+.analytics-error {
+  padding: 16px;
+  margin: 20px 0;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.analytics-error p {
+  margin: 0 0 12px 0;
+}
+
+.retry-button {
+  padding: 8px 16px;
+  border: 1px solid #d97706;
+  border-radius: 4px;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.retry-button:hover {
+  background: #d97706;
+}
   
   .analytics-content {
     width: 100%;

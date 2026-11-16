@@ -1,10 +1,13 @@
 import { useMemo, useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import DashboardNavbar from "../components/DashboardNavbar"
+import PageBack from "../components/PageBack"
 import Sidebar from "../components/Sidebar"
 import { listAllHerbs } from "../api/herbs"
 import { USE_API } from "../api/client"
 import { addFavorite, getFavorites, removeFavorite } from "../api/favorites"
+import { useUiText } from "../i18n/useUiText"
+import InfoTooltip from "../components/InfoTooltip"
 import "../styles/HerbLibrary.css"
 
 function LeafIcon({ variant = "green" }) {
@@ -53,6 +56,7 @@ function LeafIcon({ variant = "green" }) {
 }
 
 function HerbLibrary() {
+  const t = useUiText()
   const navigate = useNavigate()
 
   /*
@@ -381,7 +385,7 @@ function HerbLibrary() {
       return []
     }
     return herbs
-  }, [USE_API, apiHerbs])
+  }, [apiHerbs, herbs])
   /*
     CHECK FAVORITE
   */
@@ -534,7 +538,7 @@ function HerbLibrary() {
           <div className="herb-library-inner">
 
             {USE_API && apiLoading && (
-              <p role="status">Loading herb library...</p>
+              <p role="status">{t("herbLibLoading")}</p>
             )}
 
             {USE_API && apiError && (
@@ -543,12 +547,16 @@ function HerbLibrary() {
 
             {/* HEADER */}
             <section className="herb-library-header">
+              <PageBack fallback="/doctor" />
               <div>
                 <p className="herb-library-breadcrumb">
-                  COMPARE / HERB LIBRARY
+                  {t("herbLibBreadcrumb")}
                 </p>
 
-                <h1>Select herbs to compare</h1>
+                <h1>
+                  Select herbs to compare
+                  <InfoTooltip contentKey="compareHerbs" />
+                </h1>
               </div>
 
               <div className="library-selected-count">
@@ -617,6 +625,8 @@ function HerbLibrary() {
                 }
                 placeholder="Search herbs by name..."
               />
+
+              <InfoTooltip contentKey="searchBar" text="Quickly filter the library catalog by common English name, botanical binomial, or regional synonym." />
             </section>
 
             {/* HERB GRID */}
@@ -661,9 +671,18 @@ function HerbLibrary() {
                         {isSelected && "✓"}
                       </button>
 
-                      <LeafIcon
-                        variant={herb.variant}
-                      />
+                      {herb.imageUrl || herb.image_url ? (
+                        <img
+                          src={herb.imageUrl || herb.image_url}
+                          alt={herb.englishName || "Herb"}
+                          className="herb-library-card-photo"
+                          style={{ width: "48px", height: "48px", borderRadius: "8px", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <LeafIcon
+                          variant={herb.variant}
+                        />
+                      )}
 
                       <div className="herb-card-information">
 
@@ -794,7 +813,7 @@ function HerbLibrary() {
             {/* NO RESULTS */}
             {filteredHerbs.length === 0 && (
               <div className="herb-library-no-results">
-                <h2>No herbs found</h2>
+                <h2>{t("herbLibNoResults")}</h2>
 
                 <p>
                   Try searching with another herb name,

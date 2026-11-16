@@ -5,6 +5,10 @@ import { listHerbs, verifyHerb, deleteHerb } from "../api/herbs"
 import { getCurrentUser } from "../api/auth"
 import { getAccount } from "../api/account"
 import { canArchiveHerbs, canVerifyHerbs } from "../utils/roles"
+import { localizeApiError } from "../i18n/localizeApiError"
+import { useCurrentLanguage, useUiText } from "../i18n/useUiText"
+import { getHerbDisplayName, isSanskritLanguage } from "../utils/herbName"
+import InfoTooltip from "../components/InfoTooltip"
 import "../styles/ManageHerbs.css"
 
 const toArray = (value) => {
@@ -88,6 +92,8 @@ const getDoshaValues = (herb) => {
 }
 
 function ManageHerbs() {
+  const t = useUiText()
+  const currentLanguage = useCurrentLanguage()
   const navigate = useNavigate()
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -157,7 +163,7 @@ function ManageHerbs() {
     } catch (err) {
       console.error('Failed to load herbs:', err)
       const forbidden = err?.status === 403
-      setError(forbidden ? (err.message || "You do not have permission to view these herbs.") : (err.message || "Failed to load herbs"))
+      setError(forbidden ? (err.message || "You do not have permission to view these herbs.") : localizeApiError(t, err.message || t("manageHerbsLoadError")))
       setHerbs([])
     } finally {
       setLoading(false)
@@ -218,6 +224,7 @@ function ManageHerbs() {
           `herb-${index}`,
 
         name:
+          getHerbDisplayName(herb, currentLanguage) ||
           herb.herbNameEnglish ||
           herb.englishName ||
           herb.commonName ||
@@ -500,7 +507,7 @@ function ManageHerbs() {
       if (useApi) {
         // Check if user is domain_expert or admin
         if (!canVerifyHerbs(currentUser)) {
-          alert('Only domain experts and admins can verify herbs')
+          alert(t("manageHerbsVerifyDenied"))
           return
         }
         
@@ -531,7 +538,7 @@ function ManageHerbs() {
       })
     } catch (err) {
       console.error('Failed to verify herb:', err)
-      alert(err.message || 'Failed to verify herb')
+      alert(err.message || t("manageHerbsVerifyError"))
     }
   }
 
@@ -555,7 +562,7 @@ function ManageHerbs() {
     }
 
     const confirmed = !confirmBeforeDelete || window.confirm(
-      `Are you sure you want to archive "${herbToDelete.name}"? It will be hidden from clinical search but retained in the database.`
+      t("manageHerbsArchiveConfirm", { name: herbToDelete.name })
     )
 
     if (!confirmed) {
@@ -568,7 +575,7 @@ function ManageHerbs() {
       if (useApi) {
         // Check if user is admin
         if (!canArchiveHerbs(currentUser)) {
-          alert('Only admins can delete herbs')
+          alert(t("manageHerbsArchiveDenied"))
           return
         }
         
@@ -599,7 +606,7 @@ function ManageHerbs() {
       })
     } catch (err) {
       console.error('Failed to delete herb:', err)
-      alert(err.message || 'Failed to delete herb')
+      alert(err.message || t("manageHerbsArchiveError"))
     }
   }
 
@@ -643,7 +650,7 @@ function ManageHerbs() {
   ========================================================= */
 
   if (loading) {
-    return <p role="status">Loading herbs...</p>
+    return <p role="status">{t("manageHerbsLoading")}</p>
   }
 
   if (error) {
@@ -660,7 +667,8 @@ function ManageHerbs() {
 
         <div>
           <h1>
-            Manage Herbs
+            {t("adminManageHerbs")}
+            <InfoTooltip contentKey="reviewHerb" text="Administrative management catalog for inspecting, verifying, drafting, and updating herb records." />
           </h1>
 
           <p>
@@ -698,7 +706,7 @@ function ManageHerbs() {
 
           <input
             type="text"
-            placeholder="Search by herb, botanical name, Sanskrit name..."
+            placeholder={t("manageHerbsSearchPlaceholder")}
             value={searchTerm}
             onChange={(event) =>
               setSearchTerm(
@@ -979,38 +987,47 @@ function ManageHerbs() {
 
                 <th>
                   HERB
+                  <InfoTooltip contentKey="herbName" />
                 </th>
 
                 <th>
                   BOTANICAL NAME
+                  <InfoTooltip contentKey="botanicalName" />
                 </th>
 
                 <th>
                   RASA
+                  <InfoTooltip contentKey="rasa" />
                 </th>
 
                 <th>
                   GUNA
+                  <InfoTooltip contentKey="guna" />
                 </th>
 
                 <th>
                   VIRYA
+                  <InfoTooltip contentKey="virya" />
                 </th>
 
                 <th>
                   VIPAKA
+                  <InfoTooltip contentKey="vipaka" />
                 </th>
 
                 <th>
                   DOSHA
+                  <InfoTooltip contentKey="dosha" />
                 </th>
 
                 <th>
                   SROTAS
+                  <InfoTooltip contentKey="srotas" />
                 </th>
 
                 <th>
                   STATUS
+                  <InfoTooltip title="Verification Status" text="Indicates whether an herb is a Draft, Reviewed, or Verified in the active dataset." />
                 </th>
 
                 <th>
@@ -1023,6 +1040,7 @@ function ManageHerbs() {
 
                 <th>
                   ACTION
+                  <InfoTooltip title="Actions" text="Edit properties, verify records for search visibility, or archive entries." />
                 </th>
 
               </tr>
@@ -1047,17 +1065,34 @@ function ManageHerbs() {
                       {/* HERB */}
 
                       <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {herb.imageUrl || herb.image_url ? (
+                            <img
+                              src={herb.imageUrl || herb.image_url}
+                              alt=""
+                              style={{ width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover' }}
+                            />
+                          ) : null}
+                          <div>
+                            <strong>
+                              {herb.name}
+                            </strong>
 
-                        <strong>
-                          {herb.name}
-                        </strong>
-
-                        {herb.sanskrit !== "—" && (
-                          <small>
-                            {herb.sanskrit}
-                          </small>
-                        )}
-
+                            {isSanskritLanguage(currentLanguage) ? (
+                              (herb.herbNameEnglish || herb.englishName || herb.botanical !== "—") && (
+                                <small>
+                                  {herb.herbNameEnglish || herb.englishName || herb.botanical}
+                                </small>
+                              )
+                            ) : (
+                              herb.sanskrit !== "—" && (
+                                <small>
+                                  {herb.sanskrit}
+                                </small>
+                              )
+                            )}
+                          </div>
+                        </div>
                       </td>
 
 
@@ -1268,7 +1303,7 @@ function ManageHerbs() {
                     <div>
 
                       <strong>
-                        No herbs found
+                        {t("manageHerbsEmpty")}
                       </strong>
 
                       <p>

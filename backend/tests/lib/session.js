@@ -17,6 +17,7 @@ export function devPassword() {
 export async function login(email, password) {
   const result = await api('POST', '/api/auth/login', {
     body: { email, password },
+    rateLimitKey: 'integration-dev-login',
   });
   if (!result.ok) {
     return result;

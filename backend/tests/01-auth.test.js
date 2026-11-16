@@ -21,6 +21,8 @@ export async function run() {
   const health = await api('GET', '/api/health');
   assertEqual(health.status, 200, '/api/health');
   assertEqual(health.data.status, 'ok', 'health status');
+  assert(Array.isArray(health.data.storageMissingEnv), 'health lists storage env gaps when unset');
+  assert(Array.isArray(health.data.smtpMissingEnv), 'health lists smtp env gaps when unset');
 
   const alias = await api('GET', '/health');
   assertEqual(alias.status, 200, '/health alias');

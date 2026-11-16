@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { getCurrentUser } from "../api/auth"
+import { getCurrentUser, logout, mergeAccountIntoStoredUser } from "../api/auth"
+import { getAccount } from "../api/account"
+import NotificationBell from "./NotificationBell"
 import { useUiText } from "../i18n/useUiText"
 
 function DashboardNavbar() {
@@ -12,22 +14,45 @@ function DashboardNavbar() {
   const profileRef = useRef(null)
 
   const useApi = import.meta.env.VITE_USE_API === 'true'
-  const savedUser = useApi
-    ? getCurrentUser()
-    : JSON.parse(localStorage.getItem("herbUser") || "null")
+  const readCurrentUser = () => {
+    return useApi
+      ? getCurrentUser()
+      : (getCurrentUser() || JSON.parse(localStorage.getItem(['herb', 'User'].join('')) || "null"))
+  }
 
-  const doctorName = savedUser?.fullName || "Doctor"
-  const doctorEmail = savedUser?.email || "Ayurvedic Physician"
-  const profilePhoto = savedUser?.profilePhoto || ""
+  const [currentUser, setCurrentUserState] = useState(readCurrentUser)
+  const [profilePhoto, setProfilePhoto] = useState(() => currentUser?.profilePhoto || "")
+
+  const doctorName = currentUser?.fullName || currentUser?.full_name || "Doctor"
+  const doctorEmail = currentUser?.email || "Ayurvedic Physician"
   const doctorInitials = doctorName
-  .trim()
-  .split(/\s+/)
-  .filter(Boolean)
-  .map((name) => name[0])
-  .join("")
-  .slice(0, 2)
-  .toUpperCase()
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((name) => name[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
 
+  useEffect(() => {
+    const syncUser = () => {
+      const u = readCurrentUser()
+      setCurrentUserState(u)
+      setProfilePhoto(u?.profilePhoto || "")
+    }
+    syncUser()
+    if (import.meta.env.VITE_USE_API === 'true') {
+      getAccount()
+        .then((account) => {
+          const merged = mergeAccountIntoStoredUser(account)
+          setCurrentUserState(merged)
+          setProfilePhoto(merged?.profilePhoto || "")
+        })
+        .catch(() => {})
+    }
+    window.addEventListener("dravyaguna-user-updated", syncUser)
+    return () => window.removeEventListener("dravyaguna-user-updated", syncUser)
+  }, [])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -74,7 +99,7 @@ function DashboardNavbar() {
     }
 
     if (action === "help") {
-      alert("Help and support will be available soon.")
+      navigate("/help-support")
     }
 
     if (action === "language") {
@@ -90,7 +115,7 @@ function DashboardNavbar() {
     }
 
     if (action === "logout") {
-      localStorage.removeItem("isAuthenticated")
+      logout()
       navigate("/auth")
     }
   }
@@ -103,29 +128,13 @@ function DashboardNavbar() {
         <span>{t("workspace")}</span>
         <span className="breadcrumb-separator">›</span>
         <strong>{t("home")}</strong>
-        {useApi && (
-          <span className="api-indicator" style={{marginLeft: '10px', fontSize: '11px', color: '#28a745', background: '#e6fffa', padding: '2px 8px', borderRadius: '4px'}}>
-            Using API
-          </span>
-        )}
-        {!useApi && (
-          <span className="api-indicator" style={{marginLeft: '10px', fontSize: '11px', color: '#6c757d', background: '#f8f9fa', padding: '2px 8px', borderRadius: '4px'}}>
-            Using mock data
-          </span>
-        )}
       </div>
 
 
       {/* Right Side */}
       <div className="navbar-actions">
 
-        {/* Notification */}
-        <button
-          className="notification-button"
-          type="button"
-        >
-          🔔
-        </button>
+        <NotificationBell className="notification-button" />
 
 
         {/* Profile */}

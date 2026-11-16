@@ -18,3 +18,15 @@ export async function updateAccountPreferences(preferences) {
 export async function changeAccountPassword(currentPassword, newPassword) {
   return apiClient.post('/api/account/password', { currentPassword, newPassword });
 }
+
+export async function updateAccountEmail(newEmail, password) {
+  const response = await apiClient.post('/api/account/email', { newEmail, password });
+  return response.data;
+}
+
+export async function updateAccountProfilePhoto(profilePhotoDataUrl) {
+  const response = await apiClient.patch('/api/account/profile-photo', {
+    profilePhotoDataUrl,
+  });
+  return response.data;
+}

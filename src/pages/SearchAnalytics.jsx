@@ -1,5 +1,7 @@
 import { useMemo, useState, useEffect } from "react"
-import { getSearchAnalytics } from "../api/admin"
+import { getSearchAnalytics, getSearchAnalyticsInsights } from "../api/admin"
+import { localizeApiError } from "../i18n/localizeApiError"
+import { useUiText } from "../i18n/useUiText"
 import "../styles/SearchAnalytics.css"
 
 
@@ -62,33 +64,50 @@ function getMonthKey(date) {
    ========================================= */
 
 function SearchAnalytics() {
+  const t = useUiText()
 
   const [selectedRange, setSelectedRange] =
     useState("30 days")
 
   const [analyticsData, setAnalyticsData] = useState([])
+  const [insights, setInsights] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [retryCount, setRetryCount] = useState(0)
 
-  useEffect(() => {
-    loadAnalytics()
-  }, [])
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = async (currentRetryCount = 0) => {
     setLoading(true)
     setError(null)
     
     try {
-      const response = await getSearchAnalytics()
+      const [response, insightsResponse] = await Promise.all([
+        getSearchAnalytics(),
+        getSearchAnalyticsInsights(90),
+      ])
       setAnalyticsData(response.data || [])
+      setInsights(insightsResponse || null)
     } catch (err) {
       console.error('Failed to load analytics:', err)
-      setError(err.message || 'Failed to load analytics')
-      setAnalyticsData([])
+      if (currentRetryCount < 1) {
+        // Retry once after 500ms for transient network issues
+        setTimeout(() => loadAnalytics(currentRetryCount + 1), 500)
+      } else {
+        setError(localizeApiError(t, err.message || t("analyticsLoadError")))
+        setAnalyticsData([])
+        setInsights(null)
+      }
     } finally {
       setLoading(false)
     }
   }
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1)
+  }
+
+  useEffect(() => {
+    loadAnalytics()
+  }, [retryCount])
 
   // The API exposes daily aggregates only; do not fabricate per-query data.
   const searchHistory = analyticsData.map((entry) => ({
@@ -485,11 +504,18 @@ function SearchAnalytics() {
      ========================================= */
 
   if (loading) {
-    return <p role="status">Loading search analytics...</p>
+    return <p role="status">{t("analyticsLoading")}</p>
   }
 
   if (error) {
-    return <p role="alert">{error}</p>
+    return (
+      <div className="analytics-error">
+        <p role="alert">{error}</p>
+        <button type="button" onClick={handleRetry} className="retry-button">
+          Retry
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -502,6 +528,26 @@ function SearchAnalytics() {
             HEADER
            ========================================= */}
 
+        {insights?.suggestions?.length > 0 && (
+          <section className="analytics-insights-panel" aria-label="Expert review suggestions">
+            <p className="analytics-panel-label">IMPROVEMENT SUGGESTIONS (EXPERT REVIEW)</p>
+            <p className="analytics-insights-disclaimer" role="status">
+              {insights.disclaimer || "Suggestions are informational only; scoring weights and vocabulary are never changed automatically."}
+            </p>
+            <ul className="analytics-insights-list">
+              {insights.suggestions.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.title}</strong>
+                  <p>{item.detail}</p>
+                  {item.related_route ? (
+                    <a href={item.related_route}>Open related admin page</a>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section className="analytics-header">
 
           <div>
@@ -511,15 +557,11 @@ function SearchAnalytics() {
             </p>
 
             <h1>
-              Understand how the herb
-              intelligence engine is being used
+              {t("analyticsTitle")}
             </h1>
 
             <p className="analytics-description">
-              Review search behaviour,
-              matching quality, and areas
-              where the knowledge base may
-              need improvement.
+              {t("analyticsSubtitle")}
             </p>
 
           </div>

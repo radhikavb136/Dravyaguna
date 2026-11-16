@@ -1,4 +1,5 @@
 import { pool } from '../../db/pool.js';
+import { expandTokensWithVocabularyHints } from './symptomLexicon.js';
 
 export const SIMILARITY_THRESHOLD = 0.45;
 export const RELATIVE_CUTOFF = 0.8;
@@ -62,6 +63,15 @@ export async function mapQueryToFilterIds(query) {
 
   if (!tokens.length) {
     return { karmaIds: [], indicationIds: [], matchedTerms: [], unmatchedTokens: [] };
+  }
+
+  const hintExpansion = await expandTokensWithVocabularyHints(tokens);
+  for (const id of hintExpansion.karmaIds) ids.karma.add(id);
+  for (const id of hintExpansion.indicationIds) ids.indication.add(id);
+  matched.push(...hintExpansion.matchedTerms);
+  for (const match of hintExpansion.matchedTerms) {
+    const idx = tokens.indexOf(match.term);
+    if (idx >= 0) matchedTokenIndexes.add(idx);
   }
 
   const terms = await loadApprovedTerms();

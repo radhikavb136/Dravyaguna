@@ -1,8 +1,8 @@
 import { assert, assertEqual } from './lib/assert.js';
-import pg from 'pg';
+import { getTestPool } from './lib/testPool.js';
 
 export async function run() {
-  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+  const pool = getTestPool();
   try {
     const { rows: tableCount } = await pool.query("SELECT COUNT(*)::int AS count FROM pg_tables WHERE schemaname = 'public'");
     assert(tableCount[0].count > 0, 'public schema contains tables');
@@ -18,6 +18,6 @@ export async function run() {
     `);
     assertEqual(policies.length, 0, 'public tables have no RLS policies');
   } finally {
-    await pool.end();
+    // shared test pool; closed by tests/run.js
   }
 }

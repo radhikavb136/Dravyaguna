@@ -1,6 +1,115 @@
 import { useEffect, useMemo, useState } from "react"
+import InfoTooltip from "./InfoTooltip"
 
 import "../styles/SearchInsights.css"
+
+// =========================================================
+// FORMAT VALUES
+// =========================================================
+
+const formatValue = (value) => {
+  if (!value) {
+    return null
+  }
+
+  if (typeof value === "string") {
+    return value.trim()
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .filter(Boolean)
+      .map((item) => String(item).trim())
+      .filter(Boolean)
+      .join(" + ")
+  }
+
+  if (typeof value === "object") {
+    return Object.entries(value)
+      .filter(
+        ([, itemValue]) =>
+          itemValue !== undefined &&
+          itemValue !== null &&
+          itemValue !== "" &&
+          itemValue !== "—"
+      )
+      .map(
+        ([key, itemValue]) =>
+          `${key}: ${itemValue}`
+      )
+      .join(" · ")
+  }
+
+  return String(value)
+}
+
+// =========================================================
+// GET SEARCH VALUE
+// =========================================================
+
+// =========================================================
+// GET DOSHA
+// =========================================================
+
+const getDosha = (search) => {
+  return formatValue(
+    search.dosha ||
+    search.selectedDosha ||
+    search.filters?.dosha
+  )
+}
+
+// =========================================================
+// GET RASA
+// =========================================================
+
+const getRasa = (search) => {
+  return formatValue(
+    search.rasa ||
+    search.selectedRasa ||
+    search.filters?.rasa
+  )
+}
+
+// =========================================================
+// GET SROTAS
+// =========================================================
+
+const getSrotas = (search) => {
+  return formatValue(
+    search.srotas ||
+    search.selectedSrotas ||
+    search.filters?.srotas
+  )
+}
+
+// =========================================================
+// COUNT MOST FREQUENT VALUE
+// =========================================================
+
+const getMostFrequent = (values) => {
+  const counts = {}
+
+  values
+    .filter(Boolean)
+    .forEach((value) => {
+      counts[value] =
+        (counts[value] || 0) + 1
+    })
+
+  const entries = Object.entries(counts)
+
+  if (entries.length === 0) {
+    return null
+  }
+
+  entries.sort((a, b) => b[1] - a[1])
+
+  return {
+    value: entries[0][0],
+    count: entries[0][1],
+  }
+}
 
 function SearchInsights() {
   const [searchHistory, setSearchHistory] = useState([])
@@ -59,113 +168,6 @@ function SearchInsights() {
     }
   }, [])
 
-  // =========================================================
-  // FORMAT VALUES
-  // =========================================================
-
-  const formatValue = (value) => {
-    if (!value) {
-      return null
-    }
-
-    if (typeof value === "string") {
-      return value.trim()
-    }
-
-    if (Array.isArray(value)) {
-      return value
-        .filter(Boolean)
-        .map((item) => String(item).trim())
-        .filter(Boolean)
-        .join(" + ")
-    }
-
-    if (typeof value === "object") {
-      return Object.entries(value)
-        .filter(
-          ([, itemValue]) =>
-            itemValue !== undefined &&
-            itemValue !== null &&
-            itemValue !== "" &&
-            itemValue !== "—"
-        )
-        .map(
-          ([key, itemValue]) =>
-            `${key}: ${itemValue}`
-        )
-        .join(" · ")
-    }
-
-    return String(value)
-  }
-
-  // =========================================================
-  // GET SEARCH VALUE
-  // =========================================================
-
-  // =========================================================
-  // GET DOSHA
-  // =========================================================
-
-  const getDosha = (search) => {
-    return formatValue(
-      search.dosha ||
-      search.selectedDosha ||
-      search.filters?.dosha
-    )
-  }
-
-  // =========================================================
-  // GET RASA
-  // =========================================================
-
-  const getRasa = (search) => {
-    return formatValue(
-      search.rasa ||
-      search.selectedRasa ||
-      search.filters?.rasa
-    )
-  }
-
-  // =========================================================
-  // GET SROTAS
-  // =========================================================
-
-  const getSrotas = (search) => {
-    return formatValue(
-      search.srotas ||
-      search.selectedSrotas ||
-      search.filters?.srotas
-    )
-  }
-
-  // =========================================================
-  // COUNT MOST FREQUENT VALUE
-  // =========================================================
-
-  const getMostFrequent = (values) => {
-    const counts = {}
-
-    values
-      .filter(Boolean)
-      .forEach((value) => {
-        counts[value] =
-          (counts[value] || 0) + 1
-      })
-
-    const entries = Object.entries(counts)
-
-    if (entries.length === 0) {
-      return null
-    }
-
-    entries.sort((a, b) => b[1] - a[1])
-
-    return {
-      value: entries[0][0],
-      count: entries[0][1],
-    }
-  }
 
   // =========================================================
   // DOSHA INSIGHT
@@ -322,6 +324,7 @@ function SearchInsights() {
 
           <h2>
             Search Insights
+            <InfoTooltip contentKey="searchInsights" />
           </h2>
 
           <p>

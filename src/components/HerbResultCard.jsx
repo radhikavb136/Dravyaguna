@@ -3,15 +3,23 @@ import { useNavigate } from "react-router-dom"
 import { USE_API } from "../api/client"
 import { addFavorite, getFavorites, removeFavorite } from "../api/favorites"
 import { getHerbById } from "../api/herbs"
+import { useCurrentLanguage, useUiText } from "../i18n/useUiText"
+import { getHerbDisplayName, getHerbSecondaryName } from "../utils/herbName"
+import { recordFeedback } from "../api/model"
+import InfoTooltip from "./InfoTooltip"
 
 function HerbResultCard({ herb }) {
+  const t = useUiText()
+  const currentLanguage = useCurrentLanguage()
   const navigate = useNavigate()
 
   const [isFavorite, setIsFavorite] = useState(false)
   const [favoriteBusy, setFavoriteBusy] = useState(false)
   const [favoriteError, setFavoriteError] = useState("")
   const [localizedPartUsed, setLocalizedPartUsed] = useState(null)
-  const displayLanguage = herb.displayLanguage || "en-IN"
+  const displayLanguage = herb.displayLanguage || currentLanguage || "en-IN"
+  const displayName = getHerbDisplayName(herb, displayLanguage)
+  const secondaryName = getHerbSecondaryName(herb, displayLanguage)
   const shouldTranslate = USE_API && displayLanguage !== "en-IN"
 
   useEffect(() => {
@@ -107,6 +115,11 @@ function HerbResultCard({ herb }) {
         } else {
           await addFavorite(herb.id)
           setIsFavorite(true)
+          recordFeedback({
+            queryText: herb.matchedQuery || herb.sanskritName || herb.englishName || 'herb',
+            herbId: herb.id,
+            interactionType: 'favorite',
+          })
         }
       } catch (error) {
         console.error("Unable to update favorite herb:", error)
@@ -172,7 +185,14 @@ function HerbResultCard({ herb }) {
   // =========================================
 
   const handleViewProfile = () => {
-    navigate(`/herb/${herb.id}`)
+    recordFeedback({
+      queryText: herb.matchedQuery || herb.sanskritName || herb.englishName || 'herb',
+      herbId: herb.id,
+      interactionType: 'click',
+    })
+    navigate(`/herb/${herb.id}`, {
+      state: { searchQuery: herb.matchedQuery || herb.sanskritName || herb.englishName },
+    })
   }
 
   // =========================================
@@ -180,6 +200,11 @@ function HerbResultCard({ herb }) {
   // =========================================
 
   const handleCompare = () => {
+    recordFeedback({
+      queryText: herb.matchedQuery || herb.sanskritName || herb.englishName || 'herb',
+      herbId: herb.id,
+      interactionType: 'compare',
+    })
     const savedCompareHerbs =
       localStorage.getItem("selectedCompareHerbs")
 
@@ -208,7 +233,7 @@ function HerbResultCard({ herb }) {
     }
 
     if (compareHerbs.length >= 4) {
-      alert("You can compare up to 4 herbs.")
+      alert(t("compareMaxFourHerbs"))
       return
     }
 
@@ -280,30 +305,39 @@ function HerbResultCard({ herb }) {
 
         <div className="herb-leaf-box">
 
-          <svg
-            viewBox="0 0 64 64"
-            className="herb-leaf-icon"
-            aria-hidden="true"
-          >
-
-            <path
-              d="M52 10C31 12 16 22 12 38c-2 8 3 14 11 14 16 0 27-17 29-42Z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          {herb.imageUrl || herb.image_url ? (
+            <img
+              src={herb.imageUrl || herb.image_url}
+              alt={displayName || "Herb"}
+              className="herb-result-card-photo"
+              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "14px" }}
             />
+          ) : (
+            <svg
+              viewBox="0 0 64 64"
+              className="herb-leaf-icon"
+              aria-hidden="true"
+            >
 
-            <path
-              d="M12 52c8-11 17-19 29-26"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
+              <path
+                d="M52 10C31 12 16 22 12 38c-2 8 3 14 11 14 16 0 27-17 29-42Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
 
-          </svg>
+              <path
+                d="M12 52c8-11 17-19 29-26"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+
+            </svg>
+          )}
 
         </div>
 
@@ -321,11 +355,11 @@ function HerbResultCard({ herb }) {
           <div>
 
             <h2>
-              {herb.englishName || "Unnamed herb"}
+              {displayName}
             </h2>
 
             <em>
-              {herb.botanicalName || "Botanical name unavailable"}
+              {secondaryName || "Botanical name unavailable"}
             </em>
 
           </div>
@@ -343,8 +377,8 @@ function HerbResultCard({ herb }) {
             aria-pressed={isFavorite}
             aria-label={
               isFavorite
-                ? `Remove ${herb.englishName} from favorites`
-                : `Save ${herb.englishName}`
+                ? `Remove ${displayName} from favorites`
+                : `Save ${displayName}`
             }
           >
             {isFavorite ? "♥" : "♡"}
@@ -368,6 +402,8 @@ function HerbResultCard({ herb }) {
           <span>
             match
           </span>
+
+          <InfoTooltip contentKey="searchRelevance" />
 
           {herb.verificationStatus && (
             <span

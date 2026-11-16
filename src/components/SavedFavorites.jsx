@@ -3,11 +3,15 @@ import { useNavigate } from "react-router-dom"
 import { USE_API } from "../api/client"
 import { getFavorites } from "../api/favorites"
 import { getHerbById } from "../api/herbs"
+import { useCurrentLanguage } from "../i18n/useUiText"
+import { getHerbDisplayName } from "../utils/herbName"
+import InfoTooltip from "./InfoTooltip"
 
 import "../styles/SavedFavorites.css"
 
 function SavedFavorites() {
   const navigate = useNavigate()
+  const currentLanguage = useCurrentLanguage()
 
   const [savedFavorites, setSavedFavorites] = useState([])
   const [loading, setLoading] = useState(true)
@@ -25,9 +29,12 @@ function SavedFavorites() {
       try {
         if (USE_API) {
           const response = await getFavorites()
-          const herbs = await Promise.all(
+          const results = await Promise.allSettled(
             (response.data || []).map((favorite) => getHerbById(favorite.herb_id))
           )
+          const herbs = results
+            .filter((r) => r.status === "fulfilled" && r.value)
+            .map((r) => r.value)
           if (!cancelled) setSavedFavorites(herbs)
           return
         }
@@ -108,6 +115,7 @@ function SavedFavorites() {
 
   const getHerbName = (herb) => {
     return (
+      getHerbDisplayName(herb, currentLanguage) ||
       herb.englishName ||
       herb.name ||
       "Unnamed herb"
@@ -155,6 +163,7 @@ function SavedFavorites() {
 
         <h2>
           Saved Favorites
+          <InfoTooltip contentKey="savedFavorites" />
         </h2>
 
         <button
@@ -235,6 +244,13 @@ function SavedFavorites() {
               className="saved-favorite-item"
               key={herb.id}
             >
+              {herb.imageUrl || herb.image_url ? (
+                <img
+                  src={herb.imageUrl || herb.image_url}
+                  alt=""
+                  style={{ width: "36px", height: "36px", borderRadius: "6px", objectFit: "cover", marginRight: "12px", flexShrink: 0 }}
+                />
+              ) : null}
 
               <div className="saved-favorite-info">
 

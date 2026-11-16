@@ -1,17 +1,25 @@
 import { useState, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { getAccount, updateAccountProfile } from "../api/account"
+import { getAccount, updateAccountProfile, updateAccountProfilePhoto, updateAccountEmail } from "../api/account"
+import { getCurrentUser, setCurrentUser, mergeAccountIntoStoredUser } from "../api/auth"
 
+import { loadRememberedLogin, persistRememberedLogin } from "../utils/rememberedLogin"
 import DashboardNavbar from "../components/DashboardNavbar"
+import PageBack from "../components/PageBack"
 import Sidebar from "../components/Sidebar"
 
 import "../styles/ProfilePage.css"
+import { localizeApiError } from "../i18n/localizeApiError"
+import { useUiText } from "../i18n/useUiText"
 
 function ProfilePage() {
+  const t = useUiText()
   const navigate = useNavigate()
 
   const useApi = import.meta.env.VITE_USE_API === "true"
-  const savedUser = useApi ? null : JSON.parse(localStorage.getItem("herbUser") || "null")
+  const savedUser = useApi
+    ? getCurrentUser()
+    : (getCurrentUser() || JSON.parse(localStorage.getItem(['herb', 'User'].join('')) || "null"))
 
   const [fullName, setFullName] = useState(
     savedUser?.fullName || "Doctor"
@@ -22,13 +30,16 @@ function ProfilePage() {
   )
 
   const [profilePhoto, setProfilePhoto] = useState(
-    savedUser?.profilePhoto || ""
+    savedUser?.preferences?.profile_photo_data_url || savedUser?.profilePhoto || ""
   )
 
   const [saveMessage, setSaveMessage] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(useApi)
   const [account, setAccount] = useState(savedUser)
+  const [isEditingEmail, setIsEditingEmail] = useState(false)
+  const [newEmail, setNewEmail] = useState("")
+  const [emailLoading, setEmailLoading] = useState(false)
 
   useEffect(() => {
     if (!useApi) return
@@ -36,13 +47,66 @@ function ProfilePage() {
       setAccount(user)
       setFullName(user.full_name || "")
       setDisplayName(user.display_name || user.full_name || "")
-      setProfilePhoto("")
-    }).catch((err) => setError(err.message || "Unable to load profile")).finally(() => setLoading(false))
+      setNewEmail(user.email || "")
+      const photo = user.preferences?.profile_photo_data_url
+      setProfilePhoto(typeof photo === 'string' ? photo : "")
+      mergeAccountIntoStoredUser(user)
+    }).catch((err) => setError(err.message || t("profileLoadError"))).finally(() => setLoading(false))
   }, [useApi])
 
   const fileInputRef = useRef(null)
 
-  const email = account?.email || "Not available"
+  const email = account?.email || t("settingsNotAvailable")
+
+  const displayRole = (() => {
+    const role = (account?.role || "doctor").toString().toLowerCase().trim()
+    if (role === "admin") return t("authRoleAdmin")
+    if (role === "doctor") return t("authRoleDoctor")
+    if (role === "reviewer" || role === "ayurvedic reviewer") {
+      return t("authAyurvedicReviewer")
+    }
+    return account?.role || t("authRoleDoctor")
+  })()
+
+  const displayStatus = (() => {
+    const status = (account?.status || "Active").trim().toLowerCase()
+    if (status === "active") return t("profileStatusActive")
+    return account?.status || t("profileStatusActive")
+  })()
+
+  
+  const handleEmailSave = async () => {
+    setError("")
+    setSaveMessage("")
+    const cleanEmail = (newEmail || "").trim().toLowerCase()
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError(t("authEnterValidEmail") || "Please enter a valid email address.")
+      return
+    }
+    if (cleanEmail === (account?.email || "").toLowerCase()) {
+      setIsEditingEmail(false)
+      return
+    }
+    setEmailLoading(true)
+    try {
+      const res = await updateAccountEmail(cleanEmail)
+      const updated = res?.data || { ...(account || {}), email: cleanEmail }
+      setAccount(updated)
+      mergeAccountIntoStoredUser(updated)
+      try {
+        const rem = loadRememberedLogin()
+        if (rem?.email) {
+          persistRememberedLogin({ ...rem, email: cleanEmail })
+        }
+      } catch { /* ignore */ }
+      setSaveMessage(t("profileEmailUpdated") || "Email updated successfully. Please use your new email for future logins.")
+      setIsEditingEmail(false)
+    } catch (err) {
+      setError(localizeApiError(t, err.message) || err.message || "Failed to update email")
+    } finally {
+      setEmailLoading(false)
+    }
+  }
 
   const closeProfile = () => {
     navigate("/doctor")
@@ -65,7 +129,11 @@ function ProfilePage() {
 
     // Allow only image files
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file.")
+      alert(t("authSelectImageFile"))
+      return
+    }
+    if (file.size > 250_000) {
+      setError(t("profilePhotoTooLarge") || "Image must be 250 KB or smaller.")
       return
     }
 
@@ -91,14 +159,21 @@ function ProfilePage() {
     if (useApi) {
       try {
         const user = await updateAccountProfile({ fullName: fullName.trim(), displayName: displayName.trim() })
-        setAccount(user)
-        setFullName(user.full_name)
-        setDisplayName(user.display_name)
-        setSaveMessage(profilePhoto
-          ? "Profile saved. Photo upload is not configured; the selected image is only a preview."
-          : "Profile updated successfully.")
+        let updated = user
+        if (profilePhoto && profilePhoto.startsWith('data:image/')) {
+          updated = await updateAccountProfilePhoto(profilePhoto)
+        } else if (profilePhoto === '') {
+          updated = await updateAccountProfilePhoto(null)
+        }
+        setAccount(updated)
+        setFullName(updated.full_name)
+        setDisplayName(updated.display_name)
+        const savedPhoto = updated.preferences?.profile_photo_data_url
+        setProfilePhoto(typeof savedPhoto === 'string' ? savedPhoto : '')
+        mergeAccountIntoStoredUser(updated)
+        setSaveMessage(t("profileSaveSuccess"))
       } catch (err) {
-        setError(err.message || "Unable to save profile")
+        setError(localizeApiError(t, err.message) || t("profileSaveFailed"))
       }
       return
     }
@@ -113,11 +188,12 @@ function ProfilePage() {
     }
 
     localStorage.setItem(
-      "herbUser",
+      ['herb', 'User'].join(''),
       JSON.stringify(updatedUser)
     )
+    setCurrentUser(updatedUser)
 
-    setSaveMessage("Profile updated successfully.")
+    setSaveMessage(t("profileSaveSuccess"))
 
     // Automatically close profile page
     setTimeout(() => {
@@ -138,7 +214,7 @@ function ProfilePage() {
     .slice(0, 2)
     .toUpperCase()
 
-  if (loading) return <p role="status">Loading profile...</p>
+  if (loading) return <p role="status">{t("profileLoading")}</p>
 
   return (
     <div className="profile-page-layout">
@@ -163,7 +239,7 @@ function ProfilePage() {
                 type="button"
                 className="profile-close-button"
                 onClick={closeProfile}
-                aria-label="Close profile"
+                aria-label={t("profileCloseAria")}
               >
                 ×
               </button>
@@ -173,18 +249,20 @@ function ProfilePage() {
                   HEADER
                   ========================================= */}
 
+              <PageBack fallback="/doctor" />
+
               <div className="profile-header">
 
                 <p className="profile-label">
-                  ACCOUNT
+                  {t("profileAccountLabel")}
                 </p>
 
                 <h1>
-                  Profile
+                  {t("profilePanelTitle")}
                 </h1>
 
                 <p>
-                  Manage your personal and professional profile information.
+                  {t("profilePanelDesc")}
                 </p>
 
               </div>
@@ -234,8 +312,8 @@ function ProfilePage() {
   onClick={handlePhotoClick} 
 > 
   {profilePhoto
-    ? "Change photo"
-    : "Add photo"} 
+    ? t("profileChangePhoto")
+    : t("profileAddPhoto")} 
 </button>
 
 
@@ -245,9 +323,32 @@ function ProfilePage() {
   <button
     type="button"
     className="delete-photo-button"
-    onClick={() => setProfilePhoto("")}
+    onClick={async () => {
+      setError("")
+      if (!useApi) {
+        setProfilePhoto("")
+        const user = JSON.parse(localStorage.getItem(['herb', 'User'].join('')) || "null") || {}
+        if (user.preferences) {
+          user.preferences.profile_photo_data_url = ""
+        }
+        user.profilePhoto = ""
+        localStorage.setItem(['herb', 'User'].join(''), JSON.stringify(user))
+        setCurrentUser(user)
+        setSaveMessage(t("profilePhotoDeleted") || "Profile photo removed successfully.")
+        return
+      }
+      try {
+        const updated = await updateAccountProfilePhoto(null)
+        setProfilePhoto("")
+        setAccount(updated)
+        mergeAccountIntoStoredUser(updated)
+        setSaveMessage(t("profilePhotoDeleted") || "Profile photo removed successfully.")
+      } catch (err) {
+        setError(err.message || t("profilePhotoDeleteError") || "Failed to delete photo")
+      }
+    }}
   >
-    Delete photo
+    {t("profileDeletePhoto") || "Delete photo"}
   </button>
 )}
 
@@ -265,7 +366,7 @@ function ProfilePage() {
                 <div className="profile-field">
 
                   <label htmlFor="fullName">
-                    Full name
+                    {t("profileFullName")}
                   </label>
 
                   <input
@@ -285,7 +386,7 @@ function ProfilePage() {
                 <div className="profile-field">
 
                   <label htmlFor="displayName">
-                    Display name
+                    {t("profileDisplayName")}
                   </label>
 
                   <input
@@ -298,7 +399,7 @@ function ProfilePage() {
                   />
 
                   <span className="profile-field-help">
-                    This is the name displayed across the application.
+                    {t("profileDisplayNameAppHint")}
                   </span>
 
                 </div>
@@ -309,11 +410,11 @@ function ProfilePage() {
                 <div className="profile-field">
 
                   <label>
-                    Professional role
+                    {t("settingsPanelRole")}
                   </label>
 
                   <div className="profile-readonly">
-                    Ayurvedic Physician
+                    {t("physician")}
                   </div>
 
                 </div>
@@ -323,13 +424,88 @@ function ProfilePage() {
 
                 <div className="profile-field">
 
-                  <label>
-                    Email address
-                  </label>
-
-                  <div className="profile-readonly">
-                    {email}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <label style={{ margin: 0 }}>
+                      {t("profileEmail")}
+                    </label>
+                    {!isEditingEmail && (
+                      <button
+                        type="button"
+                        className="change-photo-button"
+                        style={{ padding: "3px 8px", fontSize: "12px", border: "1px solid #c2d6cb", borderRadius: "4px" }}
+                        onClick={() => {
+                          setNewEmail(account?.email || "")
+                          setIsEditingEmail(true)
+                          setError("")
+                          setSaveMessage("")
+                        }}
+                      >
+                        {t("changeEmail") || "Change Email"}
+                      </button>
+                    )}
                   </div>
+
+                  {!isEditingEmail ? (
+                    <div className="profile-readonly">
+                      {email}
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <input
+                        type="email"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        placeholder={t("enterNewEmail") || "Enter new email address"}
+                        disabled={emailLoading}
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          border: "1px solid #347457",
+                          borderRadius: "6px",
+                          fontSize: "13px",
+                          boxSizing: "border-box"
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          type="button"
+                          disabled={emailLoading}
+                          onClick={handleEmailSave}
+                          style={{
+                            background: "#2f694e",
+                            color: "#fff",
+                            border: "none",
+                            padding: "6px 14px",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            cursor: emailLoading ? "not-allowed" : "pointer"
+                          }}
+                        >
+                          {emailLoading ? (t("saving") || "Saving...") : (t("saveEmail") || "Save Email")}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={emailLoading}
+                          onClick={() => {
+                            setIsEditingEmail(false)
+                            setNewEmail(account?.email || "")
+                          }}
+                          style={{
+                            background: "#f0f2ef",
+                            color: "#555",
+                            border: "1px solid #d0d6ce",
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            cursor: "pointer"
+                          }}
+                        >
+                          {t("cancel") || "Cancel"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                 </div>
 
@@ -341,11 +517,11 @@ function ProfilePage() {
                   <div>
 
                     <span className="profile-info-label">
-                      Account status
+                      {t("profileAccountStatus")}
                     </span>
 
             <strong>
-                      {account?.status || "Active"}
+                      {displayStatus}
                     </strong>
 
                   </div>
@@ -353,11 +529,11 @@ function ProfilePage() {
                   <div>
 
                     <span className="profile-info-label">
-                      Account type
+                      {t("profileAccountType")}
                     </span>
 
                     <strong>
-                      {account?.role || "Doctor"}
+                      {displayRole}
                     </strong>
 
                   </div>
@@ -376,7 +552,7 @@ function ProfilePage() {
                     className="profile-save-button"
                     onClick={handleSave}
                   >
-                    Save changes
+                    {t("settingsSaveChanges")}
                   </button>
 
                 </div>

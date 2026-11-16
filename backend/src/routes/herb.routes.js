@@ -11,9 +11,17 @@ import {
   verifyHerb,
   deleteHerb,
 } from '../services/herbs/herbService.js';
+import { fetchHerbExportRows, sendHerbExportResponse } from '../services/herbs/herbExportService.js';
 
 export const herbRouter = Router();
-const translationLimit = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => req.user.id });
+const translationLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user.id,
+  skip: () => process.env.DISABLE_RATE_LIMIT === 'true',
+});
 
 // Validation schemas
 const herbQuerySchema = z.object({
@@ -108,6 +116,17 @@ herbRouter.get('/', authenticate, async (req, res, next) => {
       q: query.q,
     });
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/herbs/export - herb master export (admin only; must be registered before /:id)
+herbRouter.get('/export', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    const format = z.enum(['csv', 'xlsx']).parse(req.query.format || 'csv');
+    const rows = await fetchHerbExportRows();
+    sendHerbExportResponse(res, format, rows);
   } catch (err) {
     next(err);
   }

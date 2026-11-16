@@ -3,7 +3,8 @@ import { pool } from '../../db/pool.js';
 import { getHerbById } from '../herbs/herbService.js';
 import { runDetailedSearch } from '../scoring/searchService.js';
 import { configuredLlmProvider } from './llmProvider.js';
-import { retrieveKnowledge } from './ragKnowledgeService.js';
+import { validateGeneratedExplanation } from './explainGroundingValidation.js';
+import { herbRecordToEvidence, retrieveKnowledge } from './ragKnowledgeService.js';
 
 const MAX_EXPLANATION_LENGTH = 1200;
 const inFlight = new Map();
@@ -58,23 +59,8 @@ async function generateAndCache({ herbId, question, filters, filtersHash, cacheK
   let evidence = searchQuestion
     ? await retrieveKnowledge({ question: searchQuestion, role, herbId })
     : [];
-  if (evidence.length === 0 && herb && !question) {
-    evidence = [{
-      content: JSON.stringify(herb),
-      relevance: 1,
-      herb_id: herb.id,
-      herb_code: herb.code,
-      herb_name: herb.english_name,
-      source: {
-        identifier: `database:herb:${herb.code}`,
-        title: `Stored herb record: ${herb.english_name}`,
-        type: 'herb_record',
-        page: null,
-        section: 'Stored herb record',
-        metadata: { status: herb.status },
-      },
-      chunk_metadata: {},
-    }];
+  if (evidence.length === 0 && herb) {
+    evidence = [herbRecordToEvidence(herb, 1)];
   }
   const citations = evidence.map((item) => ({
     source: item.source.identifier,
@@ -144,7 +130,24 @@ async function generateAndCache({ herbId, question, filters, filtersHash, cacheK
       retrievedData,
     })).trim().slice(0, MAX_EXPLANATION_LENGTH);
     if (!explanation) throw new Error('LLM provider returned an empty explanation');
+    const validation = validateGeneratedExplanation(explanation);
+    if (!validation.ok) throw new Error(`Generated explanation rejected (${validation.reason})`);
   } catch {
+    const templateText = buildDatabaseTemplateExplanation({ herb, structured, evidence });
+    if (templateText) {
+      return {
+        explanation: templateText,
+        answer_status: 'database_template',
+        ai_generated: false,
+        explanation_unavailable: false,
+        message: 'Structured summary from stored database fields (no live language model).',
+        citations,
+        evidence,
+        lang,
+        provider: null,
+        structured,
+      };
+    }
     return {
       explanation: null,
       answer_status: 'generation_unavailable',
@@ -214,6 +217,32 @@ function stableValue(value) {
 
 function hash(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function buildDatabaseTemplateExplanation({ herb, structured, evidence }) {
+  const parts = [];
+  if (herb?.english_name) {
+    parts.push(`Stored record: ${herb.english_name}${herb.botanical_name ? ` (${herb.botanical_name})` : ''}.`);
+  }
+  if (structured?.matchPercentage != null) {
+    parts.push(`Match score for the active filters: ${structured.matchPercentage}%.`);
+  }
+  const breakdown = structured?.breakdown || [];
+  if (breakdown.length) {
+    const summary = breakdown
+      .filter((row) => row && row.parameter)
+      .slice(0, 8)
+      .map((row) => `${row.parameter}: ${row.score ?? row.matched ?? '—'}`)
+      .join('; ');
+    if (summary) parts.push(`Scoring breakdown (database): ${summary}.`);
+  }
+  const passageCount = evidence?.length || 0;
+  if (passageCount) {
+    parts.push(`${passageCount} indexed passage(s) are shown below with source metadata.`);
+  }
+  if (!parts.length) return null;
+  parts.push('Educational summary only — not clinical advice.');
+  return parts.join(' ');
 }
 
 export function canonicalFiltersHash(filters) {

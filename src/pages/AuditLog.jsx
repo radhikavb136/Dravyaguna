@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { getAuditLog } from "../api/admin"
+import { localizeApiError } from "../i18n/localizeApiError"
+import { useUiText } from "../i18n/useUiText"
 import "../styles/AuditLog.css"
 
 
@@ -55,6 +57,7 @@ function getDateOnly(dateValue) {
    ========================================= */
 
 function AuditLog() {
+  const t = useUiText()
 
   /* =========================================
      AUDIT DATA
@@ -63,10 +66,6 @@ function AuditLog() {
   const [auditEntries, setAuditEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-
-  useEffect(() => {
-    loadAuditLog()
-  }, [])
 
   const loadAuditLog = async () => {
     setLoading(true)
@@ -89,12 +88,16 @@ function AuditLog() {
         setAuditEntries(normalized)
     } catch (err) {
       console.error('Failed to load audit log:', err)
-      setError(err.message || 'Failed to load audit log')
+      setError(localizeApiError(t, err.message || t("auditLoadError")))
       setAuditEntries([])
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadAuditLog()
+  }, [])
 
 
   /* =========================================
@@ -600,7 +603,7 @@ function AuditLog() {
      ========================================= */
 
   if (loading) {
-    return <p role="status">Loading audit log...</p>
+    return <p role="status">{t("auditLoading")}</p>
   }
 
   if (error) {
@@ -621,12 +624,11 @@ function AuditLog() {
         <div>
 
           <h1>
-            Audit Log
+            {t("auditTitle")}
           </h1>
 
           <p>
-            Track who changed what and when
-            across the entire knowledge base.
+            {t("auditSubtitle")}
           </p>
 
         </div>

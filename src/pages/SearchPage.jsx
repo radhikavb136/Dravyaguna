@@ -4,7 +4,9 @@ import { getAccount } from "../api/account"
 import { getFilterOptions } from "../api/vocabulary"
 import { USE_API } from "../api/client"
 import { useUiText } from "../i18n/useUiText"
+import { localizeApiError } from "../i18n/localizeApiError"
 import DashboardNavbar from "../components/DashboardNavbar"
+import PageBack from "../components/PageBack"
 import Sidebar from "../components/Sidebar"
 import DetailedSearch from "../components/DetailedSearch"
 import "../styles/SearchPage.css"
@@ -32,7 +34,7 @@ function SearchPage() {
     if (USE_API) {
       getAccount()
         .then(({ preferences }) => setDefaultMode(preferences?.defaultSearch || "simple"))
-        .catch((error) => setPreferenceError(error.message || "Unable to load search preference"))
+        .catch(() => setPreferenceError("Unable to load search preference"))
       return
     }
     try {
@@ -51,7 +53,7 @@ function SearchPage() {
         if (!cancelled) setSearchVocabulary(options)
       })
       .catch((error) => {
-        if (!cancelled) setFiltersError(error.message || "Unable to load search filters")
+        if (!cancelled) setFiltersError("Unable to load search filters")
       })
       .finally(() => {
         if (!cancelled) setFiltersLoading(false)
@@ -166,8 +168,14 @@ function SearchPage() {
               ========================================= */}
 
           <section className="search-page-header">
+            <PageBack fallback="/doctor" />
 
-            {preferenceError && <p role="alert">{preferenceError}</p>}
+            {preferenceError && (
+              <div className="search-error-banner" role="alert">
+                <span className="search-error-icon">⚠</span>
+                <span>{preferenceError}</span>
+              </div>
+            )}
 
             <div className="search-header-text">
 
@@ -334,12 +342,19 @@ function SearchPage() {
 
                   <div className="simple-search-factors-grid">
 
-                    {USE_API && filtersLoading && <p role="status">Loading clinical filters...</p>}
+                    {USE_API && filtersLoading && <p role="status">{t("searchFiltersLoading")}</p>}
                     {USE_API && filtersError && (
-                      <p role="alert">
-                        Unable to load clinical filters: {filtersError}{" "}
-                        <button type="button" onClick={() => { setFiltersLoading(true); setFiltersError(""); setFiltersRetry((count) => count + 1) }}>Retry</button>
-                      </p>
+                      <div className="search-error-banner" role="alert">
+                        <span className="search-error-icon">⚠</span>
+                        <span>Unable to load search filters</span>
+                        <button 
+                          type="button" 
+                          className="search-retry-button"
+                          onClick={() => { setFiltersLoading(true); setFiltersError(""); setFiltersRetry((count) => count + 1) }}
+                        >
+                          Retry
+                        </button>
+                      </div>
                     )}
 
                     <div className="simple-search-factor">

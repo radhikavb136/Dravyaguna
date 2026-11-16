@@ -30,13 +30,14 @@ import AuditLog from "./pages/AuditLog"
 import AdminProfilePage from "./pages/AdminProfilePage"
 import AdminSettingsPage from "./pages/AdminSettingsPage"
 import AdminLanguagePage from "./pages/AdminLanguagePage"
-import AdminUpgradePlanPage from "./pages/AdminUpgradePlanPage"
+import AdminHelpSupportPage from "./pages/AdminHelpSupportPage"
 import AdminPageGuard from "./components/AdminPageGuard"
 import AuthenticatedRoute from "./components/AuthenticatedRoute"
 
 const ADMIN_EXPERT = ["admin", "domain_expert"]
 const HERB_EDITORS = ["admin", "editor", "domain_expert"]
 const ADMIN_ONLY = ["admin"]
+const ADMIN_STAFF = ["admin", "editor", "domain_expert"]
 
 function App() {
   return (
@@ -60,13 +61,10 @@ function App() {
            <Route path="search-analytics" element={<AdminPageGuard allowedRoles={ADMIN_EXPERT}><SearchAnalytics /></AdminPageGuard>} />
            <Route path="users" element={<AdminPageGuard allowedRoles={ADMIN_ONLY}><UserRoleManagement /></AdminPageGuard>} />
            <Route path="audit-log" element={<AdminPageGuard allowedRoles={ADMIN_ONLY}><AuditLog /></AdminPageGuard>} />
-           <Route path="profile" element={<AdminProfilePage />} />
-           <Route path="settings" element={<AdminSettingsPage />} />
-           <Route path="/admin/language" element={<AdminLanguagePage />}/>
-           <Route
-    path="/admin/upgrade-plan"
-    element={<AdminUpgradePlanPage />}
-  />
+           <Route path="profile" element={<AdminPageGuard allowedRoles={ADMIN_STAFF}><AdminProfilePage /></AdminPageGuard>} />
+           <Route path="settings" element={<AdminPageGuard allowedRoles={ADMIN_STAFF}><AdminSettingsPage /></AdminPageGuard>} />
+           <Route path="language" element={<AdminPageGuard allowedRoles={ADMIN_STAFF}><AdminLanguagePage /></AdminPageGuard>} />
+           <Route path="help-support" element={<AdminPageGuard allowedRoles={ADMIN_STAFF}><AdminHelpSupportPage /></AdminPageGuard>} />
 
       </Route>
 
@@ -86,7 +84,7 @@ function App() {
         <Route path="/profile" element={<AuthenticatedRoute><ProfilePage /></AuthenticatedRoute>} />
         <Route path="/settings" element={<AuthenticatedRoute><SettingsPage /></AuthenticatedRoute>} />
         <Route path="/language" element={<AuthenticatedRoute><LanguagePage /></AuthenticatedRoute>} />
-        <Route path="/help-support" element={<HelpSupportPage />} />
+        <Route path="/help-support" element={<AuthenticatedRoute><HelpSupportPage /></AuthenticatedRoute>} />
 
         {/* Additional Pages */}
         <Route path="/upgrade" element={<UpgradePlanPage />} />

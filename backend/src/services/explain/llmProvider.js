@@ -1,4 +1,5 @@
 import { env } from '../../config/env.js';
+import { createGeminiProvider, resolveGeminiModel } from './geminiProvider.js';
 
 export const mockLlmProvider = {
   name: 'mock',
@@ -13,16 +14,38 @@ export const mockLlmProvider = {
   },
 };
 
+export function resolveConfiguredLlmProviderName() {
+  if (env.nodeEnv === 'test') return 'mock';
+  if (env.llmProvider && env.llmProvider !== 'mock') return env.llmProvider;
+  return env.geminiApiKey || env.llmApiKey ? 'gemini' : 'mock';
+}
+
+export function isLiveLlmConfigured() {
+  const name = resolveConfiguredLlmProviderName();
+  if (name === 'gemini') return Boolean(env.geminiApiKey || env.llmApiKey);
+  if (name === 'openai') return Boolean(env.llmApiKey && env.llmModel);
+  return false;
+}
+
 export function configuredLlmProvider() {
-  if (!env.llmProvider || env.llmProvider === 'mock') return mockLlmProvider;
-  if (env.llmProvider === 'openai') {
+  if (env.nodeEnv === 'test') return mockLlmProvider;
+  const providerName = resolveConfiguredLlmProviderName();
+  if (providerName === 'mock') return mockLlmProvider;
+  if (providerName === 'openai') {
     return createOpenAiProvider({ apiKey: env.llmApiKey, model: env.llmModel });
   }
+  if (providerName === 'gemini') {
+    const apiKey = env.geminiApiKey || env.llmApiKey;
+    return createGeminiProvider({
+      apiKey,
+      model: resolveGeminiModel(env.llmModel),
+    });
+  }
   return {
-    name: env.llmProvider,
+    name: providerName,
     model: env.llmModel || '',
     async generate() {
-      throw new Error(`Unsupported LLM_PROVIDER: ${env.llmProvider}`);
+      throw new Error(`Unsupported LLM_PROVIDER: ${providerName}`);
     },
   };
 }
@@ -31,7 +54,7 @@ export function createOpenAiProvider({ apiKey, model, fetchImpl = fetch }) {
   return {
     name: 'openai',
     model,
-    async generate({ system, retrievedData }) {
+    async generate({ system, retrievedData, question }) {
       if (!apiKey || !model) throw new Error('OpenAI provider requires LLM_API_KEY and LLM_MODEL');
       const response = await fetchImpl('https://api.openai.com/v1/responses', {
         method: 'POST',

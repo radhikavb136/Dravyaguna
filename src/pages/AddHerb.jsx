@@ -5,9 +5,11 @@ import { getFilterOptions } from "../api/vocabulary"
 import { getCurrentUser } from "../api/auth"
 import { getBackendRole } from "../utils/roles"
 import InfoIcon from "../components/InfoIcon"
+import { useUiText } from "../i18n/useUiText"
 import "../styles/AddHerb.css"
 
 function AddHerb() {
+  const t = useUiText()
   const navigate = useNavigate()
   const imageInputRef = useRef(null)
   const [searchParams] = useSearchParams()
@@ -463,6 +465,10 @@ function AddHerb() {
         verificationStatus: herb.verificationStatus || "draft",
         classicalReferences: herb.classicalReferences?.length ? herb.classicalReferences : [{ source: "", chapter: "", verse: "", notes: "" }],
       }))
+      if (herb.imageUrl || herb.image_url) {
+        setImagePreview(herb.imageUrl || herb.image_url)
+        setImageName(herb.englishName ? `${herb.englishName} image` : "herb-image")
+      }
       setLoadError("")
       setHerbLoading(false)
     }
@@ -593,12 +599,12 @@ function AddHerb() {
     ]
 
     if (!allowedTypes.includes(file.type)) {
-      alert("Please select a PNG, JPG/JPEG, or WebP image.")
+      alert(t("addHerbImageTypeError"))
       return
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("Image size must be 2 MB or smaller.")
+      alert(t("addHerbImageSizeError"))
       return
     }
 
@@ -679,7 +685,7 @@ function AddHerb() {
   const handleSave = async (action) => {
     const useApi = import.meta.env.VITE_USE_API === 'true'
     if (selectedHerbId && !herbId) {
-      alert(loadError || "Wait for the herb to load before saving.")
+      alert(loadError || t("addHerbWaitToSave"))
       return
     }
     
@@ -706,7 +712,7 @@ function AddHerb() {
 
     // Prevent editors from setting verified status
     if (nextStatus === "verified" && getBackendRole(currentUser) === "editor") {
-      alert("Editors cannot verify herbs. Only domain experts and admins can verify.")
+      alert(t("addHerbEditorCannotVerify"))
       return
     }
 
@@ -768,20 +774,28 @@ function AddHerb() {
           const wasVerified = String(formData.verificationStatus || "").toLowerCase() === "verified"
           const saved = await updateHerb(herbId, herbData)
           if (wasVerified && saved.status === "reviewed") {
-            alert("This herb was verified. Your changes moved it back to reviewed for re-verification.")
+            alert(t("addHerbReverifyNotice"))
           }
           setFormData((previous) => ({
             ...previous,
             verificationStatus: saved.status || previous.verificationStatus,
           }))
-          if (imageFile) { await uploadHerbImage(herbId, imageFile); setImageFile(null) }
+          if (imageFile) {
+            const uploadRes = await uploadHerbImage(herbId, imageFile);
+            setImageFile(null);
+            if (uploadRes?.image_url) setImagePreview(uploadRes.image_url);
+          }
         } else {
           // Create new herb (always as draft initially)
           herbData.status = "draft"
           const created = await createHerb(herbData)
           setHerbId(created.id)
           setHerbCode(created.code)
-          if (imageFile) { await uploadHerbImage(created.id, imageFile); setImageFile(null) }
+          if (imageFile) {
+            const uploadRes = await uploadHerbImage(created.id, imageFile);
+            setImageFile(null);
+            if (uploadRes?.image_url) setImagePreview(uploadRes.image_url);
+          }
         }
       } else {
         // Fallback to localStorage for mock data
@@ -834,26 +848,26 @@ function AddHerb() {
       }
 
       if (action === "draft") {
-        alert("Herb saved as draft.")
+        alert(t("addHerbSavedDraftMsg"))
         return
       }
 
       if (action === "review") {
-        alert("Herb submitted for review.")
+        alert(t("addHerbSubmittedReviewMsg"))
         return
       }
 
       if (action === "verify") {
-        alert("Herb marked as verified.")
+        alert(t("addHerbMarkedVerifiedMsg"))
         return
       }
 
       if (action === "submit") {
-        alert("Herb saved successfully.")
+        alert(t("addHerbSaveSuccess"))
       }
     } catch (err) {
       console.error('Failed to save herb:', err)
-      alert(err.message || 'Failed to save herb')
+      alert(err.message || t("addHerbSaveError"))
     }
   }
 
@@ -924,8 +938,8 @@ function AddHerb() {
     <div className="add-herb-page">
 
       {loadError && <p role="alert">{loadError}</p>}
-      {herbLoading && <p role="status">Loading herb profile...</p>}
-      {vocabularyLoading && <p role="status">Loading herb vocabulary...</p>}
+      {herbLoading && <p role="status">{t("addHerbProfileLoading")}</p>}
+      {vocabularyLoading && <p role="status">{t("addHerbVocabLoading")}</p>}
 
       {/* HEADER */}
 
@@ -933,7 +947,7 @@ function AddHerb() {
 
         <div>
           <p className="add-herb-label">
-            HERB KNOWLEDGE BASE
+            {t("addHerbBreadcrumb")}
           </p>
 
           <h1>
@@ -1010,7 +1024,7 @@ function AddHerb() {
       <section className="add-herb-image-card">
 
         <h2>Herb Image</h2>
-        {import.meta.env.VITE_USE_API === "true" && <p role="note">Images are stored only after the herb record exists and Supabase Storage is configured.</p>}
+        <p role="note" className="add-herb-image-hint">Upload a high-quality photo of the plant or herb part. It will be displayed across search results, the herb library, and comparison views.</p>
 
         <input
           ref={imageInputRef}

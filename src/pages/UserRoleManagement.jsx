@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
 import { createUser, getUsers, updateUserRole, updateUserStatus, updateUserDetails } from "../api/admin"
 import { ROLE_PERMISSION_MATRIX } from "../utils/roles"
+import { localizeApiError } from "../i18n/localizeApiError"
+import { useUiText } from "../i18n/useUiText"
 import "../styles/UserRoleManagement.css"
 
 
@@ -52,6 +54,7 @@ function formatDateTime(dateValue) {
 
 
 function UserRoleManagement() {
+  const t = useUiText()
 
   /* =========================================
      USER DATA
@@ -78,7 +81,7 @@ function UserRoleManagement() {
       })))
     } catch (err) {
       console.error('Failed to load users:', err)
-      setError(err.message || 'Failed to load users')
+      setError(localizeApiError(t, err.message || t("usersLoadError")))
       setUserList([])
     } finally {
       setLoading(false)
@@ -168,7 +171,7 @@ function UserRoleManagement() {
     }
 
     const confirmed = window.confirm(
-      `Are you sure you want to deactivate ${user.name}?`
+      t("usersDeactivateConfirm", { name: user.name })
     )
 
     if (!confirmed) {
@@ -176,7 +179,7 @@ function UserRoleManagement() {
     }
 
     try { await updateUserStatus(userId, "inactive"); await loadUsers() }
-    catch (err) { setError(err.message || "Failed to deactivate user") }
+    catch (err) { setError(err.message || t("usersDeactivateError")) }
   }
 
 
@@ -195,7 +198,7 @@ function UserRoleManagement() {
     }
 
     const confirmed = window.confirm(
-      `Are you sure you want to activate ${user.name}?`
+      t("usersActivateConfirm", { name: user.name })
     )
 
     if (!confirmed) {
@@ -203,7 +206,7 @@ function UserRoleManagement() {
     }
 
     try { await updateUserStatus(userId, "active"); await loadUsers() }
-    catch (err) { setError(err.message || "Failed to activate user") }
+    catch (err) { setError(err.message || t("usersActivateError")) }
   }
 
 
@@ -424,13 +427,13 @@ function UserRoleManagement() {
       setEditingUser(null)
     } catch (err) {
       console.error('Failed to update user:', err)
-      setError(err.message || 'Failed to update user')
+      setError(err.message || t("usersUpdateError"))
     }
   }
 
 
   if (loading) {
-    return <p role="status">Loading users...</p>
+    return <p role="status">{t("usersLoading")}</p>
   }
 
   if (error) {
@@ -451,12 +454,11 @@ function UserRoleManagement() {
         <div>
 
           <h1>
-            User & Role Management
+            {t("usersTitle")}
           </h1>
 
           <p>
-            Manage users, roles, account status,
-            and system permissions.
+            {t("usersSubtitle")}
           </p>
 
           <button

@@ -21,6 +21,11 @@ vocab_review.generated.csv
 *.xlsx
 backend/test-rerun-logs/
 
+# Test artifacts
+test-results/
+.playwright-browsers/
+coverage/
+
 # Embedded PostgreSQL
 backend/.embedded-pg/
 backend/.embedded-pg-*/

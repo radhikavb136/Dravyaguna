@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
+import { useUiText } from "../i18n/useUiText"
 
 import "../styles/SettingsPage.css"
 import "../styles/UpgradePlanPage.css"
 
 function UpgradePlanPage() {
+  const t = useUiText()
   const navigate = useNavigate()
 
   const [selectedPlan, setSelectedPlan] = useState("Free")
@@ -65,7 +67,7 @@ function UpgradePlanPage() {
     className="continue-plan-button"
     onClick={handleContinue}
   >
-    Continue with {selectedPlan}
+    {t("continueWithPlan")} {selectedPlan}
     <span>→</span>
   </button>
 
@@ -94,12 +96,11 @@ aria-label="Close upgrade plans"
                 </p>
 
                 <h1>
-                  Upgrade your plan
+                  {t("upgradeTitle")}
                 </h1>
 
                 <p>
-                  Choose the plan that best fits your clinical
-                  research workflow.
+                  {t("upgradeSubtitle")}
                 </p>
 
               </div>

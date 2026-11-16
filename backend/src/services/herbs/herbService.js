@@ -1,6 +1,7 @@
 import { pool } from '../../db/pool.js';
 import { logAudit } from '../audit/auditService.js';
 import { slugify } from '../../utils/slugify.js';
+import { syncHerbToWorkbook } from './herbWorkbookSyncService.js';
 
 function badRequest(message) {
   const err = new Error(message);
@@ -25,7 +26,7 @@ export async function listHerbs({ page, limit, statuses, q }) {
     : '';
   const listParams = search ? [statuses, limit, offset, search] : [statuses, limit, offset];
   const { rows } = await pool.query(
-    `SELECT id, code, english_name, sanskrit_name, botanical_name, status, created_at, updated_at
+    `SELECT id, code, english_name, sanskrit_name, botanical_name, image_url, status, created_at, updated_at
      FROM herbs
      WHERE status = ANY($1)${searchSql}
      ORDER BY english_name
@@ -62,93 +63,66 @@ export async function listHerbs({ page, limit, statuses, q }) {
 
 export async function getHerbById(id, userRole) {
   const { rows } = await pool.query(
-    `SELECT * FROM herbs WHERE id = $1`,
+    `SELECT
+       h.*,
+       vt.canonical_en as virya_canonical,
+       vp.canonical_en as vipaka_canonical,
+       (SELECT COALESCE(json_agg(rt.canonical_en), '[]'::json) FROM herb_rasa hr JOIN rasa_terms rt ON hr.rasa_id = rt.id WHERE hr.herb_id = h.id) as rasa,
+       (SELECT COALESCE(json_agg(gt.canonical_en), '[]'::json) FROM herb_guna hg JOIN guna_terms gt ON hg.guna_id = gt.id WHERE hg.herb_id = h.id) as guna,
+       (SELECT COALESCE(json_agg(kt.canonical_en), '[]'::json) FROM herb_karma hk JOIN karma_terms kt ON hk.karma_id = kt.id WHERE hk.herb_id = h.id) as karma,
+       (SELECT COALESCE(json_agg(it.canonical_en), '[]'::json) FROM herb_indications hi JOIN indication_terms it ON hi.indication_id = it.id WHERE hi.herb_id = h.id) as indications,
+       (SELECT COALESCE(json_agg(json_build_object('dosha', hda.dosha, 'effect', hda.effect)), '[]'::json) FROM herb_dosha_actions hda WHERE hda.herb_id = h.id) as dosha_actions,
+       (SELECT COALESCE(json_agg(json_build_object('canonical_en', dt.canonical_en, 'score', hd.score)), '[]'::json) FROM herb_dhatu hd JOIN dhatu_terms dt ON hd.dhatu_id = dt.id WHERE hd.herb_id = h.id) as dhatu_raw,
+       (SELECT COALESCE(json_agg(json_build_object('mala', mt.canonical_en, 'effect', hm.effect)), '[]'::json) FROM herb_mala hm JOIN mala_terms mt ON hm.mala_id = mt.id WHERE hm.herb_id = h.id) as mala,
+       (SELECT COALESCE(json_agg(st.canonical_en), '[]'::json) FROM herb_srotas hs JOIN srotas_terms st ON hs.srotas_id = st.id WHERE hs.herb_id = h.id) as srotas,
+       (SELECT COALESCE(json_agg(at.canonical_en), '[]'::json) FROM herb_avayava ha JOIN avayava_terms at ON ha.avayava_id = at.id WHERE ha.herb_id = h.id) as avayava,
+       (SELECT COALESCE(json_agg(json_build_object('source', href.source, 'citation_text', href.citation_text, 'chapter_ref', href.chapter_ref)), '[]'::json) FROM (SELECT * FROM herb_references WHERE herb_id = h.id ORDER BY id) href) as raw_references
+     FROM herbs h
+     LEFT JOIN virya_terms vt ON h.virya_id = vt.id
+     LEFT JOIN vipaka_terms vp ON h.vipaka_id = vp.id
+     WHERE h.id = $1`,
     [id]
   );
 
   if (rows.length === 0) return null;
 
-  const herb = rows[0];
+  const row = rows[0];
 
   // Clinicians can only see reviewed/verified
-  if (userRole === 'clinician' && !['reviewed', 'verified'].includes(herb.status)) {
+  if (userRole === 'clinician' && !['reviewed', 'verified'].includes(row.status)) {
     return null;
   }
 
-  // Load related data
-  const [rasa, guna, karma, indications, doshaActions, dhatu, mala, srotas, avayava, virya, vipaka, references] = await Promise.all([
-    pool.query(
-      `SELECT rt.canonical_en FROM herb_rasa hr JOIN rasa_terms rt ON hr.rasa_id = rt.id WHERE hr.herb_id = $1`,
-      [id]
-    ),
-    pool.query(
-      `SELECT gt.canonical_en FROM herb_guna hg JOIN guna_terms gt ON hg.guna_id = gt.id WHERE hg.herb_id = $1`,
-      [id]
-    ),
-    pool.query(
-      `SELECT kt.canonical_en FROM herb_karma hk JOIN karma_terms kt ON hk.karma_id = kt.id WHERE hk.herb_id = $1`,
-      [id]
-    ),
-    pool.query(
-      `SELECT it.canonical_en FROM herb_indications hi JOIN indication_terms it ON hi.indication_id = it.id WHERE hi.herb_id = $1`,
-      [id]
-    ),
-    pool.query(
-      `SELECT dosha, effect FROM herb_dosha_actions WHERE herb_id = $1`,
-      [id]
-    ),
-    pool.query(
-      `SELECT dt.canonical_en, score FROM herb_dhatu hd JOIN dhatu_terms dt ON hd.dhatu_id = dt.id WHERE hd.herb_id = $1`,
-      [id]
-    ),
-    pool.query(
-      `SELECT mt.canonical_en, effect FROM herb_mala hm JOIN mala_terms mt ON hm.mala_id = mt.id WHERE hm.herb_id = $1`,
-      [id]
-    ),
-    pool.query(
-      `SELECT st.canonical_en FROM herb_srotas hs JOIN srotas_terms st ON hs.srotas_id = st.id WHERE hs.herb_id = $1`,
-      [id]
-    ),
-    pool.query(
-      `SELECT at.canonical_en FROM herb_avayava ha JOIN avayava_terms at ON ha.avayava_id = at.id WHERE ha.herb_id = $1`,
-      [id]
-    ),
-    pool.query(
-      `SELECT vt.canonical_en FROM virya_terms vt WHERE vt.id = (SELECT virya_id FROM herbs WHERE id = $1)`,
-      [id]
-    ),
-    pool.query(
-      `SELECT vt.canonical_en FROM vipaka_terms vt WHERE vt.id = (SELECT vipaka_id FROM herbs WHERE id = $1)`,
-      [id]
-    ),
-    pool.query(
-      `SELECT source, citation_text, chapter_ref FROM herb_references WHERE herb_id = $1 ORDER BY id`,
-      [id]
-    ),
-  ]);
+  const {
+    virya_canonical,
+    vipaka_canonical,
+    dhatu_raw,
+    raw_references,
+    ...herb
+  } = row;
 
   return {
     ...herb,
-    rasa: rasa.rows.map(r => r.canonical_en),
-    guna: guna.rows.map(g => g.canonical_en),
-    karma: karma.rows.map(k => k.canonical_en),
-    indications: indications.rows.map(i => i.canonical_en),
-    dosha_actions: doshaActions.rows,
-    dhatu: dhatu.rows.reduce((acc, row) => {
-      acc[row.canonical_en] = row.score;
+    rasa: row.rasa || [],
+    guna: row.guna || [],
+    karma: row.karma || [],
+    indications: row.indications || [],
+    dosha_actions: row.dosha_actions || [],
+    dhatu: (dhatu_raw || []).reduce((acc, item) => {
+      acc[item.canonical_en] = item.score;
       return acc;
     }, {}),
-    mala: mala.rows.map(m => ({ mala: m.canonical_en, effect: m.effect })),
-    srotas: srotas.rows.map(s => s.canonical_en),
-    avayava: avayava.rows.map(a => a.canonical_en),
-    virya: virya.rows[0]?.canonical_en || null,
-    vipaka: vipaka.rows[0]?.canonical_en || null,
-    references: references.rows.map((row) => {
+    mala: (row.mala || []).map((m) => ({ mala: m.mala, effect: m.effect })),
+    srotas: row.srotas || [],
+    avayava: row.avayava || [],
+    virya: virya_canonical || null,
+    vipaka: vipaka_canonical || null,
+    references: (raw_references || []).map((ref) => {
       try {
-        const citation = JSON.parse(row.citation_text);
-        return { source: row.source, chapter: row.chapter_ref || '', verse: citation.verse || '', notes: citation.notes || '' };
+        const citation = JSON.parse(ref.citation_text);
+        return { source: ref.source, chapter: ref.chapter_ref || '', verse: citation.verse || '', notes: citation.notes || '' };
       } catch {
-        return { source: row.source, chapter: row.chapter_ref || '', verse: '', notes: row.citation_text || '' };
+        return { source: ref.source, chapter: ref.chapter_ref || '', verse: '', notes: ref.citation_text || '' };
       }
     }),
   };
@@ -203,7 +177,13 @@ export async function createHerb(data, user) {
       after: data,
     });
 
-    return await getHerbById(herb.id, user.role);
+    const createdHerb = await getHerbById(herb.id, user.role);
+    try {
+      await syncHerbToWorkbook(createdHerb, data);
+    } catch (syncErr) {
+      console.warn('Workbook sync warning:', syncErr.message);
+    }
+    return createdHerb;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { TEST_API_BASE_URL } from "./testApiBase.js"
 
 describe("herb search API adapters", () => {
   beforeEach(() => {
     vi.resetModules()
     vi.stubEnv("VITE_USE_API", "true")
+    vi.stubEnv("VITE_API_BASE_URL", TEST_API_BASE_URL)
     localStorage.clear()
     globalThis.fetch = vi.fn()
   })
@@ -39,7 +41,7 @@ describe("herb search API adapters", () => {
     expect(response.matchedTerms[0].canonical).toBe("Jwara")
     expect(response.unmatchedTokens).toEqual(["unknown"])
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "http://localhost:4000/api/search/simple",
+      `${TEST_API_BASE_URL}/api/search/simple`,
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ query: "fever", limit: 25 }),
@@ -67,7 +69,7 @@ describe("herb search API adapters", () => {
     expect(response.language).toBe("mr-IN")
     expect(response.queryLanguage).toBe("hi-IN")
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "http://localhost:4000/api/search/simple",
+      `${TEST_API_BASE_URL}/api/search/simple`,
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ query: "दीपन", limit: 25, lang: "hi-IN" }),
@@ -104,7 +106,7 @@ describe("herb search API adapters", () => {
 
     expect(results[0].englishName).toBe("Guduchi")
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "http://localhost:4000/api/search/simple",
+      `${TEST_API_BASE_URL}/api/search/simple`,
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ limit: 10, filters: { rasa: ["tikta"] } }),
@@ -126,7 +128,7 @@ describe("herb search API adapters", () => {
 
     expect(result.data).toHaveLength(1)
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "http://localhost:4000/api/herbs?page=2&limit=20&status=reviewed&q=sample",
+      `${TEST_API_BASE_URL}/api/herbs?page=2&limit=20&status=reviewed&q=sample`,
       expect.objectContaining({ method: "GET" })
     )
   })
@@ -145,7 +147,7 @@ describe("herb search API adapters", () => {
     expect(results).toHaveLength(1)
     expect(results[0].id).toBe("herb-2")
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "http://localhost:4000/api/search/detailed",
+      `${TEST_API_BASE_URL}/api/search/detailed`,
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ filters: { rasa: ["tikta"] }, limit: 50 }),

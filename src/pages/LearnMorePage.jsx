@@ -2,10 +2,12 @@ import { useNavigate } from "react-router-dom"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
+import { useUiText } from "../i18n/useUiText"
 
 import "../styles/LearnMorePage.css"
 
 function LearnMorePage() {
+  const t = useUiText()
   const navigate = useNavigate()
 
   const closeLearnMore = () => {
@@ -37,7 +39,7 @@ function LearnMorePage() {
                 type="button"
                 className="learn-more-close-button"
                 onClick={closeLearnMore}
-                aria-label="Close learn more"
+                aria-label={t("learnCloseAria")}
               >
                 ×
               </button>
@@ -47,16 +49,15 @@ function LearnMorePage() {
               <div className="learn-more-header">
 
                 <p className="learn-more-label">
-                  ABOUT THE PLATFORM
+                  {t("learnLabel")}
                 </p>
 
                 <h1>
-                  Learn more about Dravyaguna
+                  {t("learnTitle")}
                 </h1>
 
                 <p>
-                  Understand how the Ayurvedic Herb Intelligence Engine
-                  supports structured herb research and clinical information retrieval.
+                  {t("learnSubtitle")}
                 </p>
 
               </div>
@@ -70,14 +71,11 @@ function LearnMorePage() {
                 <section className="learn-more-section">
 
                   <h2>
-                    What is Dravyaguna?
+                    {t("learnWhatTitle")}
                   </h2>
 
                   <p>
-                    Dravyaguna is an Ayurvedic Herb Intelligence Engine
-                    designed to help practitioners explore structured
-                    Ayurvedic herb knowledge and identify relevant herbs
-                    based on clinical and classical parameters.
+                    {t("learnWhatBody")}
                   </p>
 
                 </section>
@@ -87,11 +85,11 @@ function LearnMorePage() {
                 <section className="learn-more-section">
 
                   <p className="learn-more-section-label">
-                    HOW IT WORKS
+                    {t("learnHowLabel")}
                   </p>
 
                   <h2>
-                    From search to relevant herbs
+                    {t("learnHowTitle")}
                   </h2>
 
 
@@ -105,12 +103,11 @@ function LearnMorePage() {
 
                       <div>
                         <h3>
-                          Search
+                          {t("learnStep1Title")}
                         </h3>
 
                         <p>
-                          Enter a clinical problem or select relevant
-                          Ayurvedic parameters.
+                          {t("learnStep1Body")}
                         </p>
                       </div>
 
@@ -125,12 +122,11 @@ function LearnMorePage() {
 
                       <div>
                         <h3>
-                          Match
+                          {t("learnStep2Title")}
                         </h3>
 
                         <p>
-                          The system evaluates herbs against the
-                          selected criteria.
+                          {t("learnStep2Body")}
                         </p>
                       </div>
 
@@ -145,12 +141,11 @@ function LearnMorePage() {
 
                       <div>
                         <h3>
-                          Rank
+                          {t("learnStep3Title")}
                         </h3>
 
                         <p>
-                          Relevant herbs are ranked using weighted
-                          Ayurvedic parameters.
+                          {t("learnStep3Body")}
                         </p>
                       </div>
 
@@ -165,12 +160,11 @@ function LearnMorePage() {
 
                       <div>
                         <h3>
-                          Review
+                          {t("learnStep4Title")}
                         </h3>
 
                         <p>
-                          Explore herb profiles, match percentage,
-                          references, and scoring details.
+                          {t("learnStep4Body")}
                         </p>
                       </div>
 
@@ -253,7 +247,7 @@ function LearnMorePage() {
                   <div>
 
                     <strong>
-                      Clinical use note
+                      {t("learnClinicalNoteTitle")}
                     </strong>
 
                     <p>

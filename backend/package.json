@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "start:e2e": "node scripts/startE2eApi.js",
+    "start:demo": "node scripts/startSponsorDemoApi.js",
     "dev": "node --watch src/index.js",
     "migrate": "node-pg-migrate up",
     "migrate:down": "node-pg-migrate down",
@@ -27,9 +28,18 @@
     "staging:remove-dev-users": "node scripts/removeDevUsers.js",
     "loadtest:search": "node scripts/loadTestSearch.js",
     "explain:search": "node scripts/explainSearch.js",
-    "rag:ingest": "node scripts/ingestKnowledge.js"
+    "rag:ingest": "node scripts/ingestKnowledge.js",
+    "vocab:approved:dry-run": "node scripts/importApprovedVocabulary.js",
+    "vocab:approved:apply": "node scripts/importApprovedVocabulary.js --apply",
+    "vocab:review:report": "node scripts/reportVocabReview.js",
+    "vocab:review:export-pending": "node scripts/reportVocabReview.js --export-pending=scripts/vocab_review_pending_sample.csv --limit=100",
+    "smoke:live-providers": "node scripts/liveProviderSmoke.js",
+    "inspect:storage": "node scripts/inspectStorageConfig.js",
+    "inspect:smtp": "node scripts/inspectSmtpConfig.js",
+    "workflow:dev": "node scripts/devApplicationWorkflow.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -38,6 +48,7 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "node-pg-migrate": "^9.0.0",
+    "nodemailer": "^10.2.1",
     "pg": "^8.13.3",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",

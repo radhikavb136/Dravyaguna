@@ -1,348 +1,224 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react"
+import { Link, useNavigate } from "react-router-dom"
+import { isAuthenticated, getCurrentUser } from "../api/auth"
+import { loadRememberedLogin } from "../utils/rememberedLogin"
+import { useUiText } from "../i18n/useUiText"
+
 function LandingPage() {
-    return (
-      <div className="landing-page">
-  
-        {/* Navbar */}
-        <header className="landing-navbar">
-  
-          <div className="landing-brand">
-            <div className="landing-brand-icon">⌁</div>
-  
-            <span>Herb Intelligence</span>
-          </div>
-  
-          <nav className="landing-nav-links">
-            <a href="#about">About</a>
-            <a href="#features">Features</a>
-            <a href="#contact">Contact</a>
-          </nav>
-  
-          <div className="landing-auth-buttons">
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    try {
+      const rem = loadRememberedLogin()
+      if (rem.remember && isAuthenticated()) {
+        const user = getCurrentUser()
+        const role = (user?.backendRole || user?.role || "").toLowerCase()
+        if (role === "clinician" || role === "doctor") {
+          navigate("/doctor", { replace: true })
+          return
+        }
+        if (["admin", "editor", "domain_expert", "ayurvedic reviewer"].includes(role)) {
+          navigate("/admin", { replace: true })
+          return
+        }
+      }
+    } catch { /* ignore */ }
+  }, [navigate])
+  const t = useUiText()
+
+  return (
+    <div className="landing-page">
+      <header className="landing-navbar">
+        <div className="landing-brand">
+          <div className="landing-brand-icon">🌿</div>
+          <span>{t("landingBrand")}</span>
+        </div>
+
+        <nav className="landing-nav-links">
+          <a href="#about">{t("landingNavAbout")}</a>
+          <a href="#features">{t("landingNavFeatures")}</a>
+          <a href="#contact">{t("landingNavContact")}</a>
+        </nav>
+
+        <div className="landing-auth-buttons">
           <Link to="/auth" className="login-button">
-                  Log In
-         </Link>
-  
-            <Link to="/auth" className="signup-button">
-               Sign Up
-            </Link>
+            {t("landingLogIn")}
+          </Link>
+          <Link to="/auth" className="signup-button">
+            {t("landingSignUp")}
+          </Link>
+        </div>
+      </header>
+
+      <main>
+        <section className="landing-hero">
+          <div className="hero-badge">
+            <span>●</span>
+            {t("landingHeroBadge")}
           </div>
-  
-        </header>
-  
-  
-        {/* Hero Section */}
-        <main>
-  
-          <section className="landing-hero">
-  
-            <div className="hero-badge">
-              <span>●</span>
-              CLINICAL DECISION SUPPORT · AYURVEDA
-            </div>
-  
-            <h1>
-              Ayurvedic Herb
-              <br />
-              <em>Intelligence Engine</em>
-            </h1>
-  
-            <p className="landing-hero-description">
-              Structured Ayurvedic knowledge and intelligent relevance ranking
-              to support evidence-informed herb selection and clinical
-              exploration.
-            </p>
-  
-            <div className="hero-buttons">
-  
+
+          <h1>
+            {t("landingHeroTitle1")}
+            <br />
+            <em>{t("landingHeroTitle2")}</em>
+          </h1>
+
+          <p className="landing-hero-description">
+            {t("landingHeroDescription")}
+          </p>
+
+          <div className="hero-buttons">
             <Link to="/auth?mode=signup" className="primary-hero-button">
-               Get Started
-             </Link>
-  
-             <a href="#about" className="secondary-hero-button">
-               Explore the Platform
-              </a>
-  
+              {t("landingGetStarted")}
+            </Link>
+            <a href="#about" className="secondary-hero-button">
+              {t("landingExplore")}
+            </a>
+          </div>
+        </section>
+
+        <section className="landing-about" id="about">
+          <div className="about-section-label">{t("landingAboutLabel")}</div>
+
+          <div className="about-section-content">
+            <div className="about-section-heading">
+              <h2>
+                {t("landingAboutTitle1")}
+                <br />
+                <em>{t("landingAboutTitle2")}</em>
+              </h2>
             </div>
-  
-          </section>
 
+            <div className="about-section-text">
+              <p>{t("landingAboutP1")}</p>
+              <p>{t("landingAboutP2")}</p>
+              <p>{t("landingAboutP3")}</p>
+            </div>
+          </div>
 
-{/* About Us Section */}
-<section className="landing-about" id="about">
+          <div className="about-highlights">
+            <div className="about-highlight-card">
+              <span className="highlight-number">01</span>
+              <div>
+                <h3>{t("landingHi1Title")}</h3>
+                <p>{t("landingHi1Desc")}</p>
+              </div>
+            </div>
 
-  <div className="about-section-label">
-    ABOUT THE PLATFORM
-  </div>
+            <div className="about-highlight-card">
+              <span className="highlight-number">02</span>
+              <div>
+                <h3>{t("landingHi2Title")}</h3>
+                <p>{t("landingHi2Desc")}</p>
+              </div>
+            </div>
 
-  <div className="about-section-content">
+            <div className="about-highlight-card">
+              <span className="highlight-number">03</span>
+              <div>
+                <h3>{t("landingHi3Title")}</h3>
+                <p>{t("landingHi3Desc")}</p>
+              </div>
+            </div>
+          </div>
+        </section>
 
-    <div className="about-section-heading">
-      <h2>
-        Bringing structure to
-        <br />
-        <em>Ayurvedic knowledge.</em>
-      </h2>
+        <section className="landing-features" id="features">
+          <div className="features-header">
+            <div className="features-label">{t("landingFeaturesLabel")}</div>
+            <h2>{t("landingFeaturesTitle")}</h2>
+          </div>
+
+          <div className="features-grid">
+            <div className="feature-card">
+              <div className="feature-number">01</div>
+              <div className="feature-icon">⌕</div>
+              <h3>{t("landingFeat1Title")}</h3>
+              <p>{t("landingFeat1Desc")}</p>
+            </div>
+
+            <div className="feature-card">
+              <div className="feature-number">02</div>
+              <div className="feature-icon">%</div>
+              <h3>{t("landingFeat2Title")}</h3>
+              <p>{t("landingFeat2Desc")}</p>
+            </div>
+
+            <div className="feature-card">
+              <div className="feature-number">03</div>
+              <div className="feature-icon">◈</div>
+              <h3>{t("landingFeat3Title")}</h3>
+              <p>{t("landingFeat3Desc")}</p>
+            </div>
+
+            <div className="feature-card">
+              <div className="feature-number">04</div>
+              <div className="feature-icon">✓</div>
+              <h3>{t("landingFeat4Title")}</h3>
+              <p>{t("landingFeat4Desc")}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-stats">
+          <div className="stats-container">
+            <div className="stat-item">
+              <span className="stat-number">350+</span>
+              <span className="stat-label">{t("landingStatHerbs")}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-number">10+</span>
+              <span className="stat-label">{t("landingStatParams")}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-number">Multi</span>
+              <span className="stat-label">{t("landingStatMulti")}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-number">100%</span>
+              <span className="stat-label">{t("landingStatRank")}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-contact" id="contact">
+          <div className="contact-content">
+            <div className="contact-label">{t("landingContactLabel")}</div>
+            <p className="contact-text">
+              {t("landingContactText")}{" "}
+              <a href="mailto:support@herbintelligence.app">
+                support@herbintelligence.app
+              </a>
+            </p>
+          </div>
+        </section>
+
+        <footer className="landing-footer">
+          <div className="footer-main">
+            <div className="footer-brand">
+              <div className="footer-brand-icon">🌿</div>
+              <span>{t("landingFooterBrand")}</span>
+            </div>
+
+            <nav className="footer-links">
+              <a href="#about">{t("landingNavAbout")}</a>
+              <a href="#features">{t("landingNavFeatures")}</a>
+              <a href="#contact">{t("landingNavContact")}</a>
+              <a href="#privacy">{t("landingFooterPrivacy")}</a>
+              <a href="#terms">{t("landingFooterTerms")}</a>
+            </nav>
+
+            <div className="footer-info">
+              <span>{t("landingFooterVersion")}</span>
+              <span>{t("landingFooterCopyright")}</span>
+            </div>
+          </div>
+
+          <div className="footer-disclaimer">{t("landingDisclaimer")}</div>
+        </footer>
+      </main>
     </div>
+  )
+}
 
-    <div className="about-section-text">
-
-      <p>
-        The Ayurvedic Herb Intelligence Engine is a structured knowledge
-        platform designed to make Ayurvedic herb information easier to
-        explore, compare, and interpret.
-      </p>
-
-      <p>
-        It organizes classical Ayurvedic attributes such as Rasa, Guna,
-        Virya, Vipaka, Dosha, Dhatu, Srotas, Karma, and indications into
-        a searchable digital framework.
-      </p>
-
-      <p>
-        By combining structured Ayurvedic knowledge with relevance-based
-        ranking, the platform helps clinicians and researchers move from
-        broad herb discovery toward more focused and transparent
-        exploration.
-      </p>
-
-    </div>
-
-  </div>
-
-
-  <div className="about-highlights">
-
-    <div className="about-highlight-card">
-
-      <span className="highlight-number">01</span>
-
-      <div>
-        <h3>Structured Knowledge</h3>
-        <p>
-          Ayurvedic herb information organized through defined
-          classical attributes.
-        </p>
-      </div>
-
-    </div>
-
-
-    <div className="about-highlight-card">
-
-      <span className="highlight-number">02</span>
-
-      <div>
-        <h3>Intelligent Retrieval</h3>
-        <p>
-          Search and ranking designed to identify herbs according
-          to multiple relevant parameters.
-        </p>
-      </div>
-
-    </div>
-
-
-    <div className="about-highlight-card">
-
-      <span className="highlight-number">03</span>
-
-      <div>
-        <h3>Transparent Results</h3>
-        <p>
-          Relevance scores help users understand how closely
-          a herb matches their search criteria.
-        </p>
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-{/* Features Section */}
-<section className="landing-features" id="features">
-
-  <div className="features-header">
-
-    <div className="features-label">
-      PLATFORM CAPABILITIES
-    </div>
-
-    <h2>
-      Designed for <em>focused exploration.</em>
-    </h2>
-
-  </div>
-
-  <div className="features-grid">
-
-    {/* Feature 01 */}
-    <div className="feature-card">
-      <div className="feature-number">01</div>
-
-      <div className="feature-icon">⌕</div>
-
-      <h3>Simple & Detailed Search</h3>
-
-      <p>
-        Search herbs using natural queries or specific Ayurvedic
-        parameters such as Rasa, Guna, Virya, Dosha, and Karma.
-      </p>
-    </div>
-
-
-    {/* Feature 02 */}
-    <div className="feature-card">
-      <div className="feature-number">02</div>
-
-      <div className="feature-icon">%</div>
-
-      <h3>Weighted Relevance Ranking</h3>
-
-      <p>
-        Combine multiple parameters and rank herbs according
-        to their relevance to the selected criteria.
-      </p>
-    </div>
-
-
-    {/* Feature 03 */}
-    <div className="feature-card">
-      <div className="feature-number">03</div>
-
-      <div className="feature-icon">◈</div>
-
-      <h3>Structured Ayurvedic Knowledge</h3>
-
-      <p>
-        Explore classical Ayurvedic attributes through a
-        consistent and searchable knowledge structure.
-      </p>
-    </div>
-
-
-    {/* Feature 04 */}
-    <div className="feature-card">
-      <div className="feature-number">04</div>
-
-      <div className="feature-icon">✓</div>
-
-      <h3>Transparent Results</h3>
-
-      <p>
-        Relevance percentages and attribute matching make
-        search results easier to understand.
-      </p>
-    </div>
-
-  </div>
-
-</section>
-
-{/* Statistics Section */}
-<section className="landing-stats">
-
-  <div className="stats-container">
-
-    <div className="stat-item">
-      <span className="stat-number">350+</span>
-      <span className="stat-label">Ayurvedic Herbs</span>
-    </div>
-
-    <div className="stat-item">
-      <span className="stat-number">10+</span>
-      <span className="stat-label">Classical Parameters</span>
-    </div>
-
-    <div className="stat-item">
-      <span className="stat-number">Multi</span>
-      <span className="stat-label">Parameter Search</span>
-    </div>
-
-    <div className="stat-item">
-      <span className="stat-number">100%</span>
-      <span className="stat-label">Transparent Ranking</span>
-    </div>
-
-  </div>
-
-</section>
-
-{/* Contact Section */}
-<section className="landing-contact" id="contact">
-
-  <div className="contact-content">
-
-    <div className="contact-label">
-      CONTACT
-    </div>
-
-    <p className="contact-text">
-      Questions or feedback?{" "}
-      <a href="mailto:support@herbintelligence.app">
-        support@herbintelligence.app
-      </a>
-    </p>
-
-  </div>
-
-</section>
-
-{/* Footer */}
-<footer className="landing-footer">
-
-  <div className="footer-main">
-
-    {/* Brand */}
-    <div className="footer-brand">
-      <div className="footer-brand-icon">
-        ◒
-      </div>
-
-      <span>Herb Intelligence</span>
-    </div>
-
-
-    {/* Footer Links */}
-    <nav className="footer-links">
-
-      <a href="#about">About</a>
-      <a href="#features">Features</a>
-      <a href="#contact">Contact</a>
-      <a href="#privacy">Privacy</a>
-      <a href="#terms">Terms</a>
-
-    </nav>
-
-
-    {/* Footer Information */}
-    <div className="footer-info">
-
-      <span>For clinical use only · v1.0.0</span>
-
-      <span>© 2026 Herb Intelligence Engine</span>
-
-    </div>
-
-  </div>
-
-
-  {/* Disclaimer */}
-  <div className="footer-disclaimer">
-
-    This platform is intended for qualified Ayurvedic physicians and
-    licensed healthcare professionals only. Not for self-medication.
-
-  </div>
-
-</footer>
-  
-        </main>
-  
-      </div>
-    )
-  }
-  
-  export default LandingPage
+export default LandingPage

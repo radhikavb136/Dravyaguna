@@ -31,4 +31,17 @@ export async function run() {
   const validPng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
   const unavailable = await postImage(herbId, tokens.editor, validPng);
   assertEqual(unavailable.status, 503, 'test environment refuses external Supabase Storage writes');
+
+  const badId = await postImage('not-a-valid-uuid', tokens.editor, validPng);
+  assertEqual(badId.status, 400, 'rejects non-uuid herb id');
+
+  const missingHerb = await postImage('00000000-0000-4000-8000-000000000000', tokens.editor, validPng);
+  assertEqual(missingHerb.status, 404, 'returns 404 when herb does not exist');
+
+  const emptyBody = await fetch(`${BASE_URL}/api/upload/herb-image/${herbId}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokens.editor}`, 'Content-Type': 'image/png' },
+    body: Buffer.alloc(0),
+  });
+  assertEqual(emptyBody.status, 400, 'rejects empty image body');
 }

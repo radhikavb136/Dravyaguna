@@ -1,4 +1,4 @@
-const API_URL = process.env.E2E_API_URL || 'http://localhost:4000';
+const API_URL = process.env.E2E_API_URL || 'http://localhost:4010';
 
 export function devPassword() {
   return process.env.DEV_USER_PASSWORD || 'Dev1234567';
@@ -65,4 +65,71 @@ export async function archiveHerb(adminToken, herbId) {
 
 export async function listHerbs(token, query = '') {
   return apiRequest(token, 'GET', `/api/herbs?limit=5${query ? `&${query}` : ''}`, undefined);
+}
+
+export async function getHerbByIdApi(token, herbId) {
+  return apiRequest(token, 'GET', `/api/herbs/${herbId}`, undefined);
+}
+
+export async function getAccountApi(token) {
+  return apiRequest(token, 'GET', '/api/account', undefined);
+}
+
+export async function loginWithPassword(email, password) {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await response.json().catch(() => ({}));
+  return { status: response.status, data };
+}
+
+export async function createUserAsAdmin(adminToken, payload) {
+  return apiRequest(adminToken, 'POST', '/api/users', payload);
+}
+
+export async function setUserStatus(adminToken, userId, status) {
+  return apiRequest(adminToken, 'PATCH', `/api/users/${userId}/status`, { status });
+}
+
+export async function createVocabularyTerm(token, category, canonicalEn) {
+  const path = category === 'indications' ? '/api/vocabulary/indications' : `/api/vocabulary/${category}`;
+  return apiRequest(token, 'POST', path, { canonical_en: canonicalEn });
+}
+
+export async function deleteVocabularyTerm(adminToken, category, termId) {
+  return apiRequest(adminToken, 'DELETE', `/api/vocabulary/${category}/${termId}`, undefined);
+}
+
+export async function getScoringWeights(token) {
+  return apiRequest(token, 'GET', '/api/scoring/weights', undefined);
+}
+
+export async function updateScoringWeights(token, weights) {
+  return apiRequest(token, 'PUT', '/api/scoring/weights/bulk', { weights });
+}
+
+export async function mergeVocabularyTerms(adminToken, category, sourceId, targetId) {
+  return apiRequest(adminToken, 'POST', `/api/vocabulary/${category}/${sourceId}/merge`, {
+    target_id: targetId,
+  });
+}
+
+export async function getVocabularyFilters(token) {
+  return apiRequest(token, 'GET', '/api/vocabulary/filters', undefined);
+}
+
+export async function updateVocabularyTerm(adminToken, category, termId, canonicalEn) {
+  return apiRequest(adminToken, 'PATCH', `/api/vocabulary/${category}/${termId}`, {
+    canonical_en: canonicalEn,
+  });
+}
+
+export async function mergeVocabularyTermsAdmin(adminToken, sourceId, targetId) {
+  return mergeVocabularyTerms(adminToken, 'karma', sourceId, targetId);
+}
+
+export async function simpleSearch(token, query) {
+  return apiRequest(token, 'POST', '/api/search/simple', { query, limit: 5 });
 }

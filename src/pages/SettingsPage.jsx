@@ -3,19 +3,23 @@ import { useNavigate } from "react-router-dom"
 import { changeAccountPassword, getAccount, updateAccountPreferences } from "../api/account"
 
 import DashboardNavbar from "../components/DashboardNavbar"
+import PageBack from "../components/PageBack"
 import Sidebar from "../components/Sidebar"
 
 import "../styles/SettingsPage.css"
+import { localizeApiError } from "../i18n/localizeApiError"
+import { useUiText } from "../i18n/useUiText"
 
 function SettingsPage() {
+  const t = useUiText()
   const navigate = useNavigate()
   const useApi = import.meta.env.VITE_USE_API === "true"
 
   const savedUser = useApi ? null : JSON.parse(localStorage.getItem("herbUser") || "null")
 
   const [account, setAccount] = useState(savedUser)
-  const doctorName = account?.full_name || account?.fullName || "Doctor"
-  const doctorEmail = account?.email || "Not available"
+  const doctorName = account?.full_name || account?.fullName || t("authRoleDoctor")
+  const doctorEmail = account?.email || t("settingsNotAvailable")
 
   const [activeSetting, setActiveSetting] = useState("account")
   const [searchText, setSearchText] = useState("")
@@ -79,7 +83,7 @@ function SettingsPage() {
       setShowClassicalReferences(preferences.showClassicalReferences ?? true)
       setShowVerificationStatus(preferences.showVerificationStatus ?? true)
       setShowClinicalNotes(preferences.showClinicalNotes ?? true)
-    }).catch((err) => setError(err.message || "Unable to load account settings")).finally(() => setLoading(false))
+    }).catch((err) => setError(localizeApiError(t, err.message) || t("settingsLoadError"))).finally(() => setLoading(false))
   }, [useApi])
 
   // =========================================
@@ -89,27 +93,27 @@ function SettingsPage() {
   const settingsItems = [
     {
       id: "account",
-      label: "Account",
+      label: t("settingsAccount"),
       icon: "◉"
     },
     {
       id: "privacy",
-      label: "Privacy",
+      label: t("settingsPrivacy"),
       icon: "▣"
     },
     {
       id: "notifications",
-      label: "Notifications",
+      label: t("settingsNotifications"),
       icon: "♧"
     },
     {
       id: "search",
-      label: "Search Preferences",
+      label: t("settingsSearch"),
       icon: "⌕"
     },
     {
       id: "clinical",
-      label: "Clinical Preferences",
+      label: t("settingsClinical"),
       icon: "✦"
     }
   ]
@@ -133,7 +137,7 @@ function SettingsPage() {
   // =========================================
 
   const handleChangeEmail = () => {
-    setError("Email changes are unavailable until the email verification service is configured.")
+    setError(t("settingsEmailUnavailable"))
   }
 
   // =========================================
@@ -141,16 +145,16 @@ function SettingsPage() {
   // =========================================
 
   const handleChangePassword = async () => {
-    const currentPassword = window.prompt("Enter your current password")
+    const currentPassword = window.prompt(t("settingsPromptCurrentPassword"))
     if (currentPassword === null) return
-    const newPassword = window.prompt("Enter a new password (at least 10 characters)")
+    const newPassword = window.prompt(t("settingsPromptNewPassword"))
     if (newPassword === null) return
     try {
       await changeAccountPassword(currentPassword, newPassword)
       setError("")
-      setSaveMessage("Password updated successfully.")
+      setSaveMessage(t("settingsPasswordUpdated"))
     } catch (err) {
-      setError(err.message || "Unable to change password")
+      setError(localizeApiError(t, err.message) || t("settingsChangePasswordFailed"))
     }
   }
 
@@ -178,9 +182,9 @@ function SettingsPage() {
     try {
       if (useApi) await updateAccountPreferences({ preferences: settings })
       else localStorage.setItem("herbSettings", JSON.stringify(settings))
-      setSaveMessage("Settings saved successfully.")
+      setSaveMessage(t("settingsSaveSuccess"))
     } catch (err) {
-      setError(err.message || "Unable to save settings")
+      setError(localizeApiError(t, err.message) || t("settingsSaveFailed"))
     }
 
     setTimeout(() => {
@@ -194,7 +198,7 @@ function SettingsPage() {
 
   const handleClearSearchHistory = () => {
     localStorage.removeItem("searchHistory")
-    setSaveMessage("This browser's recent search history was cleared.")
+    setSaveMessage(t("settingsClearHistoryDone"))
   }
 
   // =========================================
@@ -205,10 +209,10 @@ function SettingsPage() {
     <div className="settings-panel-content">
 
       <div className="settings-panel-title">
-        <h2>Account</h2>
+        <h2>{t("settingsPanelAccountTitle")}</h2>
 
         <p>
-          Manage your account information and access preferences.
+          {t("settingsPanelAccountDesc")}
         </p>
       </div>
 
@@ -219,10 +223,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Full name</strong>
+            <strong>{t("settingsPanelFullName")}</strong>
 
             <span>
-              Your name associated with this account.
+              {t("settingsPanelFullNameHint")}
             </span>
           </div>
 
@@ -238,10 +242,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Email address</strong>
+            <strong>{t("settingsPanelEmail")}</strong>
 
             <span>
-              Your registered account email.
+              {t("settingsPanelEmailHint")}
             </span>
           </div>
 
@@ -256,7 +260,7 @@ function SettingsPage() {
               className="settings-text-button"
               onClick={handleChangeEmail}
             >
-              Change email
+              {t("settingsPanelChangeEmail")}
             </button>
 
           </div>
@@ -269,15 +273,15 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Professional role</strong>
+            <strong>{t("settingsPanelRole")}</strong>
 
             <span>
-              Your role within the clinical workspace.
+              {t("settingsPanelRoleHint")}
             </span>
           </div>
 
           <div className="settings-value-text">
-            Ayurvedic Physician
+            {t("physician")}
           </div>
 
         </div>
@@ -288,10 +292,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Password</strong>
+            <strong>{t("settingsPanelPassword")}</strong>
 
             <span>
-              Update your account password securely.
+              {t("settingsPanelPasswordHint")}
             </span>
           </div>
 
@@ -300,7 +304,7 @@ function SettingsPage() {
             className="settings-text-button"
             onClick={handleChangePassword}
           >
-            Change password
+            {t("settingsPanelChangePassword")}
           </button>
 
         </div>
@@ -320,10 +324,10 @@ function SettingsPage() {
 
       <div className="settings-panel-title">
 
-        <h2>Privacy</h2>
+        <h2>{t("settingsPrivacy")}</h2>
 
         <p>
-          Control how your research activity is handled within the workspace.
+          {t("settingsPrivacyDesc")}
         </p>
 
       </div>
@@ -335,10 +339,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Search history</strong>
+            <strong>{t("settingsSearchHistory")}</strong>
 
             <span>
-              Your recent searches may be stored for quick access.
+              {t("settingsSearchHistoryHint")}
             </span>
           </div>
 
@@ -347,7 +351,7 @@ function SettingsPage() {
             className="settings-text-button"
             onClick={handleClearSearchHistory}
           >
-            Clear
+            {t("settingsClear")}
           </button>
 
         </div>
@@ -358,10 +362,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Saved herb profiles</strong>
+            <strong>{t("settingsSavedHerbs")}</strong>
 
             <span>
-              Manage herbs saved to your clinical library.
+              {t("settingsSavedHerbsHint")}
             </span>
           </div>
 
@@ -370,7 +374,7 @@ function SettingsPage() {
             className="settings-text-button"
             onClick={() => navigate("/favorites")}
           >
-            Manage
+            {t("settingsManage")}
           </button>
 
         </div>
@@ -381,15 +385,15 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Local research activity</strong>
+            <strong>{t("settingsLocalActivity")}</strong>
 
             <span>
-              Review locally stored workspace activity.
+              {t("settingsLocalActivityHint")}
             </span>
           </div>
 
           <span className="settings-status-text">
-            Protected
+            {t("settingsProtected")}
           </span>
 
         </div>
@@ -409,10 +413,10 @@ function SettingsPage() {
 
       <div className="settings-panel-title">
 
-        <h2>Notifications</h2>
+        <h2>{t("settingsNotifications")}</h2>
 
         <p>
-          Control updates and reminders from your clinical workspace.
+          {t("settingsNotificationsDesc")}
         </p>
 
       </div>
@@ -424,10 +428,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Search updates</strong>
+            <strong>{t("settingsSearchUpdates")}</strong>
 
             <span>
-              Receive important updates related to your searches.
+              {t("settingsSearchUpdatesHint")}
             </span>
           </div>
 
@@ -451,10 +455,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Saved herb reminders</strong>
+            <strong>{t("settingsSavedReminders")}</strong>
 
             <span>
-              Receive reminders about saved herb profiles.
+              {t("settingsSavedRemindersHint")}
             </span>
           </div>
 
@@ -478,10 +482,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Reference updates</strong>
+            <strong>{t("settingsReferenceUpdates")}</strong>
 
             <span>
-              Receive updates related to Ayurvedic references.
+              {t("settingsReferenceUpdatesHint")}
             </span>
           </div>
 
@@ -514,10 +518,10 @@ function SettingsPage() {
 
       <div className="settings-panel-title">
 
-        <h2>Search Preferences</h2>
+        <h2>{t("settingsSearchPanelTitle")}</h2>
 
         <p>
-          Configure how the herb intelligence engine presents results.
+          {t("settingsSearchPanelDesc")}
         </p>
 
       </div>
@@ -529,10 +533,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Default search mode</strong>
+            <strong>{t("settingsDefaultSearch")}</strong>
 
             <span>
-              Choose which search method opens first.
+              {t("settingsDefaultSearchHint")}
             </span>
           </div>
 
@@ -545,11 +549,11 @@ function SettingsPage() {
           >
 
             <option value="simple">
-              Simple Search
+              {t("settingsSimpleSearchOption")}
             </option>
 
             <option value="detailed">
-              Detailed Search
+              {t("settingsDetailedSearchOption")}
             </option>
 
           </select>
@@ -562,10 +566,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Results per page</strong>
+            <strong>{t("settingsResultsPerPage")}</strong>
 
             <span>
-              Number of herb profiles shown in results.
+              {t("settingsResultsPerPageHint")}
             </span>
           </div>
 
@@ -591,10 +595,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Show verified profiles</strong>
+            <strong>{t("settingsVerifiedProfiles")}</strong>
 
             <span>
-              Highlight profiles that have been reviewed and verified.
+              {t("settingsVerifiedProfilesHint")}
             </span>
           </div>
 
@@ -618,10 +622,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Show match percentage</strong>
+            <strong>{t("settingsShowMatch")}</strong>
 
             <span>
-              Display the relevance percentage for each result.
+              {t("settingsShowMatchHint")}
             </span>
           </div>
 
@@ -645,10 +649,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Show scoring breakdown</strong>
+            <strong>{t("settingsShowScoring")}</strong>
 
             <span>
-              Display how Ayurvedic parameters contributed to ranking.
+              {t("settingsShowScoringHint")}
             </span>
           </div>
 
@@ -681,10 +685,10 @@ function SettingsPage() {
 
       <div className="settings-panel-title">
 
-        <h2>Clinical Preferences</h2>
+        <h2>{t("settingsClinicalPanelTitle")}</h2>
 
         <p>
-          Configure the clinical information displayed with herb results.
+          {t("settingsClinicalPanelDesc")}
         </p>
 
       </div>
@@ -696,10 +700,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Show classical references</strong>
+            <strong>{t("settingsClassicalRefs")}</strong>
 
             <span>
-              Display classical Ayurvedic references with herb profiles.
+              {t("settingsClassicalRefsHint")}
             </span>
           </div>
 
@@ -725,10 +729,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Show verification status</strong>
+            <strong>{t("settingsVerificationStatus")}</strong>
 
             <span>
-              Display whether a herb profile is draft, reviewed, or verified.
+              {t("settingsVerificationStatusHint")}
             </span>
           </div>
 
@@ -754,10 +758,10 @@ function SettingsPage() {
         <div className="settings-form-row">
 
           <div>
-            <strong>Show clinical notes</strong>
+            <strong>{t("settingsClinicalNotes")}</strong>
 
             <span>
-              Display additional clinical information where available.
+              {t("settingsClinicalNotesHint")}
             </span>
           </div>
 
@@ -827,7 +831,7 @@ function SettingsPage() {
           <div className="settings-overlay">
 
             <div className="settings-modal">
-
+              <PageBack fallback="/doctor" />
 
               {/* =========================================
                   LEFT SETTINGS NAVIGATION
@@ -843,7 +847,7 @@ function SettingsPage() {
 
                   <input
                     type="text"
-                    placeholder="Search"
+                    placeholder={t("settingsSearchPlaceholder")}
                     value={searchText}
                     onChange={(e) =>
                       setSearchText(e.target.value)
@@ -854,7 +858,7 @@ function SettingsPage() {
 
 
                 <div className="settings-sidebar-label">
-                  Settings
+                  {t("settingsTitle")}
                 </div>
 
 
@@ -905,7 +909,7 @@ function SettingsPage() {
                   type="button"
                   className="settings-close-button"
                   onClick={closeSettings}
-                  aria-label="Close settings"
+                  aria-label={t("settingsCloseAria")}
                 >
                   ×
                 </button>
@@ -917,7 +921,7 @@ function SettingsPage() {
 
                 <div className="settings-scroll-area">
 
-                  {loading && <p role="status">Loading settings...</p>}
+                  {loading && <p role="status">{t("settingsLoading")}</p>}
                   {error && <p role="alert">{error}</p>}
 
                   {renderActivePanel()}
@@ -943,7 +947,7 @@ function SettingsPage() {
                     onClick={handleSaveChanges}
                     disabled={loading}
                   >
-                    Save changes
+                    {t("settingsSaveChanges")}
                   </button>
 
                 </div>

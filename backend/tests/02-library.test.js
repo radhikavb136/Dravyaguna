@@ -1,8 +1,8 @@
-import pg from 'pg';
 import dotenv from 'dotenv';
 import { assert, assertEqual } from './lib/assert.js';
 import { api } from './lib/http.js';
 import { getTokens } from './lib/session.js';
+import { getTestPool } from './lib/testPool.js';
 
 dotenv.config();
 
@@ -99,16 +99,12 @@ export async function run() {
   }
   assertEqual(srotas.length, 7, 'srotas count');
 
-  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
-  try {
-    const { rows } = await pool.query(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_schema = current_schema() AND table_name = 'herb_mala'`
-    );
-    const columns = rows.map((row) => row.column_name);
-    assert(columns.includes('effect'), 'herb_mala effect column exists');
-    assert(!columns.includes('score'), 'herb_mala uses effects, not numeric scores');
-  } finally {
-    await pool.end();
-  }
+  const pool = getTestPool();
+  const { rows } = await pool.query(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = 'herb_mala'`
+  );
+  const columns = rows.map((row) => row.column_name);
+  assert(columns.includes('effect'), 'herb_mala effect column exists');
+  assert(!columns.includes('score'), 'herb_mala uses effects, not numeric scores');
 }

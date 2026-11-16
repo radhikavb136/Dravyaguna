@@ -62,14 +62,14 @@ router.delete('/favorites/:herb_id', authenticate, async (req, res, next) => {
   try {
     const parsed = herbIdSchema.safeParse(req.params.herb_id);
     if (!parsed.success) return res.status(400).json({ error: 'herb_id must be a UUID' });
-    const { herb_id } = req.params;
+    const herbId = parsed.data;
     const client = await pool.connect();
     try {
       const { rows } = await client.query(
         `DELETE FROM favorites 
          WHERE user_id = $1 AND herb_id = $2 
          RETURNING *`,
-        [req.user.id, herb_id]
+        [req.user.id, herbId]
       );
       if (rows.length === 0) {
         return res.status(404).json({ error: 'Favorite not found' });

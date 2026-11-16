@@ -19,3 +19,31 @@ services:
         value: 10
       - key: NODE_ENV
         value: production
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: PASSWORD_RESET_PUBLIC_PATH
+        sync: false
+      - key: DEV_DB_REF
+        sync: false

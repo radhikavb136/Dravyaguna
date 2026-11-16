@@ -3,8 +3,10 @@ import { Link, useLocation } from "react-router-dom"
 import AdminProfileDropdown from "./AdminProfileDropdown"
 import { getCurrentUser } from "../api/auth"
 import { getBackendRole } from "../utils/roles"
+import { useUiText } from "../i18n/useUiText"
 
-function AdminSidebar() {
+function AdminSidebar({ onMobileMenuToggle, isMobileMenuOpen }) {
+  const t = useUiText()
   const location = useLocation()
   const role = getBackendRole(getCurrentUser())
   const isAdmin = role === "admin"
@@ -15,7 +17,21 @@ function AdminSidebar() {
     useState(false)
 
   return (
-    <aside className="admin-sidebar">
+    <aside className={`admin-sidebar ${isMobileMenuOpen ? "mobile-open" : ""}`}>
+
+      {/* =====================================================
+          MOBILE MENU TOGGLE
+         ===================================================== */}
+      <button
+        className={`admin-mobile-toggle ${isMobileMenuOpen ? "open" : ""}`}
+        onClick={onMobileMenuToggle}
+        aria-label="Toggle menu"
+        aria-expanded={isMobileMenuOpen}
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
 
       {/* =====================================================
           BRAND
@@ -34,7 +50,7 @@ function AdminSidebar() {
           </h2>
 
           <span>
-            Ayurvedic Herb Intelligence
+            {t("adminBrandSubtitle")}
           </span>
 
         </div>
@@ -49,7 +65,7 @@ function AdminSidebar() {
       <nav className="admin-navigation">
 
         <p className="admin-nav-label">
-          WORKSPACE
+          {t("adminNavWorkspace")}
         </p>
 
 
@@ -63,7 +79,7 @@ function AdminSidebar() {
           }`}
         >
           <span>▦</span>
-          <span>Dashboard</span>
+          <span>{t("adminDashboard")}</span>
         </Link>}
 
 
@@ -77,7 +93,7 @@ function AdminSidebar() {
           }`}
         >
           <span>♧</span>
-          <span>Manage Herbs</span>
+          <span>{t("adminManageHerbs")}</span>
         </Link>}
 
 
@@ -91,7 +107,7 @@ function AdminSidebar() {
           }`}
         >
           <span>＋</span>
-          <span>Add Herb</span>
+          <span>{t("adminAddHerb")}</span>
         </Link>}
 
 
@@ -105,7 +121,7 @@ function AdminSidebar() {
           }`}
         >
           <span>▣</span>
-          <span>Vocabulary</span>
+          <span>{t("adminVocabulary")}</span>
         </Link>}
 
 
@@ -119,7 +135,7 @@ function AdminSidebar() {
           }`}
         >
           <span>⚙</span>
-          <span>Scoring Configuration</span>
+          <span>{t("adminScoring")}</span>
         </Link>}
 
 
@@ -133,7 +149,7 @@ function AdminSidebar() {
           }`}
         >
           <span>⌁</span>
-          <span>Search Analytics</span>
+          <span>{t("adminSearchAnalytics")}</span>
         </Link>}
 
 
@@ -147,7 +163,7 @@ function AdminSidebar() {
           }`}
         >
           <span>♙</span>
-          <span>User & Role Management</span>
+          <span>{t("adminUsers")}</span>
         </Link>}
 
 
@@ -161,8 +177,21 @@ function AdminSidebar() {
           }`}
         >
           <span>▤</span>
-          <span>Audit Log</span>
+          <span>{t("adminAuditLog")}</span>
         </Link>}
+
+        {/* Help & Support */}
+        <Link
+          to="/admin/help-support"
+          className={`admin-nav-item ${
+            location.pathname === "/admin/help-support"
+              ? "active"
+              : ""
+          }`}
+        >
+          <span>?</span>
+          <span>{t("helpSupport")}</span>
+        </Link>
 
       </nav>
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { login as apiLogin, register as apiRegister, setCurrentUser } from "../api/auth"
+import { login as apiLogin, register as apiRegister, setCurrentUser, mergeAccountIntoStoredUser, isAuthenticated, getCurrentUser } from "../api/auth"
+import { getAccount } from "../api/account"
 import { USE_API } from "../api/client"
 import {
   clearRememberedLogin,
@@ -8,8 +9,10 @@ import {
   persistRememberedLogin,
 } from "../utils/rememberedLogin"
 import "../styles/AuthPage.css"
+import { useUiText } from "../i18n/useUiText"
 
 function AuthPage() {
+  const t = useUiText()
   const navigate = useNavigate()
 
   const [isLogin, setIsLogin] = useState(false)
@@ -49,20 +52,20 @@ function AuthPage() {
     const normalizedRole = role.toLowerCase().trim()
 
     if (normalizedRole === "admin") {
-      return "Admin"
+      return t("authRoleAdmin")
     }
 
     if (
       normalizedRole === "doctor"
     ) {
-      return "Doctor"
+      return t("authRoleDoctor")
     }
 
     if (
       normalizedRole === "ayurvedic reviewer" ||
       normalizedRole === "reviewer"
     ) {
-      return "Ayurvedic Reviewer"
+      return t("authAyurvedicReviewer")
     }
 
     return role
@@ -74,14 +77,26 @@ function AuthPage() {
 
   useEffect(() => {
     const savedLogin = loadRememberedLogin()
+    if (savedLogin.remember && isAuthenticated()) {
+      const user = getCurrentUser()
+      const role = (user?.backendRole || user?.role || "").toLowerCase()
+      if (role === "clinician" || role === "doctor") {
+        navigate("/doctor", { replace: true })
+        return
+      }
+      if (["admin", "editor", "domain_expert", "ayurvedic reviewer"].includes(role)) {
+        navigate("/admin", { replace: true })
+        return
+      }
+    }
     if (savedLogin.email) {
       setEmail(savedLogin.email)
-      setRememberMe(true)
+      setRememberMe(savedLogin.remember !== false)
     }
     if (savedLogin.role) {
       setSelectedRole(savedLogin.role.toLowerCase())
     }
-  }, [])
+  }, [navigate])
 
   // =========================================
   // ROLE CHANGE
@@ -162,23 +177,19 @@ function AuthPage() {
       !password ||
       !confirmPassword
     ) {
-      alert(
-        "Please fill in all required fields."
-      )
+      alert(t("authFillRequired"))
 
       return
     }
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match.")
+      alert(t("authPasswordMismatch"))
 
       return
     }
 
     if (password.length < 10) {
-      alert(
-        "Password must contain at least 10 characters."
-      )
+      alert(t("authPasswordMinLength"))
 
       return
     }
@@ -193,7 +204,7 @@ function AuthPage() {
         await apiRegister(cleanEmail, password, fullName.trim(), displayRole)
         
         alert(
-          "Account created successfully! You can now log in."
+          t("authAccountCreated")
         )
 
         setEmail(cleanEmail)
@@ -202,7 +213,7 @@ function AuthPage() {
         setIsLogin(true)
         setRememberMe(true)
       } catch (error) {
-        alert(error.message || "Registration failed. Please try again.")
+        alert(error.message || t("authRegistrationFailed"))
       }
       return
     }
@@ -365,12 +376,13 @@ function AuthPage() {
     )
 
     persistRememberedLogin({
-      email: cleanEmail,
-      role: selectedRole,
-    })
+            email: cleanEmail,
+            role: selectedRole,
+            remember: true,
+          })
 
     alert(
-      "Account created successfully! You can now log in."
+      t("authAccountCreated")
     )
 
     setEmail(cleanEmail)
@@ -379,7 +391,7 @@ function AuthPage() {
     setIsLogin(true)
     setRememberMe(true)
     alert(
-      "Account created successfully! You can now log in."
+      t("authAccountCreated")
     )
 
     setEmail(cleanEmail)
@@ -397,7 +409,7 @@ function AuthPage() {
     const cleanEmail = email.trim().toLowerCase()
 
     if (!cleanEmail || !password) {
-      alert("Please enter your email and password.")
+      alert(t("authEnterEmailPassword"))
       return
     }
 
@@ -409,11 +421,18 @@ function AuthPage() {
         
         setCurrentUser(response.user)
         localStorage.setItem("isAuthenticated", "true")
+        try {
+          const account = await getAccount()
+          mergeAccountIntoStoredUser(account)
+        } catch {
+          /* profile photo hydrates on next dashboard load */
+        }
 
         if (rememberMe) {
           persistRememberedLogin({
             email: cleanEmail,
             role: selectedRole,
+            remember: true,
           })
         } else {
           clearRememberedLogin()
@@ -426,10 +445,10 @@ function AuthPage() {
         } else if (backendRole === 'admin' || backendRole === 'editor' || backendRole === 'domain_expert') {
           navigate("/admin")
         } else {
-          alert("This role does not have a configured destination.")
+          alert(t("authNoRoleDestination"))
         }
       } catch (error) {
-        alert(error.message || "Login failed. Please check your credentials.")
+        alert(error.message || t("authLoginFailed"))
       }
       return
     }
@@ -483,19 +502,19 @@ function AuthPage() {
     }
 
     if (user.password !== password) {
-      alert("Incorrect password. Please try again.")
+      alert(t("authIncorrectPassword"))
       return
     }
 
     const status = (user.status || "Active").trim().toLowerCase()
 
     if (status === "inactive" || status === "blocked") {
-      alert("This account is blocked. Please contact the admin.")
+      alert(t("authAccountBlocked"))
       return
     }
 
     if (status === "pending") {
-      alert("This account is pending approval. Please contact the admin.")
+      alert(t("authAccountPending"))
       return
     }
 
@@ -529,9 +548,10 @@ function AuthPage() {
 
     if (rememberMe) {
       persistRememberedLogin({
-        email: cleanEmail,
-        role: selectedRole,
-      })
+            email: cleanEmail,
+            role: selectedRole,
+            remember: true,
+          })
     } else {
       clearRememberedLogin()
     }
@@ -541,7 +561,7 @@ function AuthPage() {
     } else if (selectedNormalizedRole === "admin") {
       navigate("/admin")
     } else {
-      alert("This role does not have a configured destination.")
+      alert(t("authNoRoleDestination"))
     }
   }
 
@@ -589,6 +609,9 @@ function AuthPage() {
 
   const switchToSignUp = () => {
     setIsLogin(false)
+    if (USE_API) {
+      setSelectedRole("doctor")
+    }
 
     setPassword("")
     setConfirmPassword("")
@@ -619,7 +642,7 @@ function AuthPage() {
         <div className="auth-brand-row">
 
           <div className="auth-brand-icon">
-            ⌁
+            🌿
           </div>
 
           <span>
@@ -653,7 +676,7 @@ function AuthPage() {
             }`}
             onClick={switchToLogin}
           >
-            Log In
+            {t("authLogInTab")}
           </button>
 
 
@@ -666,7 +689,7 @@ function AuthPage() {
             }`}
             onClick={switchToSignUp}
           >
-            Sign Up
+            {t("authSignUpTab")}
           </button>
 
         </div>
@@ -677,7 +700,7 @@ function AuthPage() {
         <div className="auth-section">
 
           <label className="auth-label">
-            ROLE
+            {t("authRoleLabel")}
           </label>
 
           <div className="role-options">
@@ -700,32 +723,34 @@ function AuthPage() {
               </span>
 
               <span>
-                Doctor
+                {t("authDoctor")}
               </span>
             </button>
 
 
-            <button
-              type="button"
-              className={`role-option ${
-                selectedRole === "admin"
-                  ? "selected"
-                  : ""
-              }`}
-              onClick={() =>
-                handleRoleChange(
-                  "admin"
-                )
-              }
-            >
-              <span className="role-icon">
-                ♢
-              </span>
+            {(isLogin || !USE_API) && (
+              <button
+                type="button"
+                className={`role-option ${
+                  selectedRole === "admin"
+                    ? "selected"
+                    : ""
+                }`}
+                onClick={() =>
+                  handleRoleChange(
+                    "admin"
+                  )
+                }
+              >
+                <span className="role-icon">
+                  ♢
+                </span>
 
-              <span>
-                Admin
-              </span>
-            </button>
+                <span>
+                  {t("authAdmin")}
+                </span>
+              </button>
+            )}
 
           </div>
 
@@ -742,7 +767,7 @@ function AuthPage() {
             <div className="auth-field">
 
               <label htmlFor="language">
-                Language
+                {t("authLanguage")}
               </label>
 
               <select
@@ -868,7 +893,7 @@ function AuthPage() {
           <div className="auth-field">
 
             <label htmlFor="email">
-              Email
+              {t("authEmail")}
             </label>
 
             <input
@@ -896,7 +921,7 @@ function AuthPage() {
           <div className="auth-field">
 
             <label htmlFor="password">
-              Password
+              {t("authPassword")}
             </label>
 
             <div className="password-field">
@@ -932,8 +957,8 @@ function AuthPage() {
                 }
                 aria-label={
                   showPassword
-                    ? "Hide password"
-                    : "Show password"
+                    ? t("authHidePassword")
+                    : t("authShowPassword")
                 }
               >
                 {showPassword
@@ -953,7 +978,7 @@ function AuthPage() {
             <div className="auth-field">
 
               <label htmlFor="confirmPassword">
-                Confirm Password
+                {t("authConfirmPassword")}
               </label>
 
               <div className="password-field">
@@ -985,8 +1010,8 @@ function AuthPage() {
                   }
                   aria-label={
                     showConfirmPassword
-                      ? "Hide confirm password"
-                      : "Show confirm password"
+                      ? t("authHideConfirmPassword")
+                      : t("authShowConfirmPassword")
                   }
                 >
                   {showConfirmPassword
@@ -1020,7 +1045,7 @@ function AuthPage() {
                 />
 
                 <span>
-                  Remember me on this device
+                  {t("authRememberMe")}
                 </span>
 
               </label>
@@ -1037,11 +1062,11 @@ function AuthPage() {
             className="auth-submit"
           >
             {isLogin
-              ? "Log In"
-              : "Create Account"}
+              ? t("authLogIn")
+              : t("authCreateAccount")}
           </button>
 
-          {isLogin && <Link to="/password-reset">Forgot password?</Link>}
+          {isLogin && <Link to="/password-reset">{t("authForgotPassword")}</Link>}
 
         </form>
 
@@ -1053,7 +1078,7 @@ function AuthPage() {
           {isLogin ? (
             <>
               <span>
-                Don't have an account?
+                {t("authNoAccount")}
               </span>
 
               <button
@@ -1062,13 +1087,13 @@ function AuthPage() {
                   switchToSignUp
                 }
               >
-                Sign Up
+                {t("authSwitchSignUp")}
               </button>
             </>
           ) : (
             <>
               <span>
-                Already have an account?
+                {t("authHaveAccount")}
               </span>
 
               <button
@@ -1077,7 +1102,7 @@ function AuthPage() {
                   switchToLogin
                 }
               >
-                Log In
+                {t("authSwitchLogIn")}
               </button>
             </>
           )}
@@ -1090,11 +1115,7 @@ function AuthPage() {
       {/* DISCLAIMER */}
 
       <p className="auth-disclaimer">
-
-        For qualified Ayurvedic physicians and licensed
-        <br />
-        healthcare professionals only.
-
+        {t("authDisclaimer")}
       </p>
 
     </div>

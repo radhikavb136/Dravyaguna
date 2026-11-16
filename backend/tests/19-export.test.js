@@ -31,6 +31,19 @@ export async function run() {
 
   const clinicianXlsx = await fetch(`${BASE_URL}/api/admin/export?format=xlsx`, { headers: { Authorization: `Bearer ${tokens.clinician}` } });
   assertEqual(clinicianXlsx.status, 403, 'clinicians cannot export XLSX');
+
+  const herbsExportDenied = await fetch(`${BASE_URL}/api/herbs/export?format=csv`, {
+    headers: { Authorization: `Bearer ${tokens.clinician}` },
+  });
+  assertEqual(herbsExportDenied.status, 403, 'clinicians cannot export via /api/herbs/export');
+
+  const herbsExportCsv = await fetch(`${BASE_URL}/api/herbs/export?format=csv`, {
+    headers: { Authorization: `Bearer ${tokens.admin}` },
+  });
+  assertEqual(herbsExportCsv.status, 200, 'admin can export CSV via /api/herbs/export');
+  const herbsCsv = await herbsExportCsv.text();
+  assert(herbsCsv.includes('"Code","English Name","Sanskrit Name"'), 'herbs export CSV matches master header');
+  assert(herbsCsv.includes('African Baobab'), 'herbs export CSV includes seeded records');
 }
 
 function readZipEntries(buffer) {

@@ -1,10 +1,11 @@
-import pg from 'pg';
 import { assert, assertEqual } from './lib/assert.js';
 import { api } from './lib/http.js';
 import { getTokens } from './lib/session.js';
+import { getTestPool } from './lib/testPool.js';
+import { createMockTranslationProvider } from '../src/services/translations/translationProvider.js';
 import { translateHerbFields } from '../src/services/translations/translationService.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+const pool = getTestPool();
 
 export async function run() {
   const { tokens } = await getTokens();
@@ -50,6 +51,22 @@ export async function run() {
     assertEqual(changed.status, 200, 'herb edit succeeds');
     const remaining = await pool.query("SELECT COUNT(*)::int AS count FROM translation_cache WHERE content_type='herb' AND content_id=$1", [herbId]);
     assertEqual(remaining.rows[0].count, 0, 'herb edit invalidates translation cache');
+
+    const failingProvider = {
+      name: 'failing-fixture',
+      async translate() {
+        throw new Error('provider unavailable');
+      },
+    };
+    const fallback = await translateHerbFields(herb, 'mr-IN', failingProvider);
+    assertEqual(fallback.description.translation_unavailable, true, 'provider failure surfaces translation_unavailable');
+    assertEqual(fallback.description.text, herb.description, 'provider failure keeps source text');
+
+    const mockOnly = await translateHerbFields(herb, 'hi-IN', createMockTranslationProvider());
+    assertEqual(mockOnly.description.translation_unavailable, true, 'mock provider never fabricates herb field translations');
+    assertEqual(mockOnly.description.text, herb.description, 'mock provider keeps source text');
+    const unsupportedTarget = await translateHerbFields(herb, 'en-GB', provider);
+    assertEqual(unsupportedTarget.description.translation_unavailable, true, 'unsupported target language is reported honestly');
   } finally {
     if (herbId) await pool.query("DELETE FROM translation_cache WHERE content_type='herb' AND content_id=$1", [herbId]);
   }

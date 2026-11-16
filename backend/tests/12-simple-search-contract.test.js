@@ -1,9 +1,9 @@
 import { assert, assertEqual } from './lib/assert.js';
 import { api } from './lib/http.js';
 import { getTokens } from './lib/session.js';
-import pg from 'pg';
+import { getTestPool } from './lib/testPool.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+const pool = getTestPool();
 
 export async function run() {
   const { tokens } = await getTokens();
@@ -72,7 +72,6 @@ export async function run() {
     assert(unsupported.data.note?.includes('not interpreted'), 'untranslated query is clearly reported as not interpreted');
   } finally {
     if (synonymId) await pool.query('DELETE FROM term_synonyms WHERE id = $1', [synonymId]);
-    await pool.end();
   }
 }
 

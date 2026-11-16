@@ -1,0 +1,102 @@
+.admin-support-page {
+  padding: 1.5rem 2rem 2.5rem;
+  max-width: 1200px;
+}
+
+.admin-support-header h1 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.75rem;
+}
+
+.admin-support-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin: 0;
+}
+
+.admin-support-note {
+  font-size: 0.9rem;
+  opacity: 0.85;
+  margin-top: 0.75rem;
+}
+
+.admin-support-error {
+  color: #b42318;
+  margin: 1rem 0;
+}
+
+.admin-support-retry {
+  padding: 8px 16px;
+  border: 1px solid #d97706;
+  border-radius: 4px;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+  margin-top: 1rem;
+}
+
+.admin-support-retry:hover {
+  background: #d97706;
+}
+
+.admin-support-table-wrap {
+  overflow-x: auto;
+  margin-top: 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.admin-support-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admin-support-table th,
+.admin-support-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #eef0f2;
+}
+
+.admin-support-table th {
+  background: #f8faf9;
+  font-weight: 600;
+}
+
+.admin-support-email {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.admin-support-message {
+  max-width: 360px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-support-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.admin-support-pagination button {
+  margin-left: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.admin-support-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

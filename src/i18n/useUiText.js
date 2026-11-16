@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { getAccount } from "../api/account"
 import { USE_API } from "../api/client"
+import { interpolate } from "./relativeTime.js"
 import { uiMessages } from "./messages"
 
 let preferredLanguageRequest
@@ -26,7 +27,7 @@ function loadInterfaceLanguage() {
   return preferredLanguageRequest
 }
 
-export function useUiText() {
+export function useCurrentLanguage() {
   const [language, setLanguage] = useState(() => localStorage.getItem("dravyaguna-language") || "en-IN")
 
   useEffect(() => {
@@ -40,5 +41,18 @@ export function useUiText() {
     }
   }, [])
 
-  return (key) => uiMessages[language]?.[key] || uiMessages["en-IN"][key] || key
+  return language
+}
+
+export function useUiText() {
+  const language = useCurrentLanguage()
+
+  return useCallback((key, vars) => {
+    const text = translate(language, key)
+    return vars ? interpolate(text, vars) : text
+  }, [language])
+}
+
+export function translate(language, key) {
+  return uiMessages[language]?.[key] || uiMessages["en-IN"][key] || key
 }

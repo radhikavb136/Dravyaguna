@@ -25,5 +25,18 @@ async function shutdown() {
   process.exit(0);
 }
 
+process.on('uncaughtException', (err) => {
+  if (err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ETIMEDOUT' || err.message?.includes('ECONNRESET')) {
+    console.error('Transient database/network socket reset handled:', err.message);
+    return;
+  }
+  console.error('Uncaught exception in backend server:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection in backend server:', reason);
+});
+
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

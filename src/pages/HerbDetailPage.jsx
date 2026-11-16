@@ -1,16 +1,22 @@
 import { useEffect, useState, useMemo } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useLocation } from "react-router-dom"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
+import PageBack from "../components/PageBack"
 import herbDataset from "../data/herbDataset"
 import { getHerbById } from "../api/herbs"
 import { USE_API } from "../api/client"
 import { addFavorite, getFavorites, removeFavorite } from "../api/favorites"
 import InfoIcon from "../components/InfoIcon"
+import InfoTooltip from "../components/InfoTooltip"
 import { getCurrentUser } from "../api/auth"
 import { verifyTranslation } from "../api/translations"
 import { getBackendRole } from "../utils/roles"
+import { getAccount } from "../api/account"
+import { setInterfaceLanguage, useCurrentLanguage, useUiText } from "../i18n/useUiText"
+import { getHerbDisplayName, getHerbSecondaryName } from "../utils/herbName"
+import { recordFeedback } from "../api/model"
 
 import "../styles/HerbDetailPage.css"
 
@@ -61,10 +67,13 @@ function LeafIcon() {
 }
 
 
-function DetailField({ label, value }) {
+function DetailField({ label, value, tooltipKey }) {
   return (
     <div className="detail-field">
-      <span>{label}</span>
+      <span>
+        {label}
+        {tooltipKey && <InfoTooltip contentKey={tooltipKey} />}
+      </span>
       <strong>{value || "—"}</strong>
     </div>
   )
@@ -99,15 +108,35 @@ function formatArray(value) {
    ========================================= */
 
 function HerbDetailPage() {
+  const t = useUiText()
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
 
   const [isFavorite, setIsFavorite] = useState(false)
   const [apiHerb, setApiHerb] = useState(null)
-  const [apiLoading, setApiLoading] = useState(false)
+  const [apiLoading, setApiLoading] = useState(USE_API && Boolean(id))
   const [apiError, setApiError] = useState(null)
   const [favoriteBusy, setFavoriteBusy] = useState(false)
   const [language, setLanguage] = useState(() => localStorage.getItem('dravyaguna-language') || 'en-IN')
+
+  useEffect(() => {
+    if (!USE_API) return
+    getAccount()
+      .then(({ preferred_language: preferred }) => {
+        if (preferred) {
+          setInterfaceLanguage(preferred)
+          setLanguage(preferred)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const syncLanguage = () => setLanguage(localStorage.getItem('dravyaguna-language') || 'en-IN')
+    window.addEventListener('dravyaguna-language-change', syncLanguage)
+    return () => window.removeEventListener('dravyaguna-language-change', syncLanguage)
+  }, [])
   const [translationBusy, setTranslationBusy] = useState(false)
   const [translationMessage, setTranslationMessage] = useState('')
   const canVerifyTranslation = ['admin', 'domain_expert'].includes(getBackendRole(getCurrentUser()))
@@ -163,6 +192,22 @@ function HerbDetailPage() {
   }, [apiHerb, id])
 
   const herb = currentHerb
+
+  /* =========================================
+     RECORD CLINICAL INTERACTION FOR LEARNING
+     ========================================= */
+
+  useEffect(() => {
+    if (!herb?.id || !USE_API) return
+    const query = location.state?.searchQuery || herb.sanskritName || herb.englishName
+    if (query) {
+      recordFeedback({
+        queryText: query,
+        herbId: herb.id,
+        interactionType: 'view',
+      })
+    }
+  }, [herb?.id, location.state?.searchQuery])
 
 
   /* =========================================
@@ -233,6 +278,11 @@ function HerbDetailPage() {
         } else {
           await addFavorite(herb.id)
           setIsFavorite(true)
+          recordFeedback({
+            queryText: location.state?.searchQuery || herb.sanskritName || herb.englishName || 'herb',
+            herbId: herb.id,
+            interactionType: 'favorite',
+          })
         }
       } catch (error) {
         setApiError(error.message)
@@ -290,6 +340,22 @@ function HerbDetailPage() {
      HERB NOT FOUND
      ========================================= */
 
+  if (USE_API && apiLoading) {
+    return (
+      <div className="herb-detail-layout">
+        <DashboardNavbar />
+        <div className="herb-detail-body">
+          <Sidebar />
+          <main className="herb-detail-content">
+            <div className="herb-detail-inner">
+              <p role="status">{t("herbDetailLoading")}</p>
+            </div>
+          </main>
+        </div>
+      </div>
+    )
+  }
+
   if (!herb) {
     return (
       <div className="herb-detail-layout">
@@ -303,6 +369,10 @@ function HerbDetailPage() {
           <main className="herb-detail-content">
 
             <div className="herb-detail-inner">
+
+              {USE_API && apiError && (
+                <p role="alert">{apiError}</p>
+              )}
 
               <h1>Herb not found</h1>
 
@@ -382,7 +452,7 @@ function HerbDetailPage() {
           <div className="herb-detail-inner">
 
             {USE_API && apiLoading && (
-              <p role="status">Loading herb profile...</p>
+              <p role="status">{t("herbDetailLoading")}</p>
             )}
 
             {USE_API && apiError && (
@@ -394,15 +464,7 @@ function HerbDetailPage() {
                 BACK
                 ========================================= */}
 
-            <button
-              className="detail-back-button"
-              type="button"
-              onClick={() =>
-                navigate("/herb-library")
-              }
-            >
-              ← Back to Herb Library
-            </button>
+            <PageBack fallback="/herb-library" />
 
 
             {/* =========================================
@@ -415,7 +477,7 @@ function HerbDetailPage() {
                 <label>
                   Language{' '}
                   <select value={language} onChange={(event) => {
-                    localStorage.setItem('dravyaguna-language', event.target.value)
+                    setInterfaceLanguage(event.target.value)
                     setLanguage(event.target.value)
                   }} aria-label="Herb content language">
                     <option value="en-IN">English</option>
@@ -426,24 +488,24 @@ function HerbDetailPage() {
                 </label>
 
                 <div className="herb-detail-icon-wrapper">
-                  {herb.imageUrl ? <img src={herb.imageUrl} alt={herb.englishName} className="detail-leaf-icon" /> : <LeafIcon />}
+                  {(herb.imageUrl || herb.image_url) ? <img src={herb.imageUrl || herb.image_url} alt={getHerbDisplayName(herb, language)} className="detail-leaf-icon" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px' }} /> : <LeafIcon />}
                 </div>
 
 
                 <div>
 
                   <p className="herb-detail-breadcrumb">
-                    HERB LIBRARY / HERB INFORMATION
+                    {t("herbDetailBreadcrumb")}
                   </p>
 
 
                   <h1>
-                    {herb.englishName}
+                    {getHerbDisplayName(herb, language)}
                   </h1>
 
 
                   <em>
-                    {herb.botanicalName || "—"}
+                    {getHerbSecondaryName(herb, language) || herb.botanicalName || "—"}
                   </em>
 
                 </div>
@@ -476,26 +538,36 @@ function HerbDetailPage() {
               <div className="herb-basic-grid">
 
                 <DetailField
+                  label="SANSKRIT NAME"
+                  value={herb.sanskritName || herb.sanskrit_name || "—"}
+                  tooltipKey="sanskritName"
+                />
+
+                <DetailField
                   label="ENGLISH NAME"
                   value={herb.englishName}
+                  tooltipKey="herbName"
                 />
 
 
                 <DetailField
                   label="REGIONAL NAMES"
                   value={regionalNames}
+                  tooltipKey="regionalNames"
                 />
 
 
                 <DetailField
                   label="BOTANICAL NAME"
                   value={herb.botanicalName}
+                  tooltipKey="botanicalName"
                 />
 
 
                 <DetailField
                   label="PART USED"
                   value={herb.translations?.part_used?.text || herb.partUsed}
+                  tooltipKey="partUsed"
                 />
                 {herb.translations?.part_used?.status === 'machine_translated' && <small>Machine-translated</small>}
                 {herb.translations?.part_used?.status === 'machine_translated' && canVerifyTranslation && <button type="button" disabled={translationBusy} onClick={() => handleVerifyTranslation('part_used')}>Verify translation</button>}
@@ -510,6 +582,7 @@ function HerbDetailPage() {
                 <DetailField
                   label="VERIFICATION STATUS"
                   value={herb.verificationStatus}
+                  tooltipKey="reviewHerb"
                 />
 
               </div>
@@ -536,8 +609,8 @@ function HerbDetailPage() {
                 {favoriteBusy
                   ? "Saving..."
                   : isFavorite
-                    ? "Saved to favorites"
-                    : "Save to favorites"}
+                    ? t("favoritesSavedHerb")
+                    : t("herbDetailFavorite")}
               </button>
 
             </section>
@@ -558,7 +631,7 @@ function HerbDetailPage() {
                 <h2>
                   Classical properties
                 </h2>
-                <InfoIcon herbId={herb.id} />
+                <InfoIcon herbId={herb.id} lang={language} />
 
               </div>
 

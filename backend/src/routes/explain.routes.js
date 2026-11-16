@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { rateLimitClientKey } from '../middleware/rateLimitKey.js';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { generateExplanation } from '../services/explain/explainService.js';
@@ -16,8 +17,12 @@ const explainSchema = z.object({
 
 const explanationLimiter = rateLimit({
   windowMs: 60_000,
-  limit: 10,
-  keyGenerator: (req) => req.user.id,
+  limit: process.env.NODE_ENV === 'test' ? 500 : 10,
+  keyGenerator: (req) => {
+    const testKey = rateLimitClientKey(req);
+    if (testKey && testKey !== req.ip) return testKey;
+    return req.user?.id || req.ip;
+  },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, res) => res.status(429).json({ error: 'Explanation rate limit exceeded. Try again shortly.' }),

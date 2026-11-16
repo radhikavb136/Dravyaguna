@@ -18,6 +18,10 @@ export async function getSearchAnalytics() {
   return apiClient.get('/api/analytics/search?days=90');
 }
 
+export async function getSearchAnalyticsInsights(days = 90) {
+  return apiClient.get(`/api/analytics/search/insights?days=${days}`);
+}
+
 export async function getUsers() {
   return apiClient.get('/api/users');
 }

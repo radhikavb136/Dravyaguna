@@ -7,7 +7,10 @@ import {
   deleteManagedTerm,
   mergeManagedTerms,
 } from "../api/vocabulary"
+import { getCurrentUser } from "../api/auth"
+import { getBackendRole } from "../utils/roles"
 import "../styles/VocabularyManagement.css"
+import { useUiText } from "../i18n/useUiText"
 
 function generateTermId() {
   return Date.now().toString()
@@ -93,6 +96,7 @@ const getHerbCategoryValues = (
 }
 
 function VocabularyManagement() {
+  const t = useUiText()
   const [activeCategory, setActiveCategory] = useState("Rasa")
   const [isAddTermOpen, setIsAddTermOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
@@ -103,7 +107,9 @@ function VocabularyManagement() {
   const [error, setError] = useState(null)
   const [mutationError, setMutationError] = useState("")
   const [mutationSuccess, setMutationSuccess] = useState("")
+  const [isMutating, setIsMutating] = useState(false)
   const useApi = import.meta.env.VITE_USE_API === "true"
+  const isVocabAdmin = getBackendRole(getCurrentUser()) === "admin"
   const isManagedApiCategory = (category) => category === "Karma" || category === "Indications"
 
   const categories = [
@@ -155,7 +161,7 @@ function VocabularyManagement() {
                 id: term.id,
                 term: term.canonical_en,
                 category: category.charAt(0).toUpperCase() + category.slice(1),
-                status: term.status || null,
+                status: term.status || 'Active',
                 is_custom: term.is_custom || false,
               })
             })
@@ -171,7 +177,7 @@ function VocabularyManagement() {
       }
     } catch (err) {
       console.error('Failed to load vocabulary:', err)
-      setError('Failed to load vocabulary')
+      setError(t('vocabLoadError'))
       setVocabularyData([])
     } finally {
       setLoading(false)
@@ -344,7 +350,7 @@ function VocabularyManagement() {
         mergingTerm &&
         item.category ===
           mergingTerm.category &&
-        item.id !== mergingTerm.id &&
+        String(item.id) !== String(mergingTerm.id) &&
         item.status === "Active"
     )
 
@@ -384,9 +390,7 @@ function VocabularyManagement() {
       cleanedTerm.toLowerCase()
 
     if (!cleanedTerm) {
-      alert(
-        "Please enter the vocabulary term."
-      )
+      setMutationError(t("vocabEnterTerm"))
       return
     }
 
@@ -403,15 +407,14 @@ function VocabularyManagement() {
       )
 
     if (duplicateTerm) {
-      alert(
-        `"${cleanedTerm}" already exists in ${termForm.category}.`
-      )
+      setMutationError(`"${cleanedTerm}" already exists in ${termForm.category}.`)
       return
     }
 
     try {
       setMutationError("")
       setMutationSuccess("")
+      setIsMutating(true)
       
       if (useApi) {
         const category = termForm.category === 'Indications'
@@ -421,7 +424,7 @@ function VocabularyManagement() {
             : null
 
         if (!category) {
-          alert('API vocabulary management currently supports Karma and Indications.')
+          setMutationError(t("vocabApiScopeKarmaIndications"))
           return
         }
 
@@ -436,7 +439,7 @@ function VocabularyManagement() {
         setEditingTermId(null)
         setIsAddTermOpen(false)
         resetForm(termForm.category)
-        setMutationSuccess(editingTermId ? "Vocabulary term updated." : "Vocabulary term added.")
+        setMutationSuccess(editingTermId ? t("vocabTermUpdated") : t("vocabTermAdded"))
       } else {
         // Fallback to localStorage for mock data
         /* UPDATE */
@@ -493,9 +496,7 @@ function VocabularyManagement() {
             termForm.category
           )
 
-          alert(
-            "Vocabulary term updated successfully."
-          )
+          setMutationSuccess("Vocabulary term updated successfully.")
 
           return
         }
@@ -554,13 +555,14 @@ function VocabularyManagement() {
           termForm.category
         )
 
-        alert(
-          "Vocabulary term added successfully."
-        )
+        setMutationSuccess("Vocabulary term added successfully.")
+        setIsMutating(false)
       }
     } catch (err) {
       console.error('Failed to add vocabulary term:', err)
       setMutationError(err.message || 'Failed to save vocabulary term')
+    } finally {
+      setIsMutating(false)
     }
   }
 
@@ -664,6 +666,8 @@ function VocabularyManagement() {
       return
     }
 
+    setIsMutating(true)
+
     if (useApi) {
       const category = termToDelete.category === 'Indications'
         ? 'indications'
@@ -671,17 +675,20 @@ function VocabularyManagement() {
           ? 'karma'
           : null
       if (!category) {
-        alert('Only Karma and Indications terms can be deleted through the API.')
+        setMutationError(t("vocabApiDeleteScope"))
         return
       }
       setMutationError("")
       setMutationSuccess("")
+      setIsMutating(true)
       try {
         await deleteManagedTerm(category, termId)
         await loadVocabulary()
         setMutationSuccess(`“${termToDelete.term}” was deleted.`)
       } catch (err) {
         setMutationError(err.message || "Unable to delete vocabulary term")
+      } finally {
+        setIsMutating(false)
       }
       return
     }
@@ -703,9 +710,8 @@ function VocabularyManagement() {
       )
     )
 
-    alert(
-      `"${termToDelete.term}" was permanently deleted.`
-    )
+    setMutationSuccess(`"${termToDelete.term}" was permanently deleted.`)
+    setIsMutating(false)
   }
 
   /* =========================================================
@@ -781,23 +787,19 @@ function VocabularyManagement() {
       !mergingTerm ||
       !mergeTargetId
     ) {
-      alert(
-        "Please select a target term."
-      )
+      setMutationError(t("vocabSelectTarget"))
       return
     }
 
     const targetTerm =
       vocabularyData.find(
         (item) =>
-          item.id ===
-          mergeTargetId
+          String(item.id) ===
+          String(mergeTargetId)
       )
 
     if (!targetTerm) {
-      alert(
-        "Target term not found."
-      )
+      setMutationError(t("vocabTargetNotFound"))
       return
     }
 
@@ -805,9 +807,7 @@ function VocabularyManagement() {
       mergingTerm.category !==
       targetTerm.category
     ) {
-      alert(
-        "Terms must belong to the same category."
-      )
+      setMutationError(t("vocabSameCategory"))
       return
     }
 
@@ -815,9 +815,7 @@ function VocabularyManagement() {
       mergingTerm.id ===
       targetTerm.id
     ) {
-      alert(
-        "A term cannot be merged into itself."
-      )
+      setMutationError(t("vocabMergeSelf"))
       return
     }
 
@@ -828,11 +826,12 @@ function VocabularyManagement() {
           ? 'karma'
           : null
       if (!category) {
-        alert('Only Karma and Indications terms can be merged through the API.')
+        setMutationError(t("vocabApiMergeScope"))
         return
       }
       setMutationError("")
       setMutationSuccess("")
+      setIsMutating(true)
       try {
         await mergeManagedTerms(category, mergingTerm.id, targetTerm.id)
         await loadVocabulary()
@@ -841,6 +840,8 @@ function VocabularyManagement() {
         setMergeTargetId("")
       } catch (err) {
         setMutationError(err.message || "Unable to merge vocabulary terms")
+      } finally {
+        setIsMutating(false)
       }
       return
     }
@@ -894,9 +895,8 @@ function VocabularyManagement() {
     setMergingTerm(null)
     setMergeTargetId("")
 
-    alert(
-      `"${mergingTerm.term}" was merged into "${targetTerm.term}".`
-    )
+    setMutationSuccess(`"${mergingTerm.term}" was merged into "${targetTerm.term}".`)
+    setIsMutating(false)
   }
 
   /* =========================================================
@@ -912,7 +912,7 @@ function VocabularyManagement() {
   ========================================================= */
 
   if (loading) {
-    return <p role="status">Loading vocabulary...</p>
+    return <p role="status">{t("vocabLoading")}</p>
   }
 
   if (error) {
@@ -931,15 +931,15 @@ function VocabularyManagement() {
         <div>
 
           <p className="vocabulary-label">
-            KNOWLEDGE MANAGEMENT
+            {t("vocabPageLabel")}
           </p>
 
           <h1>
-            Vocabulary Management
+            {t("vocabPageTitle")}
           </h1>
 
           <p className="vocabulary-description">
-            Maintain standardized Ayurvedic terms and searchable values.
+            {t("vocabPageDesc")}
           </p>
 
         </div>
@@ -947,7 +947,7 @@ function VocabularyManagement() {
         <button
           type="button"
           className="vocabulary-add-button"
-          disabled={useApi && !isManagedApiCategory(activeCategory)}
+          disabled={(useApi && !isManagedApiCategory(activeCategory)) || isMutating}
           title={useApi && !isManagedApiCategory(activeCategory) ? "Only Karma and Indications can be edited through the configured API." : undefined}
           onClick={() => {
             setEditingTermId(null)
@@ -960,13 +960,21 @@ function VocabularyManagement() {
           }}
         >
           <span>＋</span>
-          Add Term
+          {t("vocabAddTerm")}
         </button>
 
       </div>
 
-      {mutationError && <p role="alert">{mutationError}</p>}
-      {mutationSuccess && <p role="status">{mutationSuccess}</p>}
+      {mutationError && (
+        <div className="vocab-alert vocab-alert-error" role="alert">
+          {mutationError}
+        </div>
+      )}
+      {mutationSuccess && (
+        <div className="vocab-alert vocab-alert-success" role="status">
+          {mutationSuccess}
+        </div>
+      )}
 
 
       {/* =====================================================
@@ -1174,6 +1182,7 @@ function VocabularyManagement() {
                                 item.id
                               )
                             }
+                            disabled={isMutating}
                           >
                             ✎
                           </button>}
@@ -1189,6 +1198,7 @@ function VocabularyManagement() {
                                 item.id
                               )
                             }
+                            disabled={isMutating}
                           >
                             Merge
                           </button>}
@@ -1204,6 +1214,7 @@ function VocabularyManagement() {
                                 item.id
                               )
                             }
+                            disabled={isMutating}
                           >
                             {item.status ===
                             "Active"
@@ -1214,7 +1225,7 @@ function VocabularyManagement() {
 
                           {/* DELETE */}
 
-                          {!useApi && <button
+                          {(!useApi || (useApi && isVocabAdmin && isManagedApiCategory(item.category))) && <button
                             type="button"
                             className="vocabulary-action-delete"
                             onClick={() =>
@@ -1222,6 +1233,7 @@ function VocabularyManagement() {
                                 item.id
                               )
                             }
+                            disabled={isMutating}
                           >
                             Delete
                           </button>}
@@ -1307,7 +1319,7 @@ function VocabularyManagement() {
                 </h2>
 
                 <p>
-                  Add a standardized term to the Ayurvedic knowledge vocabulary.
+                  {t("vocabModalAddDesc")}
                 </p>
 
               </div>
@@ -1344,7 +1356,7 @@ function VocabularyManagement() {
               <div className="vocabulary-form-field">
 
                 <label htmlFor="vocabulary-category">
-                  Category
+                  {t("vocabFormCategory")}
                 </label>
 
                 <select
@@ -1539,10 +1551,9 @@ function VocabularyManagement() {
                 <button
                   type="submit"
                   className="vocabulary-save-button"
+                  disabled={isMutating}
                 >
-                  {editingTermId
-                    ? "Save Changes"
-                    : "Add Term"}
+                  {isMutating ? "Saving..." : (editingTermId ? "Save Changes" : "Add Term")}
                 </button>
 
               </div>
@@ -1575,11 +1586,11 @@ function VocabularyManagement() {
                 </p>
 
                 <h2>
-                  Merge Vocabulary Term
+                  {t("vocabMergeTitle")}
                 </h2>
 
                 <p>
-                  Merge a duplicate or equivalent term into a standardized vocabulary term.
+                  {t("vocabMergeDesc")}
                 </p>
 
               </div>
@@ -1779,13 +1790,13 @@ function VocabularyManagement() {
                   type="button"
                   className="vocabulary-save-button"
                   disabled={
-                    !mergeTargetId
+                    !mergeTargetId || isMutating
                   }
                   onClick={
                     handleMergeTerms
                   }
                 >
-                  Merge Terms
+                  {isMutating ? "Merging..." : "Merge Terms"}
                 </button>
 
               </div>

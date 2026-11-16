@@ -364,6 +364,7 @@ SELECT
   h.id,
   h.code,
   h.english_name,
+  h.sanskrit_name,
   h.botanical_name,
   h.part_used,
   h.prabhava,

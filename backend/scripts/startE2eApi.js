@@ -1,10 +1,13 @@
 /**
- * Start API for Playwright with rate limits disabled (local E2E only).
+ * Start API for Playwright and integration tests (local isolated DB only).
+ * Forces NODE_ENV=test so HTTP handlers match backend test contracts (mock LLM,
+ * no live translation, upload/storage guards) without editing .env secrets.
  */
 import dotenv from 'dotenv';
 
 dotenv.config();
 
+process.env.NODE_ENV = 'test';
 process.env.DISABLE_RATE_LIMIT = 'true';
 if (!process.env.FRONTEND_ORIGIN?.trim()) {
   process.env.FRONTEND_ORIGIN =

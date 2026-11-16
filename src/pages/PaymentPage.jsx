@@ -1,14 +1,21 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useSearchParams, useNavigate } from "react-router-dom"
 
 import DashboardNavbar from "../components/DashboardNavbar"
 import Sidebar from "../components/Sidebar"
+import { getHealth } from "../api/health"
+import { USE_API } from "../api/client"
+import { useUiText } from "../i18n/useUiText"
 
 import "../styles/PaymentPage.css"
 
 function PaymentPage() {
+  const t = useUiText()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const [billingConfigured, setBillingConfigured] = useState(false)
+  const [billingChecked, setBillingChecked] = useState(!USE_API)
+  const [paymentNotice, setPaymentNotice] = useState("")
 
   const plan = searchParams.get("plan") || "Pro"
 
@@ -41,14 +48,21 @@ function PaymentPage() {
     setShowPaymentMethods(false)
   }
 
+  useEffect(() => {
+    if (!USE_API) return
+    getHealth()
+      .then((health) => setBillingConfigured(Boolean(health.billingConfigured)))
+      .catch(() => setBillingConfigured(false))
+      .finally(() => setBillingChecked(true))
+  }, [])
+
   const handlePayment = () => {
-    if (!selectedPaymentMethod) {
+    if (!selectedPaymentMethod) return
+    if (!billingConfigured) {
+      setPaymentNotice(t("paymentNotConfigured"))
       return
     }
-
-    alert(
-      `${selectedPaymentMethod} payment for the ${plan} plan will be connected to the backend later.`
-    )
+    setPaymentNotice(t("paymentCheckoutNotIntegrated"))
   }
 
   return (
@@ -71,7 +85,7 @@ function PaymentPage() {
               className="payment-back-button"
               onClick={handleBack}
             >
-              ← Back to plans
+              ← {t("backToPlans")}
             </button>
 
 
@@ -84,8 +98,14 @@ function PaymentPage() {
               </p>
 
               <h1>
-                Complete your payment
+                {t("paymentTitle")}
               </h1>
+
+              {billingChecked && !billingConfigured && (
+                <p className="payment-note" role="status">
+                  {t("paymentUnavailable")}
+                </p>
+              )}
 
               <p className="payment-description">
                 Upgrade your Herb Intelligence plan
@@ -325,24 +345,27 @@ function PaymentPage() {
                     ? "disabled"
                     : ""
                 }`}
-                disabled={!selectedPaymentMethod}
+                disabled={!selectedPaymentMethod || !billingConfigured}
                 onClick={handlePayment}
               >
 
                 {selectedPaymentMethod
                   ? `Pay ₹${selectedPlan.price}`
-                  : "Select a payment method"}
+                  : t("paymentSelectMethod")}
 
               </button>
 
 
               {/* PAYMENT NOTE */}
 
-              <p className="payment-note">
+              <p className="payment-note" role={paymentNotice ? "alert" : undefined}>
 
-                {selectedPaymentMethod
-                  ? `${selectedPaymentMethod} payment integration will be connected through the backend.`
-                  : "Choose a payment method to continue."}
+                {paymentNotice
+                  || (selectedPaymentMethod
+                    ? (billingConfigured
+                      ? "Payment checkout will open when billing is fully integrated."
+                      : t("paymentNotConfigured"))
+                    : "Choose a payment method to continue.")}
 
               </p>
 

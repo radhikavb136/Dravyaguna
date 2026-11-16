@@ -9,6 +9,9 @@ import {
   mapQueryToFilterIds,
   normalizeSimpleQuery,
 } from './simpleSearchMap.js';
+import { searchHerbsByName } from './herbNameSearch.js';
+import { searchHerbsByClinicalText } from './clinicalTextSearch.js';
+import { getLearnedBoostsForQuery } from '../learning/selfLearningService.js';
 
 function visibleStatusesForRole(role) {
   if (canSeeDraftHerbs(role)) {
@@ -92,7 +95,59 @@ export async function runSimpleSearch({ query, lang, filters: requestedFilters =
   const hasRequestedFilters = Object.values(filters).some(
     (value) => Array.isArray(value) && value.length > 0
   );
+  const hasUserFilters = Object.values(requestedFilters).some(
+    (value) => Array.isArray(value) && value.length > 0
+  );
   if (normalizedQuery && !mapped.karmaIds.length && !mapped.indicationIds.length && !hasRequestedFilters) {
+    const nameSearch = await searchHerbsByName({
+      query: normalizedQuery,
+      role,
+      limit,
+      offset,
+    });
+    if (nameSearch.results.length > 0) {
+      return {
+        results: nameSearch.results,
+        meta: {
+          dbDurationMs: 0,
+          unresolved: {},
+          activeFilterGroups: 0,
+          query: normalizedQuery,
+          matched_terms: mapped.matchedTerms,
+          unmatched_tokens: mapped.unmatchedTokens,
+          language,
+          displayLanguage,
+          note,
+          name_search: true,
+          ...nameSearch.meta,
+        },
+      };
+    }
+
+    const clinicalSearch = await searchHerbsByClinicalText({
+      query: normalizedQuery,
+      role,
+      limit,
+      offset,
+    });
+    if (clinicalSearch.results.length > 0) {
+      return {
+        results: clinicalSearch.results,
+        meta: {
+          dbDurationMs: 0,
+          unresolved: {},
+          activeFilterGroups: 0,
+          query: normalizedQuery,
+          matched_terms: mapped.matchedTerms,
+          unmatched_tokens: mapped.unmatchedTokens,
+          language,
+          displayLanguage,
+          note,
+          ...clinicalSearch.meta,
+        },
+      };
+    }
+
     return {
       results: [],
       meta: {
@@ -104,7 +159,7 @@ export async function runSimpleSearch({ query, lang, filters: requestedFilters =
         unmatched_tokens: mapped.unmatchedTokens,
         language,
         displayLanguage,
-        note,
+        note: note || 'No herbs matched this description in the current database. Try different words or use Detailed Search.',
       },
     };
   }
@@ -112,12 +167,142 @@ export async function runSimpleSearch({ query, lang, filters: requestedFilters =
   const searchResult = await runDetailedSearch({
     filters,
     role,
-    limit,
-    offset,
+    limit: Math.max(limit, 50),
+    offset: 0,
   });
 
+  const shouldBlendClinical =
+    normalizedQuery &&
+    !hasUserFilters &&
+    (mapped.unmatchedTokens.length > 0 ||
+      mapped.matchedTerms.some((term) => term.matchType === 'english_symptom_hint'));
+
+  if (shouldBlendClinical) {
+    const clinicalSearch = await searchHerbsByClinicalText({
+      query: normalizedQuery,
+      role,
+      limit: Math.max(limit, 50),
+      offset: 0,
+    });
+    const byId = new Map(searchResult.results.map((row) => [row.id, row]));
+    for (const row of clinicalSearch.results) {
+      if (!byId.has(row.id)) byId.set(row.id, row);
+    }
+    const merged = [...byId.values()].sort((a, b) => b.matchPercentage - a.matchPercentage);
+    if (merged.length > 0) {
+      return {
+        results: merged.slice(offset, offset + limit),
+        meta: {
+          ...searchResult.meta,
+          query,
+          matched_terms: mapped.matchedTerms,
+          unmatched_tokens: mapped.unmatchedTokens,
+          language,
+          displayLanguage,
+          note,
+          clinical_text_search: true,
+          blended_with_detailed: true,
+        },
+      };
+    }
+  }
+
+  if (searchResult.results.length === 0 && normalizedQuery) {
+    const nameSearch = await searchHerbsByName({
+      query: normalizedQuery,
+      role,
+      limit,
+      offset,
+    });
+    if (nameSearch.results.length > 0) {
+      return {
+        results: nameSearch.results,
+        meta: {
+          dbDurationMs: searchResult.meta.dbDurationMs,
+          unresolved: searchResult.meta.unresolved,
+          activeFilterGroups: searchResult.meta.activeFilterGroups,
+          query: normalizedQuery,
+          matched_terms: mapped.matchedTerms,
+          unmatched_tokens: mapped.unmatchedTokens,
+          language,
+          displayLanguage,
+          note,
+          name_search: true,
+          ...nameSearch.meta,
+        },
+      };
+    }
+
+    const clinicalSearch = await searchHerbsByClinicalText({
+      query: normalizedQuery,
+      role,
+      limit,
+      offset,
+    });
+    if (clinicalSearch.results.length > 0) {
+      let clinicalResults = clinicalSearch.results;
+      if (normalizedQuery && clinicalResults.length > 0) {
+        try {
+          const boostMap = await getLearnedBoostsForQuery(normalizedQuery);
+          if (boostMap && boostMap.size > 0) {
+            clinicalResults = clinicalResults.map((herb) => {
+              const boost = boostMap.get(herb.id);
+              if (!boost) return herb;
+              const boostedScore = Math.min(100, Math.round(herb.matchPercentage + boost.relevanceBoost));
+              const breakdown = Array.isArray(herb.breakdown) ? [...herb.breakdown] : [];
+              breakdown.push({
+                parameter: 'self_learning_boost',
+                matched: true,
+                score: boost.relevanceBoost,
+                note: `Relevance boosted by Self-Learning AI Model (${Math.round(boost.confidence * 100)}% confidence)`,
+              });
+              return { ...herb, matchPercentage: boostedScore, breakdown };
+            }).sort((a, b) => b.matchPercentage - a.matchPercentage);
+          }
+        } catch { /* non-blocking */ }
+      }
+      return {
+        results: clinicalResults.slice(offset, offset + limit),
+        meta: {
+          dbDurationMs: searchResult.meta.dbDurationMs,
+          unresolved: searchResult.meta.unresolved,
+          activeFilterGroups: searchResult.meta.activeFilterGroups,
+          query: normalizedQuery,
+          matched_terms: mapped.matchedTerms,
+          unmatched_tokens: mapped.unmatchedTokens,
+          language,
+          displayLanguage,
+          note,
+          ...clinicalSearch.meta,
+        },
+      };
+    }
+  }
+
+  let finalResults = searchResult.results;
+  if (normalizedQuery && finalResults.length > 0) {
+    try {
+      const boostMap = await getLearnedBoostsForQuery(normalizedQuery);
+      if (boostMap && boostMap.size > 0) {
+        finalResults = finalResults.map((herb) => {
+          const boost = boostMap.get(herb.id);
+          if (!boost) return herb;
+          const boostedScore = Math.min(100, Math.round(herb.matchPercentage + boost.relevanceBoost));
+          const breakdown = Array.isArray(herb.breakdown) ? [...herb.breakdown] : [];
+          breakdown.push({
+            parameter: 'self_learning_boost',
+            matched: true,
+            score: boost.relevanceBoost,
+            note: `Relevance boosted by Self-Learning AI Model (${Math.round(boost.confidence * 100)}% confidence)`,
+          });
+          return { ...herb, matchPercentage: boostedScore, breakdown };
+        }).sort((a, b) => b.matchPercentage - a.matchPercentage);
+      }
+    } catch { /* non-blocking */ }
+  }
+
   return {
-    ...searchResult,
+    results: finalResults.slice(offset, offset + limit),
     meta: {
       ...searchResult.meta,
       query,
@@ -135,6 +320,7 @@ function formatSearchRow(row) {
     id: row.id,
     code: row.code,
     englishName: row.english_name,
+    sanskritName: row.sanskrit_name,
     botanicalName: row.botanical_name,
     partUsed: row.part_used,
     prabhava: row.prabhava,

@@ -1,13 +1,20 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { submitSupportRequest } from "../api/support"
+import { USE_API } from "../api/client"
+import { localizeApiError } from "../i18n/localizeApiError"
 
 import DashboardNavbar from "../components/DashboardNavbar"
+import PageBack from "../components/PageBack"
 import Sidebar from "../components/Sidebar"
 
 import "../styles/SettingsPage.css"
 import "../styles/HelpSupportPage.css"
+import { buildHelpFaqs, buildHelpTopics } from "../i18n/helpTopics"
+import { useUiText } from "../i18n/useUiText"
 
 function HelpSupportPage() {
+  const t = useUiText()
   const navigate = useNavigate()
 
   const [openFaq, setOpenFaq] = useState(null)
@@ -19,6 +26,8 @@ function HelpSupportPage() {
   const [supportTopic, setSupportTopic] = useState("")
   const [supportMessage, setSupportMessage] = useState("")
   const [supportSubmitted, setSupportSubmitted] = useState(false)
+  const [supportBusy, setSupportBusy] = useState(false)
+  const [supportError, setSupportError] = useState("")
 
   const closeHelp = () => {
     navigate("/doctor")
@@ -32,154 +41,13 @@ function HelpSupportPage() {
      QUICK HELP CONTENT
   ========================================= */
 
-  const helpTopics = {
-    search: {
-      icon: "🔎",
-      title: "Search Guide",
-      description:
-        "Learn how Simple Search and Detailed Search help you find relevant Ayurvedic herbs.",
-
-      sections: [
-        {
-          title: "Simple Search",
-          text:
-            "Describe what you are looking for using natural language. The platform uses your requirement to identify herbs that may be relevant to your search."
-        },
-        {
-          title: "Detailed Search",
-          text:
-            "Detailed Search allows you to specify Ayurvedic attributes such as Rasa, Guna, Virya, Vipaka, Dosha, Srotas and other properties."
-        },
-        {
-          title: "When should I use it?",
-          text:
-            "Use Simple Search when you want a quick exploration. Use Detailed Search when you need more control over the Ayurvedic criteria."
-        }
-      ]
-    },
-
-    herbs: {
-      icon: "🌿",
-      title: "Herb Profiles",
-      description:
-        "Understand the information available on an Ayurvedic herb profile.",
-
-      sections: [
-        {
-          title: "Herb information",
-          text:
-            "Each herb profile provides information that helps you understand the herb and its Ayurvedic properties."
-        },
-        {
-          title: "Ayurvedic attributes",
-          text:
-            "Depending on the herb, the profile can include properties such as Rasa, Guna, Virya, Vipaka, Prabhava, Dosha, Dhatu, Mala, Srotas and Karma."
-        },
-        {
-          title: "Saving herbs",
-          text:
-            "Use the save or favorite option on a herb profile to keep an herb easily accessible for later reference."
-        }
-      ]
-    },
-
-    results: {
-      icon: "📊",
-      title: "Understanding Results",
-      description:
-        "Learn how to understand ranking, match percentage and herb comparisons.",
-
-      sections: [
-        {
-          title: "Herb ranking",
-          text:
-            "Herbs are ranked according to how closely their Ayurvedic properties match the criteria selected in your search."
-        },
-        {
-          title: "Match percentage",
-          text:
-            "The match percentage represents how closely a herb matches the requirements and attributes specified in your search."
-        },
-        {
-          title: "Compare herbs",
-          text:
-            "You can select herbs and use the Compare feature to view their properties side by side."
-        }
-      ]
-    },
-
-    billing: {
-      icon: "💳",
-      title: "Plans & Billing",
-      description:
-        "Understand the Free, Pro and Max plans available on the platform.",
-
-      sections: [
-        {
-          title: "Free plan",
-          text:
-            "The Free plan provides basic herb search, Simple and Detailed Search, herb profile access and the ability to save selected herbs."
-        },
-        {
-          title: "Pro plan",
-          text:
-            "The Pro plan provides additional capabilities such as advanced search, detailed ranking insights, advanced herb comparisons and an expanded research library."
-        },
-        {
-          title: "Max plan",
-          text:
-            "The Max plan provides additional capabilities such as higher search limits, extended clinical insights, advanced research tools and priority feature access."
-        },
-        {
-          title: "Payment",
-          text:
-            "Online payment functionality will be connected to the backend. The current interface allows users to select a plan and proceed through the payment UI."
-        }
-      ]
-    }
-  }
+  const helpTopics = buildHelpTopics(t)
 
   /* =========================================
      FAQ
   ========================================= */
 
-  const faqs = [
-    {
-      question: "How does Simple Search work?",
-      answer:
-        "Simple Search allows you to describe your requirement in natural language. Herb Intelligence uses the information provided to identify relevant Ayurvedic herbs."
-    },
-    {
-      question: "What is Detailed Search?",
-      answer:
-        "Detailed Search allows you to specify Ayurvedic attributes such as Rasa, Guna, Virya, Vipaka, Dosha, Srotas and other properties."
-    },
-    {
-      question: "How does herb ranking work?",
-      answer:
-        "Herbs are ranked according to how closely their Ayurvedic properties match the criteria selected in your search."
-    },
-    {
-      question: "What does the match percentage mean?",
-      answer:
-        "The match percentage represents how closely a herb matches the requirements and attributes specified in your search."
-    },
-    {
-      question: "Can I compare multiple herbs?",
-      answer:
-        "Yes. You can select herbs and use the Compare feature to view their properties side by side."
-    },
-    {
-      question: "How can I save a herb?",
-      answer:
-        "Use the save or favorite option available on a herb profile to keep the herb easily accessible later."
-    },
-    {
-      question: "What are Pro and Max plans?",
-      answer:
-        "Pro and Max plans provide additional search, comparison and research capabilities. You can view the available plans from the Upgrade Plan section."
-    }
-  ]
+  const faqs = buildHelpFaqs(t)
 
   const filteredFaqs = faqs.filter((faq) => {
     const search = searchText.toLowerCase().trim()
@@ -216,13 +84,29 @@ function HelpSupportPage() {
     setSupportSubmitted(false)
   }
 
-  const handleSubmitSupport = (event) => {
+  const handleSubmitSupport = async (event) => {
     event.preventDefault()
+    setSupportError("")
 
-    setSupportSubmitted(true)
+    if (!USE_API) {
+      setSupportError(t("helpContactApiRequired"))
+      return
+    }
 
-    setSupportTopic("")
-    setSupportMessage("")
+    setSupportBusy(true)
+    try {
+      await submitSupportRequest({
+        topic: supportTopic,
+        message: supportMessage.trim(),
+      })
+      setSupportSubmitted(true)
+      setSupportTopic("")
+      setSupportMessage("")
+    } catch (err) {
+      setSupportError(localizeApiError(t, err.message) || t("helpContactSubmitError"))
+    } finally {
+      setSupportBusy(false)
+    }
   }
 
   return (
@@ -241,13 +125,14 @@ function HelpSupportPage() {
           <div className="settings-overlay">
 
             <div className="help-support-modal">
+              <PageBack fallback="/doctor" />
 
               {/* CLOSE */}
               <button
                 type="button"
                 className="settings-close-button"
                 onClick={closeHelp}
-                aria-label="Close help and support"
+                aria-label={t("helpCloseAria")}
               >
                 ×
               </button>
@@ -266,7 +151,7 @@ function HelpSupportPage() {
                     className="help-back-button"
                     onClick={handleBackToHelp}
                   >
-                    ← Back to Help
+                    ← {t("helpBackToHelp")}
                   </button>
 
                   <div className="help-detail-header">
@@ -329,7 +214,7 @@ function HelpSupportPage() {
                       className="help-contact-button"
                       onClick={handleOpenContact}
                     >
-                      Contact Support
+                      {t("helpContactSupport")}
                       <span>→</span>
                     </button>
 
@@ -350,7 +235,7 @@ function HelpSupportPage() {
                     className="help-back-button"
                     onClick={handleBackToHelp}
                   >
-                    ← Back to Help
+                    ← {t("helpBackToHelp")}
                   </button>
 
 
@@ -366,22 +251,27 @@ function HelpSupportPage() {
                         <div>
 
                           <p className="help-label">
-                            SUPPORT
+                            {t("helpSupportLabel")}
                           </p>
 
                           <h1>
-                            Contact Support
+                            {t("helpContactTitle")}
                           </h1>
 
                           <p>
-                            Tell us what you need help with and
-                            our support feature will handle your request.
+                            {t("helpContactIntro")}
                           </p>
 
                         </div>
 
                       </div>
 
+
+                      {supportError && (
+                        <p className="help-form-error" role="alert">
+                          {supportError}
+                        </p>
+                      )}
 
                       <form
                         className="help-contact-form"
@@ -391,7 +281,7 @@ function HelpSupportPage() {
                         <div className="help-form-group">
 
                           <label htmlFor="support-topic">
-                            What do you need help with?
+                            {t("helpContactTopicLabel")}
                           </label>
 
                           <select
@@ -404,31 +294,31 @@ function HelpSupportPage() {
                           >
 
                             <option value="">
-                              Select a topic
+                              {t("helpContactTopicPlaceholder")}
                             </option>
 
                             <option value="search">
-                              Search
+                              {t("helpContactTopicSearch")}
                             </option>
 
                             <option value="herb">
-                              Herb information
+                              {t("helpContactTopicHerb")}
                             </option>
 
                             <option value="account">
-                              Account
+                              {t("helpContactTopicAccount")}
                             </option>
 
                             <option value="billing">
-                              Plans & billing
+                              {t("helpContactTopicBilling")}
                             </option>
 
                             <option value="technical">
-                              Technical issue
+                              {t("helpContactTopicTechnical")}
                             </option>
 
                             <option value="other">
-                              Other
+                              {t("helpContactTopicOther")}
                             </option>
 
                           </select>
@@ -439,13 +329,13 @@ function HelpSupportPage() {
                         <div className="help-form-group">
 
                           <label htmlFor="support-message">
-                            Describe your issue
+                            {t("helpContactMessageLabel")}
                           </label>
 
                           <textarea
                             id="support-message"
                             rows="5"
-                            placeholder="Describe your question or issue..."
+                            placeholder={t("helpContactMessagePlaceholder")}
                             value={supportMessage}
                             onChange={(event) =>
                               setSupportMessage(event.target.value)
@@ -459,8 +349,9 @@ function HelpSupportPage() {
                         <button
                           type="submit"
                           className="help-submit-button"
+                          disabled={supportBusy}
                         >
-                          Send Support Request
+                          {supportBusy ? t("helpContactSubmitting") : t("helpContactSubmit")}
                           <span>→</span>
                         </button>
 
@@ -477,17 +368,15 @@ function HelpSupportPage() {
                       </div>
 
                       <h2>
-                        Support request received
+                        {t("helpContactSuccessTitle")}
                       </h2>
 
                       <p>
-                        Your support request has been recorded
-                        in the current interface.
+                        {t("helpContactSuccessBody")}
                       </p>
 
                       <p className="help-success-note">
-                        Actual support requests will be connected
-                        to the backend later.
+                        {t("helpContactSuccessNote")}
                       </p>
 
                       <button
@@ -495,7 +384,7 @@ function HelpSupportPage() {
                         className="help-back-home-button"
                         onClick={handleBackToHelp}
                       >
-                        Back to Help
+                        {t("helpBackToHelp")}
                       </button>
 
                     </div>
@@ -517,7 +406,7 @@ function HelpSupportPage() {
                   <div className="help-header">
 
                     <p className="help-label">
-                      HELP CENTER
+                      {t("helpCenterLabel")}
                     </p>
 
                     <h1>
@@ -542,7 +431,7 @@ function HelpSupportPage() {
 
                     <input
                       type="text"
-                      placeholder="Search help articles..."
+                      placeholder={t("helpSearchPlaceholder")}
                       value={searchText}
                       onChange={(event) =>
                         setSearchText(event.target.value)
@@ -555,7 +444,7 @@ function HelpSupportPage() {
                         type="button"
                         className="help-search-clear"
                         onClick={() => setSearchText("")}
-                        aria-label="Clear search"
+                        aria-label={t("helpClearSearchAria")}
                       >
                         ×
                       </button>
@@ -846,7 +735,7 @@ function HelpSupportPage() {
                       className="help-contact-button"
                       onClick={handleOpenContact}
                     >
-                      Contact Support
+                      {t("helpContactSupport")}
                       <span>→</span>
                     </button>
 
@@ -866,7 +755,7 @@ function HelpSupportPage() {
                     </span>
 
                     <span>
-                      Help & Support
+                      {t("helpTitle")}
                     </span>
 
                   </div>

@@ -85,12 +85,6 @@ function AdminProfileDropdown({
       return
     }
 
-    if (option === "Upgrade Plan") {
-      navigate("/admin/upgrade-plan")
-      return
-    }
-
-
     // Settings
     if (option === "Settings") {
       navigate("/admin/settings")
@@ -105,23 +99,9 @@ function AdminProfileDropdown({
     }
 
 
-    // Upgrade Plan
-    if (option === "Upgrade Plan") {
-      navigate("/admin/upgrade")
-      return
-    }
-
-
     // Help Center
     if (option === "Help Center") {
       navigate("/admin/help-support")
-      return
-    }
-
-
-    // Privacy & Security
-    if (option === "Privacy & Security") {
-      navigate("/admin/privacy-security")
       return
     }
 
@@ -242,19 +222,6 @@ function AdminProfileDropdown({
           </button>
 
 
-          {/* UPGRADE PLAN */}
-
-          <button
-            type="button"
-            onClick={() =>
-              handleOptionClick("Upgrade Plan")
-            }
-          >
-            <span>✦</span>
-            <span>Upgrade Plan</span>
-          </button>
-
-
           {/* HELP CENTER */}
 
           <button
@@ -265,21 +232,6 @@ function AdminProfileDropdown({
           >
             <span>?</span>
             <span>Help Center</span>
-          </button>
-
-
-          {/* PRIVACY & SECURITY */}
-
-          <button
-            type="button"
-            onClick={() =>
-              handleOptionClick(
-                "Privacy & Security"
-              )
-            }
-          >
-            <span>🔒</span>
-            <span>Privacy & Security</span>
           </button>
 
 

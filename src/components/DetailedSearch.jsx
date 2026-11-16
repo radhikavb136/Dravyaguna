@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { getFilterOptions } from "../api/vocabulary"
 import InfoIcon from "./InfoIcon"
+import InfoTooltip from "./InfoTooltip"
 import { USE_API } from "../api/client"
 import "../styles/DetailedSearch.css"
 
@@ -372,7 +373,10 @@ function DetailedSearch() {
             </button>
           </div>
 
-          <h2>Refine the herb profile</h2>
+          <h2>
+            Refine the herb profile
+            <InfoTooltip contentKey="advancedSearch" />
+          </h2>
 
           <p className="detailed-search-description">
             Choose as many parameters as needed. Results will be ranked
@@ -380,13 +384,16 @@ function DetailedSearch() {
           </p>
         </div>
 
-        <button
-          className="clear-all-button"
-          type="button"
-          onClick={handleClearAll}
-        >
-          Clear all
-        </button>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+          <button
+            className="clear-all-button"
+            type="button"
+            onClick={handleClearAll}
+          >
+            Clear all
+          </button>
+          <InfoTooltip contentKey="clearFilters" />
+        </div>
       </div>
 
       {USE_API && vocabularyLoading ? (
@@ -404,6 +411,7 @@ function DetailedSearch() {
           >
             <h3 className="parameter-title">
               {parameter.title}
+              <InfoTooltip vocabulary={parameter.vocabularyKey || parameter.title.toLowerCase()} />
             </h3>
 
             <fieldset className={`parameter-card ${parameter.disabled ? 'disabled' : ''}`}>

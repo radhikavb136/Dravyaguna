@@ -1,0 +1,23 @@
+.page-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 1rem;
+  padding: 0.35rem 0.65rem;
+  border: var(--dg-border-subtle, 1px solid rgba(38, 51, 43, 0.12));
+  border-radius: var(--dg-radius-sm, 6px);
+  background: #fff;
+  color: #26332b;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.page-back-button:hover {
+  background: #f3f6f2;
+}
+
+.page-back-icon {
+  font-size: 1rem;
+  line-height: 1;
+}

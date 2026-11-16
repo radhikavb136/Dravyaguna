@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { assert, assertEqual } from './lib/assert.js';
 import { BASE_URL } from './lib/http.js';
-import { defaultFrontendOrigins, parseFrontendOrigin } from '../src/config/env.js';
+import { defaultFrontendOrigins, env, parseFrontendOrigin } from '../src/config/env.js';
 
 export async function run() {
   assertEqual(
@@ -17,7 +17,8 @@ export async function run() {
     'development uses all four documented origins by default'
   );
 
-  for (const origin of defaultFrontendOrigins) {
+  const configuredOrigins = env.frontendOrigin.length ? env.frontendOrigin : defaultFrontendOrigins;
+  for (const origin of configuredOrigins) {
     const response = await fetch(`${BASE_URL}/api/health`, { headers: { Origin: origin } });
     assertEqual(response.headers.get('access-control-allow-origin'), origin, `allowed origin ${origin}`);
   }
@@ -26,6 +27,11 @@ export async function run() {
     headers: { Origin: 'http://untrusted.invalid' },
   });
   assertEqual(denied.headers.get('access-control-allow-origin'), null, 'disallowed origin gets no allow-origin header');
+
+  const healthPayload = await fetch(`${BASE_URL}/api/health`, {
+    headers: { Origin: configuredOrigins[0] || 'http://localhost:5180' },
+  }).then((response) => response.json());
+  assertEqual(typeof healthPayload.billingConfigured, 'boolean', 'health exposes billingConfigured without secrets');
 
   const preflight = await fetch(`${BASE_URL}/api/auth/login`, {
     method: 'OPTIONS',

@@ -1,14 +1,24 @@
 import { pool } from '../../db/pool.js';
 import { createTranslationProvider } from './translationProvider.js';
+import { SARVAM_HERB_FIELD_LANGUAGES } from './sarvamTranslate.js';
 
 const allowedFields = new Set(['description', 'prabhava', 'part_used']);
 const inFlight = new Map();
 
 export async function translateHerbFields(herb, targetLanguage, provider = createTranslationProvider()) {
   const fields = {};
+  const providerIsMock = provider?.name === 'mock';
   for (const fieldName of allowedFields) {
     const sourceText = herb[fieldName];
     if (!sourceText || targetLanguage === herb.original_language) continue;
+    if (!SARVAM_HERB_FIELD_LANGUAGES.has(targetLanguage)) {
+      fields[fieldName] = { text: sourceText, translation_unavailable: true };
+      continue;
+    }
+    if (providerIsMock) {
+      fields[fieldName] = { text: sourceText, translation_unavailable: true };
+      continue;
+    }
     if (sourceText.length > 2000) { fields[fieldName] = { text: sourceText, translation_unavailable: true }; continue; }
     const key = `${herb.id}:${fieldName}:${targetLanguage}`;
     const cached = await pool.query(

@@ -1,11 +1,25 @@
+import { useUiText } from "../i18n/useUiText"
+import NotificationBell from "./NotificationBell"
 
-function AdminNavbar() {
+function AdminNavbar({ onMobileMenuToggle }) {
+  const t = useUiText()
 
   return (
     <header className="admin-topbar">
 
+      {/* Mobile menu toggle */}
+      <button
+        className="admin-navbar-toggle"
+        onClick={onMobileMenuToggle}
+        aria-label="Toggle menu"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
       <span className="admin-topbar-title">
-        Admin Dashboard
+        {t("adminTopbarTitle")}
       </span>
 
       <div className="admin-topbar-actions">
@@ -19,20 +33,13 @@ function AdminNavbar() {
 
           <input
             type="text"
-            placeholder="Quick search..."
+            placeholder={t("adminQuickSearch")}
           />
 
         </div>
 
 
-        {/* Notification */}
-        <button
-          type="button"
-          className="admin-notification"
-        >
-          ♧
-          <span></span>
-        </button>
+        <NotificationBell className="admin-notification" />
 
       </div>
 

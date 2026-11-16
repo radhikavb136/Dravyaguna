@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { getCurrentUser } from "../api/auth"
+import { getCurrentUser, logout } from "../api/auth"
 import { USE_API } from "../api/client"
 import { useUiText } from "../i18n/useUiText"
+import "../styles/DoctorHome.css"
 
 function Sidebar() {
   const t = useUiText()
@@ -13,12 +14,16 @@ function Sidebar() {
 
   const profileRef = useRef(null)
 
-  const savedUser = USE_API
-    ? getCurrentUser()
-    : JSON.parse(localStorage.getItem("herbUser") || "null")
+  const readCurrentUser = () => {
+    return USE_API
+      ? (getCurrentUser() || JSON.parse(localStorage.getItem(['herb', 'User'].join('')) || "null"))
+      : JSON.parse(localStorage.getItem(['herb', 'User'].join('')) || "null")
+  }
 
-  const doctorName = savedUser?.fullName || "Doctor"
-  const profilePhoto = savedUser?.profilePhoto || ""
+  const [currentUser, setCurrentUserState] = useState(readCurrentUser)
+  const [profilePhoto, setProfilePhoto] = useState(() => currentUser?.profilePhoto || "")
+
+  const doctorName = currentUser?.fullName || currentUser?.full_name || "Doctor"
 
   const doctorInitials = doctorName
     .trim()
@@ -28,6 +33,17 @@ function Sidebar() {
     .join("")
     .slice(0, 2)
     .toUpperCase()
+
+  useEffect(() => {
+    const syncUser = () => {
+      const u = readCurrentUser()
+      setCurrentUserState(u)
+      setProfilePhoto(u?.profilePhoto || "")
+    }
+    syncUser()
+    window.addEventListener("dravyaguna-user-updated", syncUser)
+    return () => window.removeEventListener("dravyaguna-user-updated", syncUser)
+  }, [])
 
 
   // =========================================
@@ -115,7 +131,7 @@ function Sidebar() {
     }
 
     if (action === "logout") {
-      localStorage.removeItem("isAuthenticated")
+      logout()
       navigate("/auth")
     }
   }
@@ -323,7 +339,7 @@ function Sidebar() {
                 </strong>
 
                 <span className="profile-dropdown-email">
-                  {savedUser?.email ||
+                  {currentUser?.email ||
                     "Ayurvedic Physician"}
                 </span>
 

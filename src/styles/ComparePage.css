@@ -8,6 +8,35 @@
   color: #17352a;
 }
 
+.compare-error {
+  padding: 16px;
+  margin: 20px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.compare-error p {
+  margin: 0 0 12px 0;
+}
+
+.compare-error .retry-button {
+  padding: 8px 16px;
+  border: 1px solid #d97706;
+  border-radius: 4px;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.compare-error .retry-button:hover {
+  background: #d97706;
+}
+
 /* =========================================
    PAGE BODY
    ========================================= */

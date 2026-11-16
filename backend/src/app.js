@@ -17,6 +17,13 @@ import { accountRouter } from './routes/account.routes.js';
 import { explainRouter } from './routes/explain.routes.js';
 import { translationsRouter } from './routes/translations.routes.js';
 import { uploadRouter } from './routes/upload.routes.js';
+import { supportRouter } from './routes/support.routes.js';
+import { notificationsRouter } from './routes/notifications.routes.js';
+import { modelRouter } from './routes/model.routes.js';
+import { isStorageConfigured, missingStorageEnvVars } from './services/storage/storageConfig.js';
+import { isSmtpConfigured, missingSmtpEnvVars } from './services/auth/smtpConfig.js';
+import { isBillingConfigured } from './config/billingConfig.js';
+import { isLiveLlmConfigured, resolveConfiguredLlmProviderName } from './services/explain/llmProvider.js';
 
 export function createApp() {
   const app = express();
@@ -52,6 +59,15 @@ export function createApp() {
         database: 'ok',
         databaseEndpoint,
         loginRateLimitEnabled: process.env.DISABLE_RATE_LIMIT !== 'true',
+        passwordResetRateLimitEnabled: process.env.DISABLE_RATE_LIMIT !== 'true',
+        llmProvider: resolveConfiguredLlmProviderName(),
+        llmConfigured: isLiveLlmConfigured(),
+        translationProviderConfigured: Boolean(env.sarvamApiKey || env.googleTranslateApiKey || (env.azureTranslatorKey && env.azureTranslatorRegion)),
+        billingConfigured: isBillingConfigured(),
+        smtpConfigured: isSmtpConfigured(),
+        smtpMissingEnv: isSmtpConfigured() ? [] : missingSmtpEnvVars(),
+        storageConfigured: isStorageConfigured(),
+        storageMissingEnv: isStorageConfigured() ? [] : missingStorageEnvVars(),
       });
     } catch {
       res.status(503).json({ status: 'error', database: 'unavailable', databaseEndpoint });
@@ -71,6 +87,9 @@ export function createApp() {
   app.use('/api/vocabulary', vocabularyRouter);
   app.use('/api', adminRouter);
   app.use('/api', favoritesRouter);
+  app.use('/api', supportRouter);
+  app.use('/api/notifications', notificationsRouter);
+  app.use('/api/model', modelRouter);
 
   app.use(errorHandler);
 

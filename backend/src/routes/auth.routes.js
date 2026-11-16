@@ -2,17 +2,33 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { loginUser, registerUser } from '../services/auth/authService.js';
-import { requestPasswordReset, confirmPasswordReset } from '../services/auth/passwordResetService.js';
+import { requestPasswordReset, confirmPasswordReset, updatePasswordWithRecoverySession } from '../services/auth/passwordResetService.js';
+import { rateLimitClientKey } from '../middleware/rateLimitKey.js';
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: process.env.NODE_ENV === 'test' ? 500 : 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: rateLimitClientKey,
   skip: () => process.env.DISABLE_RATE_LIMIT === 'true',
 });
-const resetRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
-const resetConfirmLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
+const resetRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: rateLimitClientKey,
+  skip: () => process.env.DISABLE_RATE_LIMIT === 'true',
+});
+const resetConfirmLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: rateLimitClientKey,
+  skip: () => process.env.DISABLE_RATE_LIMIT === 'true',
+});
 
 const registerSchema = z.object({
   email: z.string().email(), password: z.string().min(10),
@@ -52,9 +68,17 @@ authRouter.post('/password-reset/request', resetRequestLimiter, async (req, res,
 
 authRouter.post('/password-reset/confirm', resetConfirmLimiter, async (req, res, next) => {
   try {
-    const body = z.object({ token: z.string().min(32).max(256), password: z.string().min(10) }).parse(req.body);
+    const body = z.object({ token: z.string().min(6).max(1024), password: z.string().min(10) }).parse(req.body);
     const changed = await confirmPasswordReset(body.token, body.password);
     if (!changed) return res.status(400).json({ error: 'Invalid or expired password reset token' });
+    res.json({ message: 'Password updated. Sign in with your new password.' });
+  } catch (error) { next(error); }
+});
+
+authRouter.post('/password-reset/update', resetConfirmLimiter, async (req, res, next) => {
+  try {
+    const body = z.object({ accessToken: z.string().min(10), password: z.string().min(10) }).parse(req.body);
+    await updatePasswordWithRecoverySession(body.accessToken, body.password);
     res.json({ message: 'Password updated. Sign in with your new password.' });
   } catch (error) { next(error); }
 });

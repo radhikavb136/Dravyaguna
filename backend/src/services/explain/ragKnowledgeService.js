@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { pool } from '../../db/pool.js';
+import { getHerbById } from '../herbs/herbService.js';
+import { canSeeDraftHerbs, clinicianVisibleStatuses } from '../../utils/roles.js';
 
 const MAX_CHUNK_CHARS = 1800;
 
@@ -150,9 +152,115 @@ export async function ingestKnowledgeDocument(client, document) {
   return { changed: true, chunks: document.chunks.length };
 }
 
+function herbRecordPayload(herb) {
+  return {
+    record_type: 'stored herb record',
+    code: herb.code,
+    status: herb.status,
+    english_name: herb.english_name,
+    sanskrit_name: herb.sanskrit_name,
+    botanical_name: herb.botanical_name,
+    local_names: herb.local_names,
+    family: herb.family,
+    part_used: herb.part_used,
+    description: herb.description,
+    prabhava: herb.prabhava,
+    rasa: herb.rasa,
+    guna: herb.guna,
+    virya: herb.virya,
+    vipaka: herb.vipaka,
+    dosha_actions: herb.dosha_actions,
+    dhatu: herb.dhatu,
+    mala: herb.mala,
+    srotas: herb.srotas,
+    karma: herb.karma,
+    indications: herb.indications,
+    references: herb.references,
+  };
+}
+
+export function herbRecordToEvidence(herb, relevance = 0.9) {
+  return {
+    content: JSON.stringify(herbRecordPayload(herb)),
+    relevance,
+    herb_id: herb.id,
+    herb_code: herb.code,
+    herb_name: herb.english_name,
+    source: {
+      identifier: `database:herb:${herb.code}`,
+      title: `Stored herb record: ${herb.english_name}`,
+      type: 'herb_record',
+      page: null,
+      section: 'Stored herb record',
+      metadata: { status: herb.status },
+    },
+    chunk_metadata: {},
+  };
+}
+
+async function retrieveHerbRecordEvidence({ searchText, role, herbId, limit, excludeHerbCodes }) {
+  const max = Math.min(Math.max(Number(limit) || 5, 1), 10);
+  if (max <= 0) return [];
+  if (herbId) {
+    const herb = await getHerbById(herbId, role);
+    if (!herb || excludeHerbCodes.has(herb.code)) return [];
+    return [herbRecordToEvidence(herb, 1)];
+  }
+
+  const normalized = searchText.trim().toLowerCase();
+  if (normalized.length < 2) return [];
+
+  const tokens = normalized
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length > 2)
+    .sort((left, right) => right.length - left.length);
+  const stopTokens = new Set([
+    'what', 'when', 'where', 'which', 'this', 'that', 'with', 'from', 'about', 'does', 'how', 'why',
+    'the', 'and', 'for', 'are', 'can', 'you', 'use', 'herb', 'tell', 'please', 'according', 'record', 'stored',
+  ]);
+  const candidates = [...new Set([normalized, ...tokens])].filter(
+    (candidate) => candidate.length >= 3 && !stopTokens.has(candidate)
+  );
+  if (!candidates.length) return [];
+
+  const statuses = canSeeDraftHerbs(role)
+    ? ['draft', 'reviewed', 'verified']
+    : clinicianVisibleStatuses();
+
+  const evidence = [];
+  for (const candidate of candidates) {
+    if (evidence.length >= max) break;
+    const { rows } = await pool.query(
+      `SELECT id
+       FROM herbs
+       WHERE status = ANY($1::herb_status[])
+         AND (
+           lower(english_name) = $2
+           OR lower(english_name) LIKE '%' || $2 || '%'
+           OR lower(coalesce(botanical_name, '')) LIKE '%' || $2 || '%'
+           OR lower(coalesce(sanskrit_name, '')) LIKE '%' || $2 || '%'
+           OR lower(coalesce(local_name, '')) LIKE '%' || $2 || '%'
+           OR lower(code) = $2
+         )
+       ORDER BY CASE WHEN lower(english_name) = $2 THEN 0 ELSE 1 END, english_name
+       LIMIT $3`,
+      [statuses, candidate, max + excludeHerbCodes.size]
+    );
+    for (const row of rows) {
+      const herb = await getHerbById(row.id, role);
+      if (!herb || excludeHerbCodes.has(herb.code)) continue;
+      excludeHerbCodes.add(herb.code);
+      evidence.push(herbRecordToEvidence(herb));
+      if (evidence.length >= max) break;
+    }
+  }
+  return evidence;
+}
+
 export async function retrieveKnowledge({ question, role, herbId = null, limit = 5 }) {
   const searchText = String(question || '').trim().slice(0, 500);
   if (!searchText) return [];
+  const maxResults = Math.min(Math.max(Number(limit) || 5, 1), 10);
   const { rows } = await pool.query(
     `WITH terms AS (
        SELECT DISTINCT token
@@ -182,9 +290,9 @@ export async function retrieveKnowledge({ question, role, herbId = null, limit =
        AND (d.metadata->'allowed_roles' IS NULL OR d.metadata->'allowed_roles' = '[]'::jsonb OR d.metadata->'allowed_roles' ? $3)
      ORDER BY relevance DESC, d.title, c.chunk_index
      LIMIT $4`,
-    [searchText, herbId, role || 'clinician', Math.min(Math.max(Number(limit) || 5, 1), 10)]
+    [searchText, herbId, role || 'clinician', maxResults]
   );
-  return rows.map((row) => ({
+  const chunkEvidence = rows.map((row) => ({
     content: row.content,
     relevance: Number(row.relevance),
     herb_id: row.herb_id,
@@ -200,6 +308,19 @@ export async function retrieveKnowledge({ question, role, herbId = null, limit =
     },
     chunk_metadata: row.chunk_metadata,
   }));
+
+  const seenHerbCodes = new Set(chunkEvidence.map((item) => item.herb_code).filter(Boolean));
+  const herbEvidence = await retrieveHerbRecordEvidence({
+    searchText,
+    role: role || 'clinician',
+    herbId,
+    limit: maxResults - chunkEvidence.length,
+    excludeHerbCodes: seenHerbCodes,
+  });
+
+  return [...chunkEvidence, ...herbEvidence]
+    .sort((left, right) => right.relevance - left.relevance)
+    .slice(0, maxResults);
 }
 
 export function digest(value) {

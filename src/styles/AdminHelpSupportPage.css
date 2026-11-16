@@ -1,0 +1,467 @@
+/* =========================================
+   ADMIN HELP & SUPPORT PAGE
+   ========================================= */
+
+.help-support-page {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.help-support-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* =========================================
+   HEADER
+   ========================================= */
+
+.help-support-header {
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e3e0d9;
+}
+
+.help-support-header h1 {
+  margin: 0 0 8px;
+  color: #26332b;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.help-support-header p {
+  margin: 0;
+  color: #68746c;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* =========================================
+   QUICK HELP TOPICS
+   ========================================= */
+
+.help-topics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.help-topic-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #d9d5cd;
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.help-topic-card:hover {
+  border-color: #a8b8a8;
+  box-shadow: 0 2px 8px rgba(38, 51, 43, 0.08);
+}
+
+.help-topic-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.help-topic-card h3 {
+  margin: 0;
+  color: #26332b;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.help-topic-card p {
+  margin: 0;
+  color: #68746c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* =========================================
+   FAQ SECTION
+   ========================================= */
+
+.help-faq-section {
+  margin-bottom: 32px;
+  padding: 24px;
+  border: 1px solid #d9d5cd;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.help-faq-section h2 {
+  margin: 0 0 16px;
+  color: #26332b;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.help-search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid #d9d5cd;
+  border-radius: 6px;
+  background: #faf9f6;
+  margin-bottom: 20px;
+}
+
+.help-search-box > span {
+  color: #879089;
+  font-size: 16px;
+}
+
+.help-search-box input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #26332b;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.help-search-box input::placeholder {
+  color: #a0a7a1;
+}
+
+.help-faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.help-faq-item {
+  border: 1px solid #e6e3dc;
+  border-radius: 6px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.help-faq-question {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  color: #26332b;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.help-faq-question:hover {
+  background: #faf9f6;
+}
+
+.help-faq-toggle {
+  font-size: 18px;
+  color: #68746c;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.help-faq-answer {
+  padding: 0 16px 16px;
+  border-top: 1px solid #e6e3dc;
+}
+
+.help-faq-answer p {
+  margin: 14px 0 0;
+  color: #4e5b52;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.help-no-results {
+  padding: 20px;
+  text-align: center;
+  color: #68746c;
+  font-size: 14px;
+}
+
+/* =========================================
+   CONTACT SECTION
+   ========================================= */
+
+.help-contact-section {
+  padding: 24px;
+  border: 1px solid #d9d5cd;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.help-contact-section h2 {
+  margin: 0 0 8px;
+  color: #26332b;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.help-contact-section p {
+  margin: 0 0 16px;
+  color: #68746c;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.help-contact-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  background: #183f26;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.help-contact-button:hover {
+  background: #245636;
+}
+
+.help-contact-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================================
+   TOPIC DETAIL
+   ========================================= */
+
+.help-topic-detail {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.help-back-button {
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+  color: #445148;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.help-back-button:hover {
+  color: #183f26;
+}
+
+.help-topic-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e3e0d9;
+}
+
+.help-topic-detail-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.help-topic-detail-header h2 {
+  margin: 0;
+  color: #26332b;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.help-topic-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.help-topic-section h3 {
+  margin: 0 0 8px;
+  color: #26332b;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.help-topic-section p {
+  margin: 0 0 12px;
+  color: #4e5b52;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.help-topic-steps {
+  margin: 0;
+  padding-left: 20px;
+  color: #4e5b52;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.help-topic-steps li {
+  margin-bottom: 8px;
+}
+
+/* =========================================
+   CONTACT FORM
+   ========================================= */
+
+.help-contact-form-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.help-contact-form {
+  padding: 24px;
+  border: 1px solid #d9d5cd;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.help-contact-form h2 {
+  margin: 0 0 8px;
+  color: #26332b;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.help-contact-form p {
+  margin: 0 0 20px;
+  color: #68746c;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.help-form-field {
+  margin-bottom: 16px;
+}
+
+.help-form-field label {
+  display: block;
+  margin-bottom: 6px;
+  color: #4f5d4f;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.help-form-field select,
+.help-form-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dfe5dc;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #273027;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.help-form-field select:focus,
+.help-form-field textarea:focus {
+  outline: none;
+  border-color: #7c9275;
+  box-shadow: 0 0 0 3px rgba(124, 146, 117, 0.12);
+}
+
+.help-form-field textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.help-contact-error {
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 14px;
+}
+
+.help-contact-success {
+  padding: 32px;
+  text-align: center;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+}
+
+.help-success-icon {
+  display: inline-block;
+  width: 48px;
+  height: 48px;
+  line-height: 48px;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: #bbf7d0;
+  color: #166534;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.help-contact-success h2 {
+  margin: 0 0 8px;
+  color: #166534;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.help-contact-success p {
+  margin: 0 0 20px;
+  color: #166534;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* =========================================
+   RESPONSIVE
+   ========================================= */
+
+@media (max-width: 768px) {
+  .help-support-container {
+    padding: 0 12px;
+  }
+
+  .help-support-header h1 {
+    font-size: 24px;
+  }
+
+  .help-topics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .help-faq-section,
+  .help-contact-section {
+    padding: 16px;
+  }
+
+  .help-topic-detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .help-contact-form {
+    padding: 16px;
+  }
+}

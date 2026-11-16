@@ -13,7 +13,7 @@
   /* =========================================================
      PAGE HEADER
      ========================================================= */
-  
+
   .vocabulary-page-header {
     display: flex;
     align-items: flex-start;
@@ -21,7 +21,7 @@
     gap: 24px;
     margin-bottom: 24px;
   }
-  
+
   .vocabulary-label {
     margin: 0 0 7px;
     color: #718078;
@@ -29,7 +29,7 @@
     font-weight: 700;
     letter-spacing: 0.09em;
   }
-  
+
   .vocabulary-page-header h1 {
     margin: 0;
     color: #17251d;
@@ -38,12 +38,36 @@
     font-weight: 600;
     line-height: 1.2;
   }
-  
+
   .vocabulary-description {
     margin: 8px 0 0;
     color: #69746d;
     font-size: 14px;
     line-height: 1.5;
+  }
+
+  /* =========================================================
+     ALERT BANNERS
+     ========================================================= */
+
+  .vocab-alert {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .vocab-alert-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  .vocab-alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
   }
   
   

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { getAccount, updateAccountPreferences } from "../api/account"
-import { setInterfaceLanguage } from "../i18n/useUiText"
+import { setInterfaceLanguage, useUiText } from "../i18n/useUiText"
 
 import "../styles/AdminLanguagePage.css"
 
 function AdminLanguagePage() {
+  const t = useUiText()
   const navigate = useNavigate()
 
   const [selectedLanguage, setSelectedLanguage] =
@@ -73,7 +74,7 @@ function AdminLanguagePage() {
     }
   ]
 
-  if (loading) return <p role="status">Loading language preference...</p>
+  if (loading) return <p role="status">{t("languagePageLoading")}</p>
 
   return (
     <div className="admin-language-overlay">

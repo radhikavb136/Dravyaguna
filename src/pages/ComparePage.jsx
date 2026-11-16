@@ -2,19 +2,28 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 import DashboardNavbar from "../components/DashboardNavbar"
+import PageBack from "../components/PageBack"
 import Sidebar from "../components/Sidebar"
 import { USE_API } from "../api/client"
 import { getHerbById } from "../api/herbs"
 
+import { localizeApiError } from "../i18n/localizeApiError"
+import { useCurrentLanguage, useUiText } from "../i18n/useUiText"
+import { getHerbDisplayName, getHerbSecondaryName } from "../utils/herbName"
+import InfoTooltip from "../components/InfoTooltip"
 import "../styles/ComparePage.css"
 
 const MAX_COMPARE_HERBS = 4
 
 function ComparePage() {
+  const t = useUiText()
+  const currentLanguage = useCurrentLanguage()
   const navigate = useNavigate()
 
   const [selectedHerbs, setSelectedHerbs] = useState([])
   const [compareError, setCompareError] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [retryCount, setRetryCount] = useState(0)
 
   const persistCompareIds = (herbs) => {
     const ids = herbs.map((herb) => herb.id).filter(Boolean)
@@ -23,6 +32,10 @@ function ComparePage() {
     } else {
       localStorage.setItem("selectedCompareHerbs", JSON.stringify(ids))
     }
+  }
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1)
   }
 
   /*
@@ -39,6 +52,7 @@ function ComparePage() {
 
     if (!savedHerbs) {
       setSelectedHerbs([])
+      setLoading(false)
       return
     }
 
@@ -47,6 +61,7 @@ function ComparePage() {
 
       if (!Array.isArray(parsedHerbs)) {
         setSelectedHerbs([])
+        setLoading(false)
         return
       }
 
@@ -54,20 +69,70 @@ function ComparePage() {
         .map((item) => (item && typeof item === "object" ? item.id : item))
         .filter(Boolean)
 
+      if (ids.length === 0) {
+        setSelectedHerbs([])
+        setLoading(false)
+        return
+      }
+
       if (!USE_API) {
         setSelectedHerbs(parsedHerbs)
+        setLoading(false)
         return
       }
 
       persistCompareIds(ids.map((id) => ({ id })))
       setCompareError(null)
-      Promise.all(ids.map((id) => getHerbById(id)))
-        .then((herbs) => setSelectedHerbs(herbs.filter(Boolean)))
-        .catch((error) => {
+      setLoading(true)
+      
+      // Add retry logic for transient failures
+      const loadHerbsWithRetry = async (retryAttempt = 0) => {
+        try {
+          const results = await Promise.allSettled(ids.map((id) => getHerbById(id)))
+          const loadedHerbs = []
+          let hasNetworkOrServerError = false
+
+          results.forEach((res) => {
+            if (res.status === "fulfilled" && res.value) {
+              loadedHerbs.push(res.value)
+            } else {
+              const err = res.reason
+              const status = err?.status
+              if (!status || status >= 500 || status === 429) {
+                hasNetworkOrServerError = true
+              }
+            }
+          })
+
+          if (hasNetworkOrServerError && loadedHerbs.length === 0 && retryAttempt < 1) {
+            setTimeout(() => loadHerbsWithRetry(retryAttempt + 1), 500)
+            return
+          }
+
+          if (loadedHerbs.length > 0) {
+            setSelectedHerbs(loadedHerbs)
+            persistCompareIds(loadedHerbs)
+            setCompareError(null)
+            setLoading(false)
+          } else if (hasNetworkOrServerError) {
+            setCompareError(localizeApiError(t, t("compareLoadError")))
+            setSelectedHerbs([])
+            setLoading(false)
+          } else {
+            localStorage.removeItem("selectedCompareHerbs")
+            setSelectedHerbs([])
+            setCompareError(null)
+            setLoading(false)
+          }
+        } catch (error) {
           console.error("Unable to load comparison herbs:", error)
-          setCompareError("Failed to load comparison herbs from the API")
+          setCompareError(localizeApiError(t, t("compareLoadError")))
           setSelectedHerbs([])
-        })
+          setLoading(false)
+        }
+      }
+      
+      loadHerbsWithRetry()
     } catch (error) {
       console.error(
         "Unable to load comparison herbs:",
@@ -76,7 +141,7 @@ function ComparePage() {
 
       setSelectedHerbs([])
     }
-  }, [])
+  }, [retryCount])
 
   /*
     =========================================
@@ -323,8 +388,31 @@ function ComparePage() {
     return formatArray(names)
   }
 
+  if (loading) {
+    return <p role="status">{t("loading") || "Loading..."}</p>
+  }
+
   if (compareError) {
-    return <p role="alert">{compareError}</p>
+    return (
+      <div className="compare-error">
+        <p role="alert">{compareError}</p>
+        <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "1rem" }}>
+          <button type="button" onClick={handleRetry} className="retry-button">
+            Retry
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              clearComparison()
+              setCompareError(null)
+            }}
+            className="retry-button"
+          >
+            {t("compareEmptyButton") || "Back to Herb Library"}
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -345,15 +433,17 @@ function ComparePage() {
                 ========================================= */}
 
             <section className="compare-header">
+              <PageBack fallback="/doctor" />
 
               <div>
 
                 <p className="compare-breadcrumb">
-                  WORKSPACE / COMPARE
+                  {t("compareBreadcrumb")}
                 </p>
 
                 <h1>
-                  Compare herbs
+                  {t("compare")}
+                  <InfoTooltip contentKey="compareHerbs" />
                 </h1>
 
               </div>
@@ -363,7 +453,7 @@ function ComparePage() {
                 type="button"
                 onClick={handleAddHerb}
               >
-                + Add herb
+                {t("compareAddHerb")}
               </button>
 
             </section>
@@ -380,7 +470,7 @@ function ComparePage() {
                 <div>
 
                   <p className="compare-selector-label">
-                    SELECTED HERBS (
+                    {t("compareSelectorLabel")} (
                     {selectedHerbs.length}/
                     {MAX_COMPARE_HERBS}
                     )
@@ -390,7 +480,7 @@ function ComparePage() {
 
                     {selectedHerbs.length === 0 && (
                       <span className="no-selected-herbs">
-                        No herbs selected
+                        {t("compareNoSelected")}
                       </span>
                     )}
 
@@ -403,8 +493,8 @@ function ComparePage() {
                           toggleCompareHerb(herb)
                         }
                       >
-                        {herb.englishName ||
-                          "Unnamed herb"}
+                        {getHerbDisplayName(herb, currentLanguage) ||
+                          t("compareUnnamedHerb")}
 
                         <span>
                           ×
@@ -439,7 +529,7 @@ function ComparePage() {
                       toggleCompareHerb(herb)
                     }
                   >
-                    {herb.englishName ||
+                    {getHerbDisplayName(herb, currentLanguage) ||
                       "Unnamed herb"}
                   </button>
                 ))}
@@ -448,8 +538,7 @@ function ComparePage() {
 
 
               <p className="compare-selector-hint">
-                Select up to 4 herbs. Choose at least 2 herbs
-                to compare.
+                {t("compareSelectorHint")}
               </p>
 
             </section>
@@ -468,12 +557,11 @@ function ComparePage() {
                 </div>
 
                 <h2>
-                  Compare Ayurvedic herbs
+                  {t("compareEmptyTitle")}
                 </h2>
 
                 <p>
-                  Select two or more herbs to compare
-                  their classical properties side by side.
+                  {t("compareEmptyDesc")}
                 </p>
 
                 <button
@@ -481,7 +569,7 @@ function ComparePage() {
                   type="button"
                   onClick={handleAddHerb}
                 >
-                  + Add herb
+                  {t("compareEmptyButton")}
                 </button>
 
               </section>
@@ -500,18 +588,27 @@ function ComparePage() {
                 <div className="compare-selected-preview">
 
                   <div className="comparison-herb-icon">
-                    🍃
+                    {selectedHerbs[0]?.imageUrl || selectedHerbs[0]?.image_url ? (
+                      <img
+                        src={selectedHerbs[0].imageUrl || selectedHerbs[0].image_url}
+                        alt=""
+                        style={{ width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover" }}
+                      />
+                    ) : (
+                      "🍃"
+                    )}
                   </div>
 
                   <div>
 
                     <h2>
-                      {selectedHerbs[0].englishName ||
+                      {getHerbDisplayName(selectedHerbs[0], currentLanguage) ||
                         "Unnamed herb"}
                     </h2>
 
                     <em>
-                      {selectedHerbs[0].botanicalName ||
+                      {getHerbSecondaryName(selectedHerbs[0], currentLanguage) ||
+                        selectedHerbs[0].botanicalName ||
                         "Botanical name unavailable"}
                     </em>
 
@@ -523,12 +620,11 @@ function ComparePage() {
                 <div className="compare-incomplete-message">
 
                   <strong>
-                    Select at least one more herb
+                    {t("compareIncompleteTitle")}
                   </strong>
 
                   <p>
-                    Choose another herb to start the
-                    comparison.
+                    {t("compareIncompleteDesc")}
                   </p>
 
                   <button
@@ -536,7 +632,7 @@ function ComparePage() {
                     type="button"
                     onClick={handleAddHerb}
                   >
-                    + Add herb
+                    {t("compareAddHerb")}
                   </button>
 
                 </div>
@@ -559,7 +655,7 @@ function ComparePage() {
                   <div>
 
                     <p className="comparison-section-label">
-                      SELECTED HERBS
+                      {t("compareSelectorLabel")}
                     </p>
 
                     <h2>
@@ -573,7 +669,7 @@ function ComparePage() {
                     type="button"
                     onClick={clearComparison}
                   >
-                    Clear comparison
+                    {t("compareClearAll")}
                   </button>
 
                 </div>
@@ -627,7 +723,15 @@ function ComparePage() {
                           <div className="comparison-herb-top">
 
                             <div className="comparison-herb-icon">
-                              🍃
+                              {herb.imageUrl || herb.image_url ? (
+                                <img
+                                  src={herb.imageUrl || herb.image_url}
+                                  alt=""
+                                  style={{ width: "38px", height: "38px", borderRadius: "6px", objectFit: "cover" }}
+                                />
+                              ) : (
+                                "🍃"
+                              )}
                             </div>
 
                             <button
@@ -644,12 +748,13 @@ function ComparePage() {
 
 
                           <h2>
-                            {herb.englishName ||
-                              "Unnamed herb"}
+                            {getHerbDisplayName(herb, currentLanguage) ||
+                              t("compareUnnamedHerb")}
                           </h2>
 
                           <em>
-                            {herb.botanicalName ||
+                            {getHerbSecondaryName(herb, currentLanguage) ||
+                              herb.botanicalName ||
                               "Botanical name unavailable"}
                           </em>
 
@@ -676,6 +781,7 @@ function ComparePage() {
 
                         <strong>
                           PART USED
+                          <InfoTooltip contentKey="partUsed" />
                         </strong>
 
                         <span>
@@ -715,6 +821,7 @@ function ComparePage() {
 
                         <strong>
                           RASA
+                          <InfoTooltip contentKey="rasa" />
                         </strong>
 
                         <span>

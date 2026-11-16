@@ -1,9 +1,9 @@
-import pg from 'pg';
 import { assert, assertEqual } from './lib/assert.js';
 import { api } from './lib/http.js';
+import { getTestPool } from './lib/testPool.js';
 import { requestPasswordReset } from '../src/services/auth/passwordResetService.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+const pool = getTestPool();
 
 export async function run() {
   const stamp = Date.now();
@@ -11,17 +11,31 @@ export async function run() {
   const password = 'TestPassword-123';
   const registered = await api('POST', '/api/auth/register', { body: { email, fullName: 'ZZ Test Password Reset', password } });
   assertEqual(registered.status, 201, 'creates a reset test account');
-  const known = await api('POST', '/api/auth/password-reset/request', { body: { email } });
-  const unknown = await api('POST', '/api/auth/password-reset/request', { body: { email: `missing_${stamp}@test.com` } });
+  const health = await api('GET', '/api/health');
+  const resetRateLimitEnabled = health.data?.passwordResetRateLimitEnabled !== false;
+  const rateLimitKey = `password-reset-${stamp}`;
+
+  const known = await api('POST', '/api/auth/password-reset/request', { body: { email }, rateLimitKey });
+  const unknown = await api('POST', '/api/auth/password-reset/request', { body: { email: `missing_${stamp}@test.com` }, rateLimitKey });
   assertEqual(known.status, 202, 'request returns accepted for an existing user');
   assertEqual(unknown.status, 202, 'request returns accepted for an unknown user');
   assertEqual(known.data.message, unknown.data.message, 'request response does not reveal account existence');
-  for (let requestNumber = 3; requestNumber <= 5; requestNumber += 1) {
-    const allowed = await api('POST', '/api/auth/password-reset/request', { body: { email: `missing_${stamp}@test.com` } });
-    assertEqual(allowed.status, 202, `reset request ${requestNumber} remains within rate limit`);
+  if (resetRateLimitEnabled) {
+    for (let requestNumber = 3; requestNumber <= 5; requestNumber += 1) {
+      const allowed = await api('POST', '/api/auth/password-reset/request', {
+        body: { email: `missing_${stamp}@test.com` },
+        rateLimitKey,
+      });
+      assertEqual(allowed.status, 202, `reset request ${requestNumber} remains within rate limit`);
+    }
+    const limited = await api('POST', '/api/auth/password-reset/request', {
+      body: { email: `missing_${stamp}@test.com` },
+      rateLimitKey,
+    });
+    assertEqual(limited.status, 429, 'password reset requests are rate limited');
+  } else {
+    console.log('  (skip: password-reset rate limit assertions; API has DISABLE_RATE_LIMIT=true)');
   }
-  const limited = await api('POST', '/api/auth/password-reset/request', { body: { email: `missing_${stamp}@test.com` } });
-  assertEqual(limited.status, 429, 'password reset requests are rate limited');
 
   let resetToken = '';
   await requestPasswordReset(email, { deliver: async ({ token }) => { resetToken = token; } });

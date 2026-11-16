@@ -8,8 +8,16 @@ import { pool } from '../db/pool.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { z } from 'zod';
 import { logAudit } from '../services/audit/auditService.js';
+import {
+  approveSynonym,
+  getSynonymReviewById,
+  listSynonymReviews,
+  rejectSynonym,
+  proposeSynonym,
+} from '../services/vocabulary/synonymReviewService.js';
 
 const router = express.Router();
+const synonymReviewRoles = requireRole('admin', 'domain_expert');
 
 // Schema for creating custom terms
 const createKarmaSchema = z.object({
@@ -250,6 +258,95 @@ router.post('/:category/:id/merge', authenticate, requireRole('admin'), async (r
     }
   } catch (err) {
     next(err);
+  }
+});
+
+const reviewListSchema = z.object({
+  status: z.enum(['draft', 'approved', 'rejected']).optional().default('draft'),
+  vocabulary: z.enum(['karma', 'indication', 'karma_terms', 'indication_terms']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(25),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
+const proposeSynonymSchema = z.object({
+  vocabulary: z.enum(['karma', 'indication', 'karma_terms', 'indication_terms']),
+  termId: z.coerce.number().int().positive(),
+  languageCode: z.string().min(2).max(10).optional().default('en-IN'),
+  text: z.string().trim().min(1).max(200),
+});
+
+router.post('/synonyms/propose', authenticate, requireRole('editor', 'admin', 'domain_expert'), async (req, res, next) => {
+  try {
+    const body = proposeSynonymSchema.parse(req.body);
+    const result = await proposeSynonym({
+      vocabulary: body.vocabulary,
+      termId: body.termId,
+      languageCode: body.languageCode,
+      text: body.text,
+      userId: req.user.id,
+    });
+    if (result.error === 'unsupported_vocabulary' || result.error === 'invalid_text') {
+      return res.status(400).json({ error: 'Invalid synonym proposal' });
+    }
+    if (result.error === 'missing_term') return res.status(404).json({ error: 'Vocabulary term not found' });
+    if (result.error === 'duplicate') {
+      return res.status(409).json({ error: 'This synonym already exists for the term' });
+    }
+    res.status(201).json(result.item);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/synonyms/review', authenticate, synonymReviewRoles, async (req, res, next) => {
+  try {
+    const query = reviewListSchema.parse(req.query);
+    const result = await listSynonymReviews(query);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/synonyms/review/:id', authenticate, synonymReviewRoles, async (req, res, next) => {
+  try {
+    const id = z.coerce.number().int().positive().parse(req.params.id);
+    const item = await getSynonymReviewById(id);
+    if (!item) return res.status(404).json({ error: 'Synonym mapping not found' });
+    res.json(item);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/synonyms/review/:id/approve', authenticate, synonymReviewRoles, async (req, res, next) => {
+  try {
+    const id = z.coerce.number().int().positive().parse(req.params.id);
+    const result = await approveSynonym(id, req.user.id);
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Synonym mapping not found' });
+    if (result.error === 'conflict') return res.status(409).json({ error: 'Synonym mapping was already reviewed' });
+    if (result.error === 'missing_term' || result.error === 'unsupported_vocabulary') {
+      return res.status(400).json({ error: 'Synonym mapping references invalid vocabulary data' });
+    }
+    res.json(result.item);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/synonyms/review/:id/reject', authenticate, synonymReviewRoles, async (req, res, next) => {
+  try {
+    const id = z.coerce.number().int().positive().parse(req.params.id);
+    const body = z.object({ reason: z.string().max(500).optional() }).parse(req.body || {});
+    const result = await rejectSynonym(id, req.user.id, body.reason);
+    if (result.error === 'not_found') return res.status(404).json({ error: 'Synonym mapping not found' });
+    if (result.error === 'conflict') return res.status(409).json({ error: 'Synonym mapping was already reviewed' });
+    if (result.error === 'missing_term' || result.error === 'unsupported_vocabulary') {
+      return res.status(400).json({ error: 'Synonym mapping references invalid vocabulary data' });
+    }
+    res.json(result.item);
+  } catch (error) {
+    next(error);
   }
 });
 

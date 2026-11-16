@@ -7,6 +7,27 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
 );
 const USE_API = import.meta.env.VITE_USE_API === 'true';
 
+/** Resolved API base URL (from VITE_API_BASE_URL or dev/prod fallback). */
+export function getApiBaseUrl() {
+  return API_BASE_URL;
+}
+
+/** Routes that may load before login; do not hard-redirect to /auth on 401. */
+const PUBLIC_AUTH_OPTIONAL_PATHS = new Set([
+  '/',
+  '/auth',
+  '/password-reset',
+  '/upgrade',
+  '/payment',
+  '/learn-more',
+]);
+
+export function shouldRedirectToAuthOn401(pathname = '') {
+  const base = String(pathname || '').split('?')[0] || '';
+  if (base === '/auth') return false;
+  return !PUBLIC_AUTH_OPTIONAL_PATHS.has(base);
+}
+
 export function formatApiNetworkError(baseURL, error, pageOrigin = globalThis.location?.origin || '') {
   let safeBaseURL = String(baseURL || '');
   try {
@@ -31,7 +52,7 @@ export function formatApiNetworkError(baseURL, error, pageOrigin = globalThis.lo
   const hint = crossOrigin
     ? `This may be a network failure or a CORS block for ${pageOrigin}; confirm that origin is in FRONTEND_ORIGIN.`
     : 'Check that the backend is running and reachable.';
-  return `API unreachable: No response from ${safeBaseURL} (${detail}). ${hint}`;
+  return `Unable to connect to the server. ${hint} Please try again.`;
 }
 
 class ApiClient {
@@ -50,7 +71,13 @@ class ApiClient {
   }
 
   getToken() {
-    return this.token || localStorage.getItem('auth_token');
+    const stored = localStorage.getItem('auth_token');
+    if (!stored) {
+      this.token = null;
+      return null;
+    }
+    this.token = stored;
+    return stored;
   }
 
   clearToken() {
@@ -94,13 +121,30 @@ class ApiClient {
       if (response.status === 401) {
         this.clearToken();
         localStorage.removeItem('user');
-        if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+        if (
+          typeof window !== 'undefined' &&
+          shouldRedirectToAuthOn401(window.location.pathname)
+        ) {
           window.location.assign('/auth');
         }
       }
 
       console.error('API client error response:', errorData);
-      const message = errorData.error || errorData.message || `Request failed with status ${response.status}`;
+      let message = errorData.error || errorData.message;
+      if (!message && errorData.database === 'unavailable') {
+        message = 'Database service is currently unavailable. Please verify the database connection.';
+      }
+      if (!message) {
+        if (response.status === 503) {
+          message = 'Service temporarily unavailable. Please try again later.';
+        } else if (response.status === 502) {
+          message = 'Bad gateway. The server could not be reached.';
+        } else if (response.status === 504) {
+          message = 'Gateway timeout. The server took too long to respond.';
+        } else {
+          message = `Request failed with status ${response.status}`;
+        }
+      }
       const apiError = new Error(message);
       apiError.status = response.status;
       if (errorData.details) {

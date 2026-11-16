@@ -3,10 +3,10 @@
  * Deterministic on any DB size: baseline → +0 (draft) → +1 (reviewed) → +1 (verified) → baseline (archive).
  * Optional fixed baseline when ACCEPTANCE_BASELINE_TIKTA_DEEPANA=55 (approved dev dataset).
  */
-import pg from 'pg';
 import { assert, assertEqual } from './lib/assert.js';
 import { api } from './lib/http.js';
 import { devPassword, getTokens } from './lib/session.js';
+import { getTestPool } from './lib/testPool.js';
 
 const FILTERS = { rasa: ['Tikta'], karma: ['Deepana'] };
 
@@ -78,11 +78,7 @@ export async function run() {
   const afterArchive = countPerfectMatches(await detailedSearch(clinicianToken));
   assertEqual(afterArchive, baselineCount, 'archived herb removed from clinician 100% set');
 
-  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-  try {
-    const { rowCount } = await pool.query('DELETE FROM herbs WHERE code = $1', [code]);
-    assert(rowCount <= 1, 'acceptance cleanup');
-  } finally {
-    await pool.end();
-  }
+  const pool = getTestPool();
+  const { rowCount } = await pool.query('DELETE FROM herbs WHERE code = $1', [code]);
+  assert(rowCount <= 1, 'acceptance cleanup');
 }

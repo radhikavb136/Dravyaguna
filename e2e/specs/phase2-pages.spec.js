@@ -9,8 +9,20 @@ import {
   verifyHerb,
 } from '../helpers/api.js';
 import { attachPageDiagnostics, loginViaUi } from '../helpers/ui.js';
+import {
+  ACCESS_DENIED,
+  ADD_HERB_TITLE,
+  ANALYTICS_TITLE,
+  AUDIT_TITLE,
+  COMPARE_TITLE,
+  FAVORITES_TITLE,
+  MANAGE_HERBS_TITLE,
+  SCORING_TITLE,
+  USERS_TITLE,
+  VOCABULARY_TITLE,
+} from '../helpers/i18nMatchers.js';
 
-const apiURL = process.env.E2E_API_URL || 'http://localhost:4000';
+const apiURL = process.env.E2E_API_URL || 'http://localhost:4010';
 const expectedDbHost = process.env.E2E_EXPECT_DB_HOST || '127.0.0.1:54334';
 
 test.beforeAll(async () => {
@@ -58,32 +70,32 @@ test.describe('Phase 2 — page access by role', () => {
     await loginViaUi(page, 'admin');
 
     await page.goto('/admin/scoring');
-    await expect(page.getByRole('heading', { name: 'Scoring Configuration' })).toBeVisible();
-    await expect(page.getByText(/Live example/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: SCORING_TITLE })).toBeVisible();
+    await expect(page.getByText(/Live example|उदाहरण|उदाहरणात/i)).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/manage-herbs');
-    await expect(page.getByRole('heading', { name: 'Manage Herbs' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: MANAGE_HERBS_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/add-herb');
-    await expect(page.getByRole('heading', { name: 'Add New Herb' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: ADD_HERB_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/vocabulary');
-    await expect(page.getByRole('heading', { name: 'Vocabulary Management' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: VOCABULARY_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/search-analytics');
-    await expect(page.getByRole('heading', { name: /Understand how the herb/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: ANALYTICS_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/users');
-    await expect(page.getByRole('heading', { name: /User & Role Management/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: USERS_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/audit-log');
-    await expect(page.getByRole('heading', { name: 'Audit Log' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: AUDIT_TITLE })).toBeVisible();
     diag.assertClean();
   });
 
@@ -92,25 +104,25 @@ test.describe('Phase 2 — page access by role', () => {
     await loginViaUi(page, 'editor');
 
     await page.goto('/admin/manage-herbs');
-    await expect(page.getByRole('heading', { name: 'Manage Herbs' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: MANAGE_HERBS_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/add-herb');
-    await expect(page.getByRole('heading', { name: 'Add New Herb' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: ADD_HERB_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/vocabulary');
-    await expect(page.getByRole('heading', { name: 'Vocabulary Management' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: VOCABULARY_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/scoring');
-    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: ACCESS_DENIED })).toBeVisible();
 
     await page.goto('/admin/users');
-    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: ACCESS_DENIED })).toBeVisible();
 
     await page.goto('/admin/audit-log');
-    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: ACCESS_DENIED })).toBeVisible();
   });
 
   test('domain expert: scoring, analytics, herbs; denied users', async ({ page }) => {
@@ -118,19 +130,19 @@ test.describe('Phase 2 — page access by role', () => {
     await loginViaUi(page, 'expert');
 
     await page.goto('/admin/scoring');
-    await expect(page.getByRole('heading', { name: 'Scoring Configuration' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: SCORING_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/search-analytics');
-    await expect(page.getByRole('heading', { name: /Understand how the herb/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: ANALYTICS_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/manage-herbs');
-    await expect(page.getByRole('heading', { name: 'Manage Herbs' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: MANAGE_HERBS_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/users');
-    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: ACCESS_DENIED })).toBeVisible();
   });
 
   test('clinician: favorites and compare; denied admin users', async ({ page }) => {
@@ -143,14 +155,14 @@ test.describe('Phase 2 — page access by role', () => {
     expect(herbId).toBeTruthy();
 
     await page.goto('/favorites');
-    await expect(page.getByRole('heading', { level: 1, name: 'Your saved library' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: FAVORITES_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.evaluate((id) => {
       localStorage.setItem('selectedCompareHerbs', JSON.stringify([id]));
     }, herbId);
     await page.goto('/compare');
-    await expect(page.getByRole('heading', { name: /Compare herbs/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: COMPARE_TITLE })).toBeVisible();
     diag.assertClean();
 
     await page.goto('/admin/users');

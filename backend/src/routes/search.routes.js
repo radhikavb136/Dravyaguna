@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { rateLimitClientKey } from '../middleware/rateLimitKey.js';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import {
@@ -56,8 +57,12 @@ export const searchRouter = Router();
 
 const queryTranslationLimiter = rateLimit({
   windowMs: 60_000,
-  limit: 30,
-  keyGenerator: (req) => req.user.id,
+  limit: process.env.NODE_ENV === 'test' ? 500 : 30,
+  keyGenerator: (req) => {
+    const testKey = rateLimitClientKey(req);
+    if (testKey && testKey !== req.ip) return testKey;
+    return req.user?.id || req.ip;
+  },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, res) => res.status(429).json({ error: 'Search translation rate limit exceeded. Try again shortly.' }),

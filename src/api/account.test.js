@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { TEST_API_BASE_URL } from "./testApiBase.js"
 
 describe("account API persistence contract", () => {
   beforeEach(() => {
     vi.resetModules()
     vi.stubEnv("VITE_USE_API", "true")
+    vi.stubEnv("VITE_API_BASE_URL", TEST_API_BASE_URL)
     localStorage.clear()
     globalThis.fetch = vi.fn()
   })
@@ -17,7 +19,7 @@ describe("account API persistence contract", () => {
     const { getAccount } = await import("./account.js")
     await expect(getAccount()).resolves.toEqual({ id: "user-1", full_name: "Ayurveda User" })
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "http://localhost:4000/api/account",
+      `${TEST_API_BASE_URL}/api/account`,
       expect.objectContaining({ method: "GET" })
     )
   })
@@ -37,7 +39,7 @@ describe("account API persistence contract", () => {
     await expect(updateAccountPreferences(preferences)).resolves.toEqual({ language: "en", result_page_size: 50 })
     expect(globalThis.fetch).toHaveBeenNthCalledWith(
       1,
-      "http://localhost:4000/api/account/preferences",
+      `${TEST_API_BASE_URL}/api/account/preferences`,
       expect.objectContaining({ method: "PATCH", body: JSON.stringify(preferences) })
     )
     await expect(updateAccountPreferences({ resultPageSize: 999 })).rejects.toThrow("Unsupported result page size")

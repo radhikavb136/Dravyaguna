@@ -3,10 +3,16 @@ import { useNavigate } from "react-router-dom"
 import { getFavorites, removeFavorite as removeFavoriteApi, getSavedSearches, removeSavedSearch } from "../api/favorites"
 import { getHerbById } from "../api/herbs"
 import DashboardNavbar from "../components/DashboardNavbar"
+import PageBack from "../components/PageBack"
 import Sidebar from "../components/Sidebar"
+import { localizeApiError } from "../i18n/localizeApiError"
+import { useCurrentLanguage, useUiText } from "../i18n/useUiText"
+import { getHerbDisplayName, getHerbSecondaryName } from "../utils/herbName"
 import "../styles/FavoritesPage.css"
 
 function FavoritesPage() {
+  const t = useUiText()
+  const currentLanguage = useCurrentLanguage()
   const navigate = useNavigate()
 
   const [savedHerbs, setSavedHerbs] = useState([])
@@ -21,11 +27,6 @@ function FavoritesPage() {
   // LOAD SAVED HERBS
   // =========================================================
 
-  useEffect(() => {
-    loadFavorites()
-    loadSavedSearches()
-  }, [])
-
   const loadSavedSearches = async () => {
     if (import.meta.env.VITE_USE_API !== 'true') return
     setSearchesLoading(true)
@@ -34,7 +35,7 @@ function FavoritesPage() {
       const response = await getSavedSearches()
       setSavedSearches(response.data || [])
     } catch (err) {
-      setSearchesError(err.message || "Unable to load saved searches")
+      setSearchesError(localizeApiError(t, err.message || t("favoritesSearchesLoadError")))
     } finally {
       setSearchesLoading(false)
     }
@@ -50,12 +51,12 @@ function FavoritesPage() {
       if (useApi) {
         const response = await getFavorites()
         // Convert backend favorites to frontend format
-        const herbs = await Promise.all(
-          response.data.map(async (fav) => {
-            const herb = await getHerbById(fav.herb_id)
-            return herb
-          })
+        const results = await Promise.allSettled(
+          (response.data || []).map((fav) => getHerbById(fav.herb_id))
         )
+        const herbs = results
+          .filter((r) => r.status === "fulfilled" && r.value)
+          .map((r) => r.value)
         setSavedHerbs(herbs)
       } else {
         // Fallback to localStorage for mock data
@@ -78,12 +79,17 @@ function FavoritesPage() {
       }
     } catch (err) {
       console.error('Failed to load favorites:', err)
-      setError(err.message || 'Failed to load favorites')
+      setError(localizeApiError(t, err.message || t("favoritesLoadError")))
       setSavedHerbs([])
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadFavorites()
+    loadSavedSearches()
+  }, [])
 
   // =========================================================
   // REMOVE HERB FROM FAVORITES
@@ -110,7 +116,7 @@ function FavoritesPage() {
       }
     } catch (err) {
       console.error('Failed to remove favorite:', err)
-      setError(err.message || 'Failed to remove favorite')
+      setError(localizeApiError(t, err.message || t("favoritesRemoveError")))
     }
   }
 
@@ -119,7 +125,7 @@ function FavoritesPage() {
       await removeSavedSearch(id)
       setSavedSearches((previous) => previous.filter((item) => item.id !== id))
     } catch (err) {
-      setSearchesError(err.message || "Unable to remove saved search")
+      setSearchesError(localizeApiError(t, err.message || t("favoritesRemoveSearchError")))
     }
   }
 
@@ -198,6 +204,7 @@ function FavoritesPage() {
 
   const getHerbName = (herb) => {
     return (
+      getHerbDisplayName(herb, currentLanguage) ||
       herb.englishName ||
       herb.name ||
       "Unnamed herb"
@@ -210,6 +217,7 @@ function FavoritesPage() {
 
   const getBotanicalName = (herb) => {
     return (
+      getHerbSecondaryName(herb, currentLanguage) ||
       herb.botanicalName ||
       herb.scientificName ||
       "Botanical name unavailable"
@@ -217,7 +225,7 @@ function FavoritesPage() {
   }
 
   if (loading) {
-    return <p role="status">Loading favorites...</p>
+    return <p role="status">{t("favoritesLoading")}</p>
   }
 
   if (error) {
@@ -245,6 +253,7 @@ function FavoritesPage() {
                 ================================================= */}
 
             <section className="favorites-header">
+              <PageBack fallback="/doctor" />
 
               <div>
 
@@ -253,7 +262,7 @@ function FavoritesPage() {
                 </p>
 
                 <h1>
-                  Your saved library
+                  {t("favoritesTitle")}
                 </h1>
 
               </div>
@@ -287,7 +296,7 @@ function FavoritesPage() {
                 type="button"
                 onClick={() => setActiveTab("herbs")}
               >
-                Herbs
+                {t("favoritesTabHerbs")}
               </button>
 
               <button
@@ -295,7 +304,7 @@ function FavoritesPage() {
                 type="button"
                 onClick={() => setActiveTab("searches")}
               >
-                Searches
+                {t("favoritesTabSearches")}
               </button>
 
             </div>
@@ -304,8 +313,8 @@ function FavoritesPage() {
             {searchesError && activeTab === "searches" && <p role="alert">{searchesError}</p>}
 
             {activeTab === "searches" ? (
-              searchesLoading ? <p role="status">Loading saved searches...</p> : savedSearches.length === 0 ? (
-                !searchesError && <section className="favorites-empty-state"><h2>No saved searches yet</h2><p>Save a search from its results page to find it here.</p></section>
+              searchesLoading ? <p role="status">{t("favoritesLoadingSearches")}</p> : savedSearches.length === 0 ? (
+                !searchesError && <section className="favorites-empty-state"><h2>{t("favoritesNoSearchesTitle")}</h2><p>{t("favoritesNoSearchesDesc")}</p></section>
               ) : (
                 <section className="saved-herbs-grid">
                   {savedSearches.map((saved) => (
@@ -325,7 +334,7 @@ function FavoritesPage() {
                 EMPTY STATE
                 ================================================= */}
 
-            {loading ? <p role="status">Loading saved herbs...</p> : savedHerbs.length === 0 && !error ? (
+            {loading ? <p role="status">{t("favoritesLoadingHerbs")}</p> : savedHerbs.length === 0 && !error ? (
 
               <section className="favorites-empty-state">
 
@@ -411,7 +420,15 @@ function FavoritesPage() {
                             "#a5b195",
                         }}
                       >
-                        <span>♧</span>
+                        {herb.imageUrl || herb.image_url ? (
+                          <img
+                            src={herb.imageUrl || herb.image_url}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "10px" }}
+                          />
+                        ) : (
+                          <span>♧</span>
+                        )}
                       </div>
 
                       {/* =================================================

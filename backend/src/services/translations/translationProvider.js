@@ -1,4 +1,5 @@
 import { env } from '../../config/env.js';
+import { createSarvamTranslateFn } from './sarvamTranslate.js';
 
 export function createMockTranslationProvider() {
   return {
@@ -7,19 +8,6 @@ export function createMockTranslationProvider() {
       return `[${target} mock translation] ${text}`;
     },
   };
-}
-
-async function translateSarvam(text, source, target) {
-  const response = await fetch('https://api.sarvam.ai/translate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'api-subscription-key': env.sarvamApiKey },
-    body: JSON.stringify({ input: text, source_language_code: source, target_language_code: target, model: 'sarvam-translate:v1' }),
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!response.ok) throw new Error(`Sarvam translation failed (${response.status})`);
-  const data = await response.json();
-  if (!data.translated_text) throw new Error('Sarvam returned no translated text');
-  return data.translated_text;
 }
 
 async function translateGoogle(text, source, target) {
@@ -54,12 +42,14 @@ async function translateAzure(text, source, target) {
   return translated;
 }
 
-export function createTranslationProvider() {
+export function createTranslationProvider(options = {}) {
   // Automated tests must not make billable provider requests, even if developer
   // credentials happen to be present in the process environment.
-  if (env.nodeEnv === 'test') return createMockTranslationProvider();
+  if (env.nodeEnv === 'test' && !options.allowLiveInTest) return createMockTranslationProvider();
+
+  const sarvamKey = options.sarvamApiKey ?? env.sarvamApiKey;
   const providers = [];
-  if (env.sarvamApiKey) providers.push(['sarvam', translateSarvam]);
+  if (sarvamKey) providers.push(['sarvam', createSarvamTranslateFn({ apiKey: sarvamKey, fetchImpl: options.fetchImpl })]);
   if (env.googleTranslateApiKey) providers.push(['google', translateGoogle]);
   if (env.azureTranslatorKey && env.azureTranslatorRegion) providers.push(['azure', translateAzure]);
   if (!providers.length) return createMockTranslationProvider();
